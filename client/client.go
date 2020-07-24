@@ -4,31 +4,53 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"github.com/newrelic/lambda-extension/api"
 	"io/ioutil"
 	"net/http"
 	"os"
-	"github.com/newrelic/lambda-extension/api"
+	"path/filepath"
 )
 
-
 type InvocationClient struct {
-	version      string
-	base_url     string
-	http_client  http.Client
-	extension_id string
+	version     string
+	baseUrl     string
+	httpClient  http.Client
+	extensionId string
 }
-
 
 type RegistrationClient struct {
-	extension_name string
-	version        string
-	base_url       string
-	http_client    http.Client
+	extensionName string
+	version       string
+	baseUrl       string
+	httpClient    http.Client
 }
 
+func New(httpClient http.Client) RegistrationClient {
+	exeName := filepath.Base(os.Args[0])
 
-func registerRequest(rc RegistrationClient) (*http.Response, error) {
-	e := []string{api.INVOKE, api.SHUTDOWN}
+	return RegistrationClient{
+		extensionName: exeName,
+		version:       api.Version,
+		baseUrl:       os.Getenv(api.AwsLambdaRuntimeApi),
+		httpClient:    httpClient,
+	}
+}
+
+func (rc *RegistrationClient) RegisterDefault() (InvocationClient, error) {
+	res, err := rc.registerRequest()
+	if err != nil {
+		return InvocationClient{}, err
+	}
+	id, exists := res.Header["Lambda-Extension-Identifier"]
+	if exists {
+		return InvocationClient{rc.version, rc.baseUrl, rc.httpClient, id[0]}, nil
+	} else {
+		return InvocationClient{}, fmt.Errorf("missing extension identifier")
+	}
+}
+
+func (rc *RegistrationClient) registerRequest() (*http.Response, error) {
+	e := []string{api.Invoke, api.Shutdown}
 	rr := api.RegistrationRequest{Events: e, ConfigurationKeys: nil}
 
 	b, err := json.Marshal(rr)
@@ -37,81 +59,46 @@ func registerRequest(rc RegistrationClient) (*http.Response, error) {
 		return nil, fmt.Errorf("error occurred while marshaling registration request %s", err)
 	}
 
-	register_url := fmt.Sprintf("http://%s/%s/extension/register", rc.base_url, rc.version)
-	req, err := http.NewRequest("POST", register_url, bytes.NewBuffer(b))
+	registerUrl := fmt.Sprintf("http://%s/%s/extension/register", rc.baseUrl, rc.version)
+	req, err := http.NewRequest("POST", registerUrl, bytes.NewBuffer(b))
 	if err != nil {
 		return nil, fmt.Errorf("error occurred while creating registration request %s", err)
 	}
-	req.Header.Set("Lambda-Extension-Name", rc.extension_name)
-	res, err := rc.http_client.Do(req)
+	req.Header.Set("Lambda-Extension-Name", rc.extensionName)
+	res, err := rc.httpClient.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("error occurred while making registration request %s", err)
 	}
+	//noinspection GoUnhandledErrorResult
+	defer res.Body.Close()
 
-	res.Body.Close()
 	return res, nil
 }
 
-func NextEvent(ic InvocationClient) error {
-	next_event_url := fmt.Sprintf("http://%s/%s/extension/event/next", ic.base_url, ic.version)
-	req, err := http.NewRequest("GET", next_event_url, nil)
+func (ic *InvocationClient) NextEvent() (*api.InvocationEvent, error) {
+	nextEventUrl := fmt.Sprintf("http://%s/%s/extension/event/next", ic.baseUrl, ic.version)
+	req, err := http.NewRequest("GET", nextEventUrl, nil)
 	if err != nil {
-		return fmt.Errorf("error occurred when creating next request %s", err)
+		return nil, fmt.Errorf("error occurred when creating next request %s", err)
 	}
-	req.Header.Set("Lambda-Extension-Identifier", ic.extension_id)
+	req.Header.Set("Lambda-Extension-Identifier", ic.extensionId)
 
-	res, err := ic.http_client.Do(req)
+	res, err := ic.httpClient.Do(req)
 	if err != nil {
-		return fmt.Errorf("error occurred when calling extension/event/next %s", err)
+		return nil, fmt.Errorf("error occurred when calling extension/event/next %s", err)
 	}
+	//noinspection GoUnhandledErrorResult
+	defer res.Body.Close()
 	body, err := ioutil.ReadAll(res.Body)
 	if err != nil {
-		return fmt.Errorf("error occurred while reading extension/event/next response body %s", err)
+		return nil, fmt.Errorf("error occurred while reading extension/event/next response body %s", err)
 	}
 
 	event := api.InvocationEvent{}
 	err = json.Unmarshal(body, &event)
 	if err != nil {
-		return fmt.Errorf("error occurred while unmarshaling extension/event/next response body %s", err)
+		return nil, fmt.Errorf("error occurred while unmarshaling extension/event/next response body %s", err)
 	}
 
-	if event.EventType == api.INVOKE {
-		invokeRequest(event)
-	}
-	if event.EventType == api.SHUTDOWN {
-		shutdownRequest(event)
-	}
-
-	res.Body.Close()
-	return nil
-}
-
-func invokeRequest(event api.InvocationEvent) {
-	// do things with invoke event...
-	b, _ := json.Marshal(event)
-	fmt.Println(string(b))
-}
-
-func shutdownRequest(event api.InvocationEvent) {
-	// do things with shutdown event...
-	b, _ := json.Marshal(event)
-	fmt.Println(string(b))
-}
-
-func RegisterDefault(client http.Client) (ic InvocationClient, err error) {
-	rc := RegistrationClient{
-		extension_name: "extension_golang",
-		version:        api.VERSION,
-		base_url:       os.Getenv(api.AWS_LAMBDA_RUNTIME_API),
-		http_client:    client,
-	}
-	res, err := registerRequest(rc)
-	if err != nil {
-		return InvocationClient{}, err
-	}
-	id, exists := res.Header["Lambda-Extension-Identifier"]
-	if exists {
-		ic = InvocationClient{rc.version, rc.base_url, rc.http_client, id[0]}
-	}
-	return ic, nil
+	return &event, nil
 }

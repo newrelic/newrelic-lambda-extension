@@ -1,10 +1,10 @@
 package api
 
 const (
-	INVOKE                 = "INVOKE"
-	SHUTDOWN               = "SHUTDOWN"
-	VERSION                = "2020-01-01"
-	AWS_LAMBDA_RUNTIME_API = "AWS_LAMBDA_RUNTIME_API"
+	Invoke              = "INVOKE"
+	Shutdown            = "SHUTDOWN"
+	Version             = "2020-01-01"
+	AwsLambdaRuntimeApi = "AWS_LAMBDA_RUNTIME_API"
 )
 
 type InvocationEvent struct {

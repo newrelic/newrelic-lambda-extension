@@ -2,21 +2,29 @@ package main
 
 import (
 	"encoding/json"
-	"fmt"
 	"github.com/newrelic/lambda-extension/api"
 	"github.com/newrelic/lambda-extension/client"
 	"log"
 	"net/http"
 )
 
+func logAsJson(v interface{}) {
+	indent, err := json.MarshalIndent(v, "", "  ")
+	if err != nil {
+		log.Panic(err)
+	}
+	log.Println(string(indent))
+}
+
 func main() {
-	fmt.Println("Extension starting up")
+	log.Println("Extension starting up")
 
 	registrationClient := client.New(http.Client{})
-	invocationClient, err := registrationClient.RegisterDefault()
+	invocationClient, registrationResponse, err := registrationClient.RegisterDefault()
 	if err != nil {
 		log.Fatal(err)
 	} else {
+		logAsJson(registrationResponse)
 		counter := 0
 		for {
 			counter++
@@ -26,13 +34,12 @@ func main() {
 				log.Fatal(err)
 			}
 
-			jsonStr, _ := json.Marshal(event)
-			fmt.Println(string(jsonStr))
+			logAsJson(event)
 
 			if event.EventType == api.Shutdown {
 				break
 			}
 		}
-		fmt.Printf("Shutting down after %v events\n", counter)
+		log.Printf("Shutting down after %v events\n", counter)
 	}
 }

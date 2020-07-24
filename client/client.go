@@ -1,3 +1,7 @@
+// Package client is a generic client for the AWS Lambda Extension API.
+// The API's lifecycle begins with execution of the extension binary, which is expected to register.
+// The extension then makes blocking requests for the next event. The response to the next event request
+// is either a notification of the next event, or a shutdown notification.
 package client
 
 import (
@@ -11,6 +15,10 @@ import (
 	"path/filepath"
 )
 
+const extensionIdHeader = "Lambda-Extension-Identifier"
+
+// InvocationClient is used to poll for invocation events. It is produced as a result of successful
+// registration. The zero value is not usable.
 type InvocationClient struct {
 	version     string
 	baseUrl     string
@@ -18,6 +26,7 @@ type InvocationClient struct {
 	extensionId string
 }
 
+// RegistrationClient is used to register, and acquire an InvocationClient. The zero value is not usable.
 type RegistrationClient struct {
 	extensionName string
 	version       string
@@ -25,6 +34,7 @@ type RegistrationClient struct {
 	httpClient    http.Client
 }
 
+// Constructs a new RegistrationClient. This is the entry point.
 func New(httpClient http.Client) RegistrationClient {
 	exeName := filepath.Base(os.Args[0])
 
@@ -36,52 +46,64 @@ func New(httpClient http.Client) RegistrationClient {
 	}
 }
 
-func (rc *RegistrationClient) RegisterDefault() (InvocationClient, error) {
-	res, err := rc.registerRequest()
-	if err != nil {
-		return InvocationClient{}, err
-	}
-	id, exists := res.Header["Lambda-Extension-Identifier"]
-	if exists {
-		return InvocationClient{rc.version, rc.baseUrl, rc.httpClient, id[0]}, nil
-	} else {
-		return InvocationClient{}, fmt.Errorf("missing extension identifier")
-	}
+// Register for Invoke and Shutdown events, with no configuration parameters.
+func (rc *RegistrationClient) RegisterDefault() (*InvocationClient, *api.RegistrationResponse, error) {
+	defaultEvents := []string{api.Invoke, api.Shutdown}
+	defaultRequest := api.RegistrationRequest{Events: defaultEvents, ConfigurationKeys: nil}
+	return rc.Register(defaultRequest)
 }
 
-func (rc *RegistrationClient) registerRequest() (*http.Response, error) {
-	e := []string{api.Invoke, api.Shutdown}
-	rr := api.RegistrationRequest{Events: e, ConfigurationKeys: nil}
-
-	b, err := json.Marshal(rr)
-
+// Register, with custom registration.
+func (rc *RegistrationClient) Register(registrationRequest api.RegistrationRequest) (*InvocationClient, *api.RegistrationResponse, error) {
+	registrationRequestJson, err := json.Marshal(registrationRequest)
 	if err != nil {
-		return nil, fmt.Errorf("error occurred while marshaling registration request %s", err)
+		return nil, nil, fmt.Errorf("error occurred while marshaling registration request %s", err)
 	}
 
 	registerUrl := fmt.Sprintf("http://%s/%s/extension/register", rc.baseUrl, rc.version)
-	req, err := http.NewRequest("POST", registerUrl, bytes.NewBuffer(b))
+	req, err := http.NewRequest("POST", registerUrl, bytes.NewBuffer(registrationRequestJson))
 	if err != nil {
-		return nil, fmt.Errorf("error occurred while creating registration request %s", err)
+		return nil, nil, fmt.Errorf("error occurred while creating registration request %s", err)
 	}
+
 	req.Header.Set("Lambda-Extension-Name", rc.extensionName)
 	res, err := rc.httpClient.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("error occurred while making registration request %s", err)
+		return nil, nil, fmt.Errorf("error occurred while making registration request %s", err)
 	}
+
 	//noinspection GoUnhandledErrorResult
 	defer res.Body.Close()
 
-	return res, nil
+	id, exists := res.Header[extensionIdHeader]
+	if exists {
+		invocationClient := InvocationClient{rc.version, rc.baseUrl, rc.httpClient, id[0]}
+		registrationResponse := api.RegistrationResponse{}
+		bodyBytes, err := ioutil.ReadAll(res.Body)
+		if err != nil {
+			return nil, nil, err
+		}
+
+		err = json.Unmarshal(bodyBytes, &registrationResponse)
+		if err != nil {
+			return nil, nil, err
+		}
+
+		return &invocationClient, &registrationResponse, nil
+	} else {
+		return nil, nil, fmt.Errorf("missing extension identifier")
+	}
 }
 
+// NextEvent awaits the next event.
 func (ic *InvocationClient) NextEvent() (*api.InvocationEvent, error) {
 	nextEventUrl := fmt.Sprintf("http://%s/%s/extension/event/next", ic.baseUrl, ic.version)
 	req, err := http.NewRequest("GET", nextEventUrl, nil)
 	if err != nil {
 		return nil, fmt.Errorf("error occurred when creating next request %s", err)
 	}
-	req.Header.Set("Lambda-Extension-Identifier", ic.extensionId)
+
+	req.Header.Set(extensionIdHeader, ic.extensionId)
 
 	res, err := ic.httpClient.Do(req)
 	if err != nil {
@@ -89,6 +111,7 @@ func (ic *InvocationClient) NextEvent() (*api.InvocationEvent, error) {
 	}
 	//noinspection GoUnhandledErrorResult
 	defer res.Body.Close()
+
 	body, err := ioutil.ReadAll(res.Body)
 	if err != nil {
 		return nil, fmt.Errorf("error occurred while reading extension/event/next response body %s", err)

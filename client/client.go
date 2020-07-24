@@ -1,4 +1,4 @@
-package main
+package client
 
 import (
 	"bytes"
@@ -6,26 +6,30 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	"os"
+	"github.com/newrelic/lambda-extension/api"
 )
 
-const (
-	INVOKE                 = "INVOKE"
-	SHUTDOWN               = "SHUTDOWN"
-	VERSION                = "2020-01-01"
-	AWS_LAMBDA_RUNTIME_API = "AWS_LAMBDA_RUNTIME_API"
-)
 
-type InvocationEvent struct {
-	EventType          string            `json:"eventType"`
-	DeadlineMs         int               `json:"deadlineMs"`
-	RequestId          string            `json:"requestId"`
-	InvokedFunctionArn string            `json:"invokedFunctionArn"`
-	Tracing            map[string]string `json:"tracing"`
+type InvocationClient struct {
+	version      string
+	base_url     string
+	http_client  http.Client
+	extension_id string
 }
 
+
+type RegistrationClient struct {
+	extension_name string
+	version        string
+	base_url       string
+	http_client    http.Client
+}
+
+
 func registerRequest(rc RegistrationClient) (*http.Response, error) {
-	e := []string{INVOKE, SHUTDOWN}
-	rr := RegistrationRequest{Events: e, ConfigurationKeys: nil}
+	e := []string{api.INVOKE, api.SHUTDOWN}
+	rr := api.RegistrationRequest{Events: e, ConfigurationKeys: nil}
 
 	b, err := json.Marshal(rr)
 
@@ -48,7 +52,7 @@ func registerRequest(rc RegistrationClient) (*http.Response, error) {
 	return res, nil
 }
 
-func nextEvent(ic InvocationClient) error {
+func NextEvent(ic InvocationClient) error {
 	next_event_url := fmt.Sprintf("http://%s/%s/extension/event/next", ic.base_url, ic.version)
 	req, err := http.NewRequest("GET", next_event_url, nil)
 	if err != nil {
@@ -65,16 +69,16 @@ func nextEvent(ic InvocationClient) error {
 		return fmt.Errorf("error occurred while reading extension/event/next response body %s", err)
 	}
 
-	event := InvocationEvent{}
+	event := api.InvocationEvent{}
 	err = json.Unmarshal(body, &event)
 	if err != nil {
 		return fmt.Errorf("error occurred while unmarshaling extension/event/next response body %s", err)
 	}
 
-	if event.EventType == INVOKE {
+	if event.EventType == api.INVOKE {
 		invokeRequest(event)
 	}
-	if event.EventType == SHUTDOWN {
+	if event.EventType == api.SHUTDOWN {
 		shutdownRequest(event)
 	}
 
@@ -82,14 +86,32 @@ func nextEvent(ic InvocationClient) error {
 	return nil
 }
 
-func invokeRequest(event InvocationEvent) {
+func invokeRequest(event api.InvocationEvent) {
 	// do things with invoke event...
 	b, _ := json.Marshal(event)
 	fmt.Println(string(b))
 }
 
-func shutdownRequest(event InvocationEvent) {
+func shutdownRequest(event api.InvocationEvent) {
 	// do things with shutdown event...
 	b, _ := json.Marshal(event)
 	fmt.Println(string(b))
+}
+
+func RegisterDefault(client http.Client) (ic InvocationClient, err error) {
+	rc := RegistrationClient{
+		extension_name: "extension_golang",
+		version:        api.VERSION,
+		base_url:       os.Getenv(api.AWS_LAMBDA_RUNTIME_API),
+		http_client:    client,
+	}
+	res, err := registerRequest(rc)
+	if err != nil {
+		return InvocationClient{}, err
+	}
+	id, exists := res.Header["Lambda-Extension-Identifier"]
+	if exists {
+		ic = InvocationClient{rc.version, rc.base_url, rc.http_client, id[0]}
+	}
+	return ic, nil
 }

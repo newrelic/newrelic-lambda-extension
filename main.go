@@ -4,24 +4,25 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"github.com/newrelic/lambda-extension/client"
 )
 
 func main() {
+	fmt.Println("Extension starting up")
 
-	client := http.Client{}
+	httpClient := http.Client{}
 	counter := 0
-	ic, err := registerDefault(client)
+	ic, err := client.RegisterDefault(httpClient)
 	if err != nil {
 		log.Fatal(err)
 	}
 
 	for {
 		counter++
-		err := nextEvent(ic)
+		err := client.NextEvent(ic)
 		if err != nil {
 			fmt.Println(err)
 		}
 		fmt.Printf("event number: %v\n", counter)
 	}
-
 }

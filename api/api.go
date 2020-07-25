@@ -10,15 +10,15 @@ const (
 
 type InvocationEvent struct {
 	// Either INVOKE or SHUTDOWN.
-	EventType          string            `json:"eventType"`
+	EventType string `json:"eventType"`
 	// The time at which the event will timeout, as milliseconds since the epoch.
-	DeadlineMs         int64               `json:"deadlineMs"`
+	DeadlineMs int64 `json:"deadlineMs"`
 	// The AWS Request ID, for INVOKE events.
-	RequestId          string            `json:"requestId"`
+	RequestId string `json:"requestId"`
 	// The ARN of the function being invoked, for INVOKE events.
-	InvokedFunctionArn string            `json:"invokedFunctionArn"`
+	InvokedFunctionArn string `json:"invokedFunctionArn"`
 	// XRay trace ID, for INVOKE events.
-	Tracing            map[string]string `json:"tracing"`
+	Tracing map[string]string `json:"tracing"`
 }
 
 type RegistrationRequest struct {

@@ -4,9 +4,15 @@ import (
 	"encoding/json"
 	"github.com/newrelic/lambda-extension/api"
 	"github.com/newrelic/lambda-extension/client"
+	"io/ioutil"
 	"log"
 	"net/http"
+	"os"
+	"syscall"
+	"time"
 )
+
+const telemetryNamedPipePath = "/tmp/newrelic-telemetry"
 
 func logAsJson(v interface{}) {
 	indent, err := json.MarshalIndent(v, "", "  ")
@@ -16,7 +22,38 @@ func logAsJson(v interface{}) {
 	log.Println(string(indent))
 }
 
+func initTelemetryChannel() (chan []byte, error) {
+	_ = os.Remove(telemetryNamedPipePath)
+
+	err := syscall.Mkfifo(telemetryNamedPipePath, 0666)
+	if err != nil {
+		return nil, err
+	}
+
+	telemetryChan := make(chan []byte)
+
+	go func() {
+		// Opening a pipe will block, until the write side has been opened as well
+		telemetryPipe, err := os.OpenFile(telemetryNamedPipePath, os.O_RDONLY, 0)
+		if err != nil {
+			log.Panic("failed to open telemetry pipe", err)
+		}
+
+		for {
+			// If the write side closes, we get an EOF. But that may not be permanent.
+			bytes, err := ioutil.ReadAll(telemetryPipe)
+			if err != nil {
+				log.Panic("failed to read telemetry pipe", err)
+			}
+			telemetryChan <- bytes
+		}
+	}()
+
+	return telemetryChan, nil
+}
+
 func main() {
+	extensionStartup := time.Now()
 	log.Println("Extension starting up")
 
 	registrationClient := client.New(http.Client{})
@@ -25,21 +62,38 @@ func main() {
 		log.Fatal(err)
 	} else {
 		logAsJson(registrationResponse)
+
+		telemetryChan, err := initTelemetryChannel()
+		if err != nil {
+			log.Fatal("telemetry pipe init failed: ", err)
+		}
+
 		counter := 0
 		for {
-			counter++
-
 			event, err := invocationClient.NextEvent()
 			if err != nil {
+				// TODO: extension error API
 				log.Fatal(err)
 			}
+
+			eventStart := time.Now()
+			counter++
 
 			logAsJson(event)
 
 			if event.EventType == api.Shutdown {
 				break
 			}
+
+			telemetryBytes := <-telemetryChan
+			log.Printf("Telemetry: %s", string(telemetryBytes))
+
+			eventEnd := time.Now()
+			log.Printf("Event %v took %vms", counter, eventEnd.Sub(eventStart).Milliseconds())
 		}
 		log.Printf("Shutting down after %v events\n", counter)
 	}
+	shutdownAt := time.Now()
+	ranFor := shutdownAt.Sub(extensionStartup)
+	log.Printf("Extension shutdown after %vms", ranFor.Milliseconds())
 }

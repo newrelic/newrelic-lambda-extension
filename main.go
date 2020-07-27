@@ -47,6 +47,7 @@ func pollForTelemetry() []byte {
 	if err != nil {
 		log.Panic("failed to open telemetry pipe", err)
 	}
+	//noinspection GoUnhandledErrorResult
 	defer telemetryPipe.Close()
 
 	// When the write side closes, we get an EOF.

@@ -1,16 +1,24 @@
 // Package api contains types and constants for interacting with the AWS Lambda Extension API.
 package api
 
+// LifecycleEvent represents lifecycle events that the extension can express interest in
+type LifecycleEvent string
+
 const (
-	Invoke              = "INVOKE"
-	Shutdown            = "SHUTDOWN"
-	Version             = "2020-01-01"
-	AwsLambdaRuntimeApi = "AWS_LAMBDA_RUNTIME_API"
+	Invoke   LifecycleEvent = "INVOKE"
+	Shutdown LifecycleEvent = "SHUTDOWN"
+
+	Version = "2020-01-01"
+
+	LambdaHostPortEnvVar = "AWS_LAMBDA_RUNTIME_API"
+
+	ExtensionNameHeader = "Lambda-Extension-Name"
+	ExtensionIdHeader   = "Lambda-Extension-Identifier"
 )
 
 type InvocationEvent struct {
 	// Either INVOKE or SHUTDOWN.
-	EventType string `json:"eventType"`
+	EventType LifecycleEvent `json:"eventType"`
 	// The time at which the event will timeout, as milliseconds since the epoch.
 	DeadlineMs int64 `json:"deadlineMs"`
 	// The AWS Request ID, for INVOKE events.
@@ -22,8 +30,8 @@ type InvocationEvent struct {
 }
 
 type RegistrationRequest struct {
-	Events            []string `json:"events"`
-	ConfigurationKeys []string `json:"configurationKeys"`
+	Events            []LifecycleEvent `json:"events"`
+	ConfigurationKeys []string         `json:"configurationKeys"`
 }
 
 type RegistrationResponse struct {

@@ -33,23 +33,28 @@ func initTelemetryChannel() (chan []byte, error) {
 	telemetryChan := make(chan []byte)
 
 	go func() {
-		// Opening a pipe will block, until the write side has been opened as well
-		telemetryPipe, err := os.OpenFile(telemetryNamedPipePath, os.O_RDONLY, 0)
-		if err != nil {
-			log.Panic("failed to open telemetry pipe", err)
-		}
-
 		for {
-			// If the write side closes, we get an EOF. But that may not be permanent.
-			bytes, err := ioutil.ReadAll(telemetryPipe)
-			if err != nil {
-				log.Panic("failed to read telemetry pipe", err)
-			}
-			telemetryChan <- bytes
+			telemetryChan <- pollForTelemetry()
 		}
 	}()
 
 	return telemetryChan, nil
+}
+
+func pollForTelemetry() []byte {
+	// Opening a pipe will block, until the write side has been opened as well
+	telemetryPipe, err := os.OpenFile(telemetryNamedPipePath, os.O_RDONLY, 0)
+	if err != nil {
+		log.Panic("failed to open telemetry pipe", err)
+	}
+	defer telemetryPipe.Close()
+
+	// When the write side closes, we get an EOF.
+	bytes, err := ioutil.ReadAll(telemetryPipe)
+	if err != nil {
+		log.Panic("failed to read telemetry pipe", err)
+	}
+	return bytes
 }
 
 func main() {
@@ -85,6 +90,7 @@ func main() {
 			break
 		}
 
+		log.Printf("Awaiting telemetry channel...")
 		telemetryBytes := <-telemetryChan
 		log.Printf("Telemetry: %s", string(telemetryBytes))
 

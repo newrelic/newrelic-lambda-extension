@@ -14,7 +14,7 @@ import (
 
 const telemetryNamedPipePath = "/tmp/newrelic-telemetry"
 
-func logAsJson(v interface{}) {
+func logAsJSON(v interface{}) {
 	indent, err := json.MarshalIndent(v, "", "  ")
 	if err != nil {
 		log.Panic(err)
@@ -60,39 +60,39 @@ func main() {
 	invocationClient, registrationResponse, err := registrationClient.RegisterDefault()
 	if err != nil {
 		log.Fatal(err)
-	} else {
-		logAsJson(registrationResponse)
-
-		telemetryChan, err := initTelemetryChannel()
-		if err != nil {
-			log.Fatal("telemetry pipe init failed: ", err)
-		}
-
-		counter := 0
-		for {
-			event, err := invocationClient.NextEvent()
-			if err != nil {
-				// TODO: extension error API
-				log.Fatal(err)
-			}
-
-			eventStart := time.Now()
-			counter++
-
-			logAsJson(event)
-
-			if event.EventType == api.Shutdown {
-				break
-			}
-
-			telemetryBytes := <-telemetryChan
-			log.Printf("Telemetry: %s", string(telemetryBytes))
-
-			eventEnd := time.Now()
-			log.Printf("Event %v took %vms", counter, eventEnd.Sub(eventStart).Milliseconds())
-		}
-		log.Printf("Shutting down after %v events\n", counter)
 	}
+	logAsJSON(registrationResponse)
+
+	telemetryChan, err := initTelemetryChannel()
+	if err != nil {
+		log.Fatal("telemetry pipe init failed: ", err)
+	}
+
+	counter := 0
+	for {
+		event, err := invocationClient.NextEvent()
+		if err != nil {
+			// TODO: extension error API
+			log.Fatal(err)
+		}
+
+		eventStart := time.Now()
+		counter++
+
+		logAsJSON(event)
+
+		if event.EventType == api.Shutdown {
+			break
+		}
+
+		telemetryBytes := <-telemetryChan
+		log.Printf("Telemetry: %s", string(telemetryBytes))
+
+		eventEnd := time.Now()
+		log.Printf("Event %v took %vms", counter, eventEnd.Sub(eventStart).Milliseconds())
+	}
+	log.Printf("Shutting down after %v events\n", counter)
+
 	shutdownAt := time.Now()
 	ranFor := shutdownAt.Sub(extensionStartup)
 	log.Printf("Extension shutdown after %vms", ranFor.Milliseconds())

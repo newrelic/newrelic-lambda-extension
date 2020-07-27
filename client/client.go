@@ -15,6 +15,7 @@ import (
 	"path/filepath"
 )
 
+const extensionNameHeader = "Lambda-Extension-Name"
 const extensionIdHeader = "Lambda-Extension-Identifier"
 
 // InvocationClient is used to poll for invocation events. It is produced as a result of successful
@@ -66,7 +67,7 @@ func (rc *RegistrationClient) Register(registrationRequest api.RegistrationReque
 		return nil, nil, fmt.Errorf("error occurred while creating registration request %s", err)
 	}
 
-	req.Header.Set("Lambda-Extension-Name", rc.extensionName)
+	req.Header.Set(extensionNameHeader, rc.extensionName)
 	res, err := rc.httpClient.Do(req)
 	if err != nil {
 		return nil, nil, fmt.Errorf("error occurred while making registration request %s", err)

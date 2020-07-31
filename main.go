@@ -2,14 +2,15 @@ package main
 
 import (
 	"encoding/json"
-	"github.com/newrelic/lambda-extension/api"
-	"github.com/newrelic/lambda-extension/client"
 	"io/ioutil"
 	"log"
 	"net/http"
 	"os"
 	"syscall"
 	"time"
+
+	"github.com/newrelic/lambda-extension/api"
+	"github.com/newrelic/lambda-extension/client"
 )
 
 const telemetryNamedPipePath = "/tmp/newrelic-telemetry"

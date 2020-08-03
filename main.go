@@ -71,21 +71,19 @@ func main() {
 	}
 	logAsJSON(registrationResponse)
 
+	_, found := os.LookupEnv("NEW_RELIC_CLOUDWATCH_INGEST")
+	if found {
+		log.Println("Extension telemetry path disabled")
+		noopLoop(invocationClient)
+		return
+	}
+
 	licenseKey, err := credentials.GetNewRelicLicenseKey()
 	if err != nil {
 		log.Println("Failed to retrieve license key", err)
 		// Don't create the telemetry named pipe, just silently pump events
-		for {
-			event, err := invocationClient.NextEvent()
-			if err != nil {
-				// TODO: extension error API
-				log.Fatal(err)
-			}
-
-			if event.EventType == api.Shutdown {
-				return
-			}
-		}
+		noopLoop(invocationClient)
+		return
 	}
 
 	telemetryChan, err := initTelemetryChannel()
@@ -121,6 +119,20 @@ func main() {
 	shutdownAt := time.Now()
 	ranFor := shutdownAt.Sub(extensionStartup)
 	log.Printf("Extension shutdown after %vms", ranFor.Milliseconds())
+}
+
+func noopLoop(invocationClient *client.InvocationClient) {
+	for {
+		event, err := invocationClient.NextEvent()
+		if err != nil {
+			// TODO: extension error API
+			log.Fatal(err)
+		}
+
+		if event.EventType == api.Shutdown {
+			return
+		}
+	}
 }
 
 func sendTelemetry(telemetryBytes []byte, key *string, start time.Time, end time.Time) {

@@ -11,6 +11,7 @@ import (
 
 	"github.com/newrelic/lambda-extension/api"
 	"github.com/newrelic/lambda-extension/client"
+	"github.com/newrelic/lambda-extension/credentials"
 )
 
 const telemetryNamedPipePath = "/tmp/newrelic-telemetry"
@@ -70,6 +71,23 @@ func main() {
 	}
 	logAsJSON(registrationResponse)
 
+	licenseKey, err := credentials.GetNewRelicLicenseKey()
+	if err != nil {
+		log.Println("Failed to retrieve license key", err)
+		// Don't create the telemetry named pipe, just silently pump events
+		for {
+			event, err := invocationClient.NextEvent()
+			if err != nil {
+				// TODO: extension error API
+				log.Fatal(err)
+			}
+
+			if event.EventType == api.Shutdown {
+				return
+			}
+		}
+	}
+
 	telemetryChan, err := initTelemetryChannel()
 	if err != nil {
 		log.Fatal("telemetry pipe init failed: ", err)
@@ -94,14 +112,20 @@ func main() {
 
 		log.Printf("Awaiting telemetry channel...")
 		telemetryBytes := <-telemetryChan
-		log.Printf("Telemetry: %s", string(telemetryBytes))
-
 		eventEnd := time.Now()
-		log.Printf("Event %v took %vms", counter, eventEnd.Sub(eventStart).Milliseconds())
+
+		sendTelemetry(telemetryBytes, licenseKey, eventStart, eventEnd)
 	}
 	log.Printf("Shutting down after %v events\n", counter)
 
 	shutdownAt := time.Now()
 	ranFor := shutdownAt.Sub(extensionStartup)
 	log.Printf("Extension shutdown after %vms", ranFor.Milliseconds())
+}
+
+func sendTelemetry(telemetryBytes []byte, key *string, start time.Time, end time.Time) {
+	// TODO: hook up the request module instead of the debug output
+	log.Printf("Telemetry: %s", string(telemetryBytes))
+	log.Printf("Event took %vms", end.Sub(start).Milliseconds())
+	log.Printf("Would send using license key %v", key)
 }

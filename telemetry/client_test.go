@@ -1,0 +1,53 @@
+package telemetry
+
+import (
+	"encoding/json"
+	"io/ioutil"
+	"net/http"
+	"net/http/httptest"
+	"os"
+	"testing"
+
+	"github.com/newrelic/lambda-extension/api"
+	"github.com/newrelic/lambda-extension/util"
+	"github.com/stretchr/testify/assert"
+)
+
+func TestClientSend(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, r.Method, http.MethodPost)
+
+		assert.Equal(t, r.Header.Get("Content-Encoding"), "gzip")
+		assert.Equal(t, r.Header.Get("Content-Type"), "application/json")
+		assert.Equal(t, r.Header.Get("User-Agent"), "lambda-extension")
+		assert.Equal(t, r.Header.Get("X-License-Key"), "a mock license key")
+
+		reqBytes, err := ioutil.ReadAll(r.Body)
+		assert.NoError(t, err)
+		defer util.Close(r.Body)
+		assert.NotEmpty(t, reqBytes)
+
+		reqBody, err := util.Uncompress(reqBytes)
+		assert.NoError(t, err)
+		assert.NotEmpty(t, reqBody)
+
+		var reqData RequestData
+		assert.NoError(t, json.Unmarshal(reqBody, &reqData))
+		assert.NotEmpty(t, reqData)
+
+		w.WriteHeader(200)
+		w.Write([]byte(""))
+	}))
+
+	defer srv.Close()
+
+	client := NewWithHTTPClient(srv.Client(), &api.RegistrationResponse{}, "a mock license key")
+	os.Setenv("NEWRELIC_INFRA_ENDPOINT", srv.URL)
+	defer os.Unsetenv("NEWRELIC_INFRA_ENDPOINT")
+
+	res, body, err := client.Send(&api.InvocationEvent{}, []byte("foobar"))
+
+	assert.NoError(t, err)
+	assert.Equal(t, res.StatusCode, http.StatusOK)
+	assert.Equal(t, body, "")
+}

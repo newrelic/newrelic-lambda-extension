@@ -71,6 +71,7 @@ func (rc *RegistrationClient) Register(registrationRequest api.RegistrationReque
 	}
 
 	req.Header.Set(api.ExtensionNameHeader, rc.extensionName)
+
 	res, err := rc.httpClient.Do(req)
 	if err != nil {
 		return nil, nil, fmt.Errorf("error occurred while making registration request %s", err)

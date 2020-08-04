@@ -12,6 +12,7 @@ import (
 	"github.com/newrelic/lambda-extension/api"
 	"github.com/newrelic/lambda-extension/client"
 	"github.com/newrelic/lambda-extension/credentials"
+	"github.com/newrelic/lambda-extension/telemetry"
 )
 
 const telemetryNamedPipePath = "/tmp/newrelic-telemetry"
@@ -62,7 +63,7 @@ func pollForTelemetry() []byte {
 
 func main() {
 	extensionStartup := time.Now()
-	log.Println("Extension starting up")
+	log.Println("New Relic Lambda Extension starting up")
 
 	registrationClient := client.New(http.Client{})
 	invocationClient, registrationResponse, err := registrationClient.RegisterDefault()
@@ -85,6 +86,8 @@ func main() {
 		noopLoop(invocationClient)
 		return
 	}
+
+	telemetryClient := telemetry.New(registrationResponse, *licenseKey)
 
 	telemetryChan, err := initTelemetryChannel()
 	if err != nil {
@@ -110,6 +113,14 @@ func main() {
 
 		log.Printf("Awaiting telemetry channel...")
 		telemetryBytes := <-telemetryChan
+		log.Printf("Telemetry: %s", string(telemetryBytes))
+
+		res, body, err := telemetryClient.Send(event, telemetryBytes)
+		if err != nil {
+			log.Printf("Telemetry client error: %s", err)
+		} else {
+			log.Printf("Telemetry client response: [%s] %s", res.Status, body)
+		}
 		eventEnd := time.Now()
 
 		sendTelemetry(telemetryBytes, licenseKey, eventStart, eventEnd)

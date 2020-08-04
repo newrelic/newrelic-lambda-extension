@@ -22,9 +22,9 @@ type InvocationEvent struct {
 	// The time at which the event will timeout, as milliseconds since the epoch.
 	DeadlineMs int64 `json:"deadlineMs"`
 	// The AWS Request ID, for INVOKE events.
-	RequestId string `json:"requestId"`
+	RequestID string `json:"requestId"`
 	// The ARN of the function being invoked, for INVOKE events.
-	InvokedFunctionArn string `json:"invokedFunctionArn"`
+	InvokedFunctionARN string `json:"invokedFunctionArn"`
 	// XRay trace ID, for INVOKE events.
 	Tracing map[string]string `json:"tracing"`
 }

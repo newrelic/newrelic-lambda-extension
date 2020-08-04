@@ -2,10 +2,11 @@ package credentials
 
 import (
 	"encoding/json"
+	"os"
+
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/secretsmanager"
 	"github.com/aws/aws-sdk-go/service/secretsmanager/secretsmanageriface"
-	"os"
 )
 
 type licenseKeySecret struct {

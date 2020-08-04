@@ -1,25 +1,24 @@
 package credentials
 
 import (
+	"os"
+	"testing"
+
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/secretsmanager"
 	"github.com/aws/aws-sdk-go/service/secretsmanager/secretsmanageriface"
-	"os"
-	"testing"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestGetLicenseKeySecretId(t *testing.T) {
-	defaultSecretId := getLicenseKeySecretId()
-	if defaultSecretId != defaultSecretId {
-		t.Error("Unexpected default value")
-	}
+	secretId := getLicenseKeySecretId()
+	assert.Equal(t, defaultSecretId, secretId)
 
 	const testSecretId = "testSecretName"
 	os.Setenv(secretNameEnvVar, testSecretId)
-	customSecretId := getLicenseKeySecretId()
-	if customSecretId != testSecretId {
-		t.Error("Unexpected custom value")
-	}
+	defer os.Unsetenv(secretNameEnvVar)
+	secretId = getLicenseKeySecretId()
+	assert.Equal(t, testSecretId, secretId)
 }
 
 type mockSecretManager struct {
@@ -38,7 +37,5 @@ func TestGetLicenseKeyImpl(t *testing.T) {
 		t.Error("Unexpected error", err)
 	}
 
-	if *lk != "foo" {
-		t.Error("Wrong license key string")
-	}
+	assert.Equal(t, "foo", *lk)
 }

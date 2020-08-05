@@ -11,6 +11,7 @@ import (
 
 	"github.com/newrelic/lambda-extension/api"
 	"github.com/newrelic/lambda-extension/client"
+	"github.com/newrelic/lambda-extension/credentials"
 	"github.com/newrelic/lambda-extension/telemetry"
 )
 
@@ -64,11 +65,6 @@ func main() {
 	extensionStartup := time.Now()
 	log.Println("New Relic Lambda Extension starting up")
 
-	licenseKey := os.Getenv("LICENSE_KEY")
-	if licenseKey == "" {
-		log.Fatal("No LICENSE_KEY environment variable set")
-	}
-
 	registrationClient := client.New(http.Client{})
 	invocationClient, registrationResponse, err := registrationClient.RegisterDefault()
 	if err != nil {
@@ -76,7 +72,22 @@ func main() {
 	}
 	logAsJSON(registrationResponse)
 
-	telemetryClient := telemetry.New(registrationResponse, licenseKey)
+	_, found := os.LookupEnv("NEW_RELIC_CLOUDWATCH_INGEST")
+	if found {
+		log.Println("Extension telemetry path disabled")
+		noopLoop(invocationClient)
+		return
+	}
+
+	licenseKey, err := credentials.GetNewRelicLicenseKey()
+	if err != nil {
+		log.Println("Failed to retrieve license key", err)
+		// Don't create the telemetry named pipe, just silently pump events
+		noopLoop(invocationClient)
+		return
+	}
+
+	telemetryClient := telemetry.New(registrationResponse, *licenseKey)
 
 	telemetryChan, err := initTelemetryChannel()
 	if err != nil {
@@ -91,7 +102,6 @@ func main() {
 			log.Fatal(err)
 		}
 
-		eventStart := time.Now()
 		counter++
 
 		logAsJSON(event)
@@ -110,13 +120,24 @@ func main() {
 		} else {
 			log.Printf("Telemetry client response: [%s] %s", res.Status, body)
 		}
-
-		eventEnd := time.Now()
-		log.Printf("Event %v took %vms", counter, eventEnd.Sub(eventStart).Milliseconds())
 	}
 	log.Printf("Shutting down after %v events\n", counter)
 
 	shutdownAt := time.Now()
 	ranFor := shutdownAt.Sub(extensionStartup)
 	log.Printf("Extension shutdown after %vms", ranFor.Milliseconds())
+}
+
+func noopLoop(invocationClient *client.InvocationClient) {
+	for {
+		event, err := invocationClient.NextEvent()
+		if err != nil {
+			// TODO: extension error API
+			log.Fatal(err)
+		}
+
+		if event.EventType == api.Shutdown {
+			return
+		}
+	}
 }

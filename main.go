@@ -102,7 +102,6 @@ func main() {
 			log.Fatal(err)
 		}
 
-		eventStart := time.Now()
 		counter++
 
 		logAsJSON(event)
@@ -121,9 +120,6 @@ func main() {
 		} else {
 			log.Printf("Telemetry client response: [%s] %s", res.Status, body)
 		}
-		eventEnd := time.Now()
-
-		sendTelemetry(telemetryBytes, licenseKey, eventStart, eventEnd)
 	}
 	log.Printf("Shutting down after %v events\n", counter)
 
@@ -144,11 +140,4 @@ func noopLoop(invocationClient *client.InvocationClient) {
 			return
 		}
 	}
-}
-
-func sendTelemetry(telemetryBytes []byte, key *string, start time.Time, end time.Time) {
-	// TODO: hook up the request module instead of the debug output
-	log.Printf("Telemetry: %s", string(telemetryBytes))
-	log.Printf("Event took %vms", end.Sub(start).Milliseconds())
-	log.Printf("Would send using license key %v", key)
 }

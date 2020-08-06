@@ -13,8 +13,8 @@ import (
 )
 
 const (
-	InfraEndpointEU string = "https://cloud-collector.eu01.nr-data.net/aws/lambda/v1/"
-	InfraEndpointUS string = "https://cloud-collector.newrelic.com/aws/lambda/v1/"
+	InfraEndpointEU string = "https://cloud-collector.eu01.nr-data.net/aws/lambda/v1"
+	InfraEndpointUS string = "https://cloud-collector.newrelic.com/aws/lambda/v1"
 )
 
 type Client struct {

@@ -87,6 +87,8 @@ func main() {
 		return
 	}
 
+	log.Println("Fetched license key from managed secret.")
+
 	telemetryClient := telemetry.New(registrationResponse, *licenseKey)
 
 	telemetryChan, err := initTelemetryChannel()

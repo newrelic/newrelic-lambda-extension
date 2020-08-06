@@ -7,10 +7,15 @@
 
 ### Pulled from extensionsbetashare docs:
 
-3. build the docker container for sample function code. Give it the tag `lambda_ext`.
-4. start up your container.
- 
+3. Build the docker container for sample function code. Give it the tag `lambda_ext`.
+4. Start up your container.
+
+        export AWS_ACCESS_KEY_ID=$(aws configure get aws_access_key_id --profile default)
+        export AWS_SECRET_ACCESS_KEY=$(aws configure get aws_secret_access_key_id --profile default)
+        export AWS_SESSION_TOKEN=$(aws configure get aws_session_token --profile default)
+
         docker run --rm -v $(pwd)/extensions:/opt/extensions -p 9001:8080 \
+            -e AWS_ACCESS_KEY_ID -e AWS_SECRET_ACCESS_KEY -e AWS_SESSION_TOKEN \
             lambda_ext:latest \
             -h function.handler -c '{}' -t 60000
 

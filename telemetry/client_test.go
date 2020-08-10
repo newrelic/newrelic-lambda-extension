@@ -5,7 +5,6 @@ import (
 	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
-	"os"
 	"testing"
 
 	"github.com/newrelic/lambda-extension/api"
@@ -41,9 +40,7 @@ func TestClientSend(t *testing.T) {
 
 	defer srv.Close()
 
-	client := NewWithHTTPClient(srv.Client(), &api.RegistrationResponse{}, "a mock license key")
-	os.Setenv("NEWRELIC_INFRA_ENDPOINT", srv.URL)
-	defer os.Unsetenv("NEWRELIC_INFRA_ENDPOINT")
+	client := NewWithHTTPClient(srv.Client(), "", "a mock license key", &srv.URL)
 
 	res, body, err := client.Send(&api.InvocationEvent{}, []byte("foobar"))
 

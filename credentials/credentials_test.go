@@ -1,7 +1,7 @@
 package credentials
 
 import (
-	"os"
+	"github.com/newrelic/lambda-extension/config"
 	"testing"
 
 	"github.com/aws/aws-sdk-go/aws"
@@ -11,13 +11,12 @@ import (
 )
 
 func TestGetLicenseKeySecretId(t *testing.T) {
-	secretId := getLicenseKeySecretId()
+	secretId := getLicenseKeySecretId(&config.Configuration{})
 	assert.Equal(t, defaultSecretId, secretId)
 
-	const testSecretId = "testSecretName"
-	os.Setenv(secretNameEnvVar, testSecretId)
-	defer os.Unsetenv(secretNameEnvVar)
-	secretId = getLicenseKeySecretId()
+	var testSecretId = "testSecretName"
+	var conf = &config.Configuration{LicenseKeySecretId: &testSecretId}
+	secretId = getLicenseKeySecretId(conf)
 	assert.Equal(t, testSecretId, secretId)
 }
 
@@ -32,7 +31,7 @@ func (mockSecretManager) GetSecretValue(*secretsmanager.GetSecretValueInput) (*s
 }
 
 func TestGetLicenseKeyImpl(t *testing.T) {
-	lk, err := getLicencesKeyImpl(mockSecretManager{})
+	lk, err := getLicencesKeyImpl(mockSecretManager{}, &config.Configuration{})
 	if err != nil {
 		t.Error("Unexpected error", err)
 	}

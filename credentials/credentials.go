@@ -2,7 +2,8 @@ package credentials
 
 import (
 	"encoding/json"
-	"os"
+
+	"github.com/newrelic/lambda-extension/config"
 
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/secretsmanager"
@@ -18,14 +19,12 @@ var sess = session.Must(session.NewSessionWithOptions(session.Options{
 }))
 
 const defaultSecretId = "NEW_RELIC_LICENSE_KEY"
-const secretNameEnvVar = "NEW_RELIC_LICENSE_KEY_SECRET_ID"
 
-func getLicenseKeySecretId() string {
-	secretId, found := os.LookupEnv(secretNameEnvVar)
-	if !found {
-		return defaultSecretId
+func getLicenseKeySecretId(conf *config.Configuration) string {
+	if conf.LicenseKeySecretId != nil {
+		return *conf.LicenseKeySecretId
 	}
-	return secretId
+	return defaultSecretId
 }
 
 func decodeLicenseKey(rawJson *string) (*string, error) {
@@ -39,8 +38,8 @@ func decodeLicenseKey(rawJson *string) (*string, error) {
 	return &secrets.LicenseKey, nil
 }
 
-func getLicencesKeyImpl(secrets secretsmanageriface.SecretsManagerAPI) (*string, error) {
-	secretId := getLicenseKeySecretId()
+func getLicencesKeyImpl(secrets secretsmanageriface.SecretsManagerAPI, conf *config.Configuration) (*string, error) {
+	secretId := getLicenseKeySecretId(conf)
 	secretValueInput := secretsmanager.GetSecretValueInput{SecretId: &secretId}
 
 	secretValueOutput, err := secrets.GetSecretValue(&secretValueInput)
@@ -51,7 +50,11 @@ func getLicencesKeyImpl(secrets secretsmanageriface.SecretsManagerAPI) (*string,
 }
 
 // GetNewRelicLicenseKey fetches the license key from AWS Secrets Manager.
-func GetNewRelicLicenseKey() (*string, error) {
+func GetNewRelicLicenseKey(conf *config.Configuration) (*string, error) {
+	if conf.LicenseKey != nil {
+		return conf.LicenseKey, nil
+	}
+
 	secrets := secretsmanager.New(sess)
-	return getLicencesKeyImpl(secrets)
+	return getLicencesKeyImpl(secrets, conf)
 }

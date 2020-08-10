@@ -1,8 +1,8 @@
 package config
 
 import (
-	"testing"
 	"github.com/stretchr/testify/assert"
+	"testing"
 )
 
 func TestParseRegistrationZero(t *testing.T) {
@@ -25,7 +25,7 @@ func TestParseRegistration(t *testing.T) {
 }
 
 func TestParseRegistrationSecretId(t *testing.T) {
-	conf := ParseRegistration(map[string]string {
+	conf := ParseRegistration(map[string]string{
 		"NEW_RELIC_LICENSE_KEY_SECRET": "secretId",
 	})
 	assert.Equal(t, "secretId", *conf.LicenseKeySecretId)

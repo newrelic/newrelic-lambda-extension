@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
+	"log"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -36,7 +37,11 @@ type RegistrationClient struct {
 
 // Constructs a new RegistrationClient. This is the entry point.
 func New(httpClient http.Client) *RegistrationClient {
-	exeName := filepath.Base(os.Args[0])
+	exePath, err := os.Executable()
+	if err != nil {
+		log.Fatal(err)
+	}
+	exeName := filepath.Base(exePath)
 
 	return &RegistrationClient{
 		extensionName: exeName,
@@ -46,8 +51,8 @@ func New(httpClient http.Client) *RegistrationClient {
 	}
 }
 
-// GetRegisterURL returns the Lambda Extension register URL
-func (rc *RegistrationClient) GetRegisterURL() string {
+// getRegisterURL returns the Lambda Extension register URL
+func (rc *RegistrationClient) getRegisterURL() string {
 	return fmt.Sprintf("http://%s/%s/extension/register", rc.baseUrl, rc.version)
 }
 
@@ -65,7 +70,7 @@ func (rc *RegistrationClient) Register(registrationRequest api.RegistrationReque
 		return nil, nil, fmt.Errorf("error occurred while marshaling registration request %s", err)
 	}
 
-	req, err := http.NewRequest("POST", rc.GetRegisterURL(), bytes.NewBuffer(registrationRequestJson))
+	req, err := http.NewRequest("POST", rc.getRegisterURL(), bytes.NewBuffer(registrationRequestJson))
 	if err != nil {
 		return nil, nil, fmt.Errorf("error occurred while creating registration request %s", err)
 	}
@@ -99,14 +104,14 @@ func (rc *RegistrationClient) Register(registrationRequest api.RegistrationReque
 	return &invocationClient, &registrationResponse, nil
 }
 
-// GetNextEventURL returns the Lambda Extension next event URL
-func (ic *InvocationClient) GetNextEventURL() string {
+// getNextEventURL returns the Lambda Extension next event URL
+func (ic *InvocationClient) getNextEventURL() string {
 	return fmt.Sprintf("http://%s/%s/extension/event/next", ic.baseUrl, ic.version)
 }
 
 // NextEvent awaits the next event.
 func (ic *InvocationClient) NextEvent() (*api.InvocationEvent, error) {
-	req, err := http.NewRequest("GET", ic.GetNextEventURL(), nil)
+	req, err := http.NewRequest("GET", ic.getNextEventURL(), nil)
 	if err != nil {
 		return nil, fmt.Errorf("error occurred when creating next request %s", err)
 	}

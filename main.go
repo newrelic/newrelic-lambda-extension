@@ -28,7 +28,7 @@ func main() {
 
 	registrationClient := client2.New(http.Client{})
 	regReq := api2.RegistrationRequest{
-		Events: []api2.LifecycleEvent{api2.Invoke, api2.Shutdown},
+		Events:            []api2.LifecycleEvent{api2.Invoke, api2.Shutdown},
 		ConfigurationKeys: config.ConfigurationKeys,
 	}
 	invocationClient, registrationResponse, err := registrationClient.Register(regReq)

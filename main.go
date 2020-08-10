@@ -2,15 +2,14 @@ package main
 
 import (
 	"encoding/json"
-	api2 "github.com/newrelic/lambda-extension/lambda/extension/api"
-	client2 "github.com/newrelic/lambda-extension/lambda/extension/client"
 	"log"
 	"net/http"
 	"time"
 
 	"github.com/newrelic/lambda-extension/config"
-
 	"github.com/newrelic/lambda-extension/credentials"
+	"github.com/newrelic/lambda-extension/lambda/extension/api"
+	"github.com/newrelic/lambda-extension/lambda/extension/client"
 	"github.com/newrelic/lambda-extension/telemetry"
 )
 
@@ -26,9 +25,9 @@ func main() {
 	extensionStartup := time.Now()
 	log.Println("New Relic Lambda Extension starting up")
 
-	registrationClient := client2.New(http.Client{})
-	regReq := api2.RegistrationRequest{
-		Events:            []api2.LifecycleEvent{api2.Invoke, api2.Shutdown},
+	registrationClient := client.New(http.Client{})
+	regReq := api.RegistrationRequest{
+		Events:            []api.LifecycleEvent{api.Invoke, api.Shutdown},
 		ConfigurationKeys: config.ConfigurationKeys,
 	}
 	invocationClient, registrationResponse, err := registrationClient.Register(regReq)
@@ -71,7 +70,7 @@ func main() {
 
 		logAsJSON(event)
 
-		if event.EventType == api2.Shutdown {
+		if event.EventType == api.Shutdown {
 			break
 		}
 
@@ -93,7 +92,7 @@ func main() {
 	log.Printf("Extension shutdown after %vms", ranFor.Milliseconds())
 }
 
-func noopLoop(invocationClient *client2.InvocationClient) {
+func noopLoop(invocationClient *client.InvocationClient) {
 	for {
 		event, err := invocationClient.NextEvent()
 		if err != nil {
@@ -101,7 +100,7 @@ func noopLoop(invocationClient *client2.InvocationClient) {
 			log.Fatal(err)
 		}
 
-		if event.EventType == api2.Shutdown {
+		if event.EventType == api.Shutdown {
 			return
 		}
 	}

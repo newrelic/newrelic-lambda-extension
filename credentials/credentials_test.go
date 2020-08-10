@@ -1,8 +1,9 @@
 package credentials
 
 import (
-	"github.com/newrelic/lambda-extension/config"
 	"testing"
+
+	"github.com/newrelic/lambda-extension/config"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/secretsmanager"

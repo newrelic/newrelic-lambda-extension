@@ -2,7 +2,6 @@ package client
 
 import (
 	"encoding/json"
-	"github.com/newrelic/lambda-extension/util"
 	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
@@ -11,6 +10,7 @@ import (
 	"testing"
 
 	"github.com/newrelic/lambda-extension/lambda/extension/api"
+	"github.com/newrelic/lambda-extension/util"
 
 	"github.com/stretchr/testify/assert"
 )

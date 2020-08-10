@@ -1,12 +1,12 @@
 package telemetry
 
 import (
+	api2 "github.com/newrelic/lambda-extension/lambda/extension/api"
 	"io/ioutil"
 	"net/http"
 	"strings"
 	"time"
 
-	"github.com/newrelic/lambda-extension/api"
 	"github.com/newrelic/lambda-extension/util"
 )
 
@@ -51,7 +51,7 @@ func getInfraEndpointURL(licenseKey string, telemetryEndpointOverride *string) s
 }
 
 // Send sends the payload to the Vortex endpoint
-func (c *Client) Send(invocationEvent *api.InvocationEvent, payload []byte) (*http.Response, string, error) {
+func (c *Client) Send(invocationEvent *api2.InvocationEvent, payload []byte) (*http.Response, string, error) {
 	req, err := BuildRequest(payload, invocationEvent, c.functionName, c.licenseKey, c.telemetryEndpoint, "lambda-extension")
 	if err != nil {
 		return nil, "", err

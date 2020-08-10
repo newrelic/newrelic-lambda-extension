@@ -3,9 +3,9 @@ package telemetry
 import (
 	"encoding/json"
 	"fmt"
+	api2 "github.com/newrelic/lambda-extension/lambda/extension/api"
 	"net/http"
 
-	"github.com/newrelic/lambda-extension/api"
 	"github.com/newrelic/lambda-extension/util"
 )
 
@@ -42,7 +42,7 @@ type LogsEvent struct {
 }
 
 // BuildRequest builds a Vortex HTTP request
-func BuildRequest(payload []byte, invocationEvent *api.InvocationEvent, functionName string, licenseKey string, url string, userAgent string) (*http.Request, error) {
+func BuildRequest(payload []byte, invocationEvent *api2.InvocationEvent, functionName string, licenseKey string, url string, userAgent string) (*http.Request, error) {
 	logEvent := LogsEvent{ID: util.UUID(), Message: payload, Timestamp: util.Timestamp()}
 	logEntry := LogsEntry{LogEvents: []LogsEvent{logEvent}}
 

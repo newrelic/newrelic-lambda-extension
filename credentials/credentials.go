@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"os"
 
+	"github.com/newrelic/lambda-extension/config"
+
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/secretsmanager"
 	"github.com/aws/aws-sdk-go/service/secretsmanager/secretsmanageriface"
@@ -17,17 +19,12 @@ var sess = session.Must(session.NewSessionWithOptions(session.Options{
 	SharedConfigState: session.SharedConfigEnable,
 }))
 
-const (
-	defaultSecretId  = "NEW_RELIC_LICENSE_KEY"
-	secretNameEnvVar = "NEW_RELIC_LICENSE_KEY_SECRET_ID"
-)
+const defaultSecretId = "NEW_RELIC_LICENSE_KEY"
 
-func getLicenseKeySecretId() string {
-	secretId, found := os.LookupEnv(secretNameEnvVar)
-	if found {
-		return secretId
+func getLicenseKeySecretId(conf *config.Configuration) string {
+	if conf.LicenseKeySecretId != nil {
+		return *conf.LicenseKeySecretId
 	}
-
 	return defaultSecretId
 }
 
@@ -42,8 +39,8 @@ func decodeLicenseKey(rawJson *string) (*string, error) {
 	return &secrets.LicenseKey, nil
 }
 
-func getLicenseKeyImpl(secrets secretsmanageriface.SecretsManagerAPI) (*string, error) {
-	secretId := getLicenseKeySecretId()
+func getLicenseKeyImpl(secrets secretsmanageriface.SecretsManagerAPI, conf *config.Configuration) (*string, error) {
+	secretId := getLicenseKeySecretId(conf)
 	secretValueInput := secretsmanager.GetSecretValueInput{SecretId: &secretId}
 
 	secretValueOutput, err := secrets.GetSecretValue(&secretValueInput)
@@ -59,9 +56,12 @@ func getLicenseKeyImpl(secrets secretsmanageriface.SecretsManagerAPI) (*string, 
 	return decodeLicenseKey(secretValueOutput.SecretString)
 }
 
-// GetNewRelicLicenseKey fetches the license key from AWS Secrets Manager or fallback to
-// fetching license key from NEW_RELIC_LICENSE_KEY environment variable.
-func GetNewRelicLicenseKey() (*string, error) {
+// GetNewRelicLicenseKey fetches the license key from AWS Secrets Manager.
+func GetNewRelicLicenseKey(conf *config.Configuration) (*string, error) {
+	if conf.LicenseKey != nil {
+		return conf.LicenseKey, nil
+	}
+
 	secrets := secretsmanager.New(sess)
-	return getLicenseKeyImpl(secrets)
+	return getLicenseKeyImpl(secrets, conf)
 }

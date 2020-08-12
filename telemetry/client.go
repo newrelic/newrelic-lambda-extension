@@ -3,12 +3,10 @@ package telemetry
 import (
 	"io/ioutil"
 	"net/http"
-
-	"os"
 	"strings"
 	"time"
 
-	"github.com/newrelic/lambda-extension/api"
+	"github.com/newrelic/lambda-extension/lambda/extension/api"
 	"github.com/newrelic/lambda-extension/util"
 )
 
@@ -18,32 +16,34 @@ const (
 )
 
 type Client struct {
-	httpClient           *http.Client
-	licenseKey           string
-	registrationResponse *api.RegistrationResponse
+	httpClient        *http.Client
+	licenseKey        string
+	telemetryEndpoint string
+	functionName      string
 }
 
 // New creates a telemetry client with sensible defaults
-func New(registrationResponse *api.RegistrationResponse, licenseKey string) *Client {
+func New(functionName string, licenseKey string, telemetryEndpointOverride *string) *Client {
 	httpClient := &http.Client{
 		Timeout: time.Second * 2,
 	}
 
-	return &Client{httpClient, licenseKey, registrationResponse}
+	endpoint := getInfraEndpointURL(licenseKey, telemetryEndpointOverride)
+	return &Client{httpClient, licenseKey, endpoint, functionName}
 }
 
 // NewWithHTTPClient is just like New, but the HTTP client can be voerridden
-func NewWithHTTPClient(httpClient *http.Client, registrationResponse *api.RegistrationResponse, licenseKey string) *Client {
-	return &Client{httpClient, licenseKey, registrationResponse}
+func NewWithHTTPClient(httpClient *http.Client, functionName string, licenseKey string, telemetryEndpointOverride *string) *Client {
+	endpoint := getInfraEndpointURL(licenseKey, telemetryEndpointOverride)
+	return &Client{httpClient, licenseKey, endpoint, functionName}
 }
 
 // GetInfraEndpointURL returns the Vortex endpoint for the provided license key
-func (c *Client) GetInfraEndpointURL() string {
-	endpointOverride := os.Getenv("NEWRELIC_INFRA_ENDPOINT")
-	if endpointOverride != "" {
-		return endpointOverride
+func getInfraEndpointURL(licenseKey string, telemetryEndpointOverride *string) string {
+	if telemetryEndpointOverride != nil {
+		return *telemetryEndpointOverride
 	}
-	if strings.HasPrefix(c.licenseKey, "eu") {
+	if strings.HasPrefix(licenseKey, "eu") {
 		return InfraEndpointEU
 	}
 
@@ -52,7 +52,7 @@ func (c *Client) GetInfraEndpointURL() string {
 
 // Send sends the payload to the Vortex endpoint
 func (c *Client) Send(invocationEvent *api.InvocationEvent, payload []byte) (*http.Response, string, error) {
-	req, err := BuildRequest(payload, invocationEvent, c.registrationResponse, c.licenseKey, c.GetInfraEndpointURL(), "lambda-extension")
+	req, err := BuildRequest(payload, invocationEvent, c.functionName, c.licenseKey, c.telemetryEndpoint, "lambda-extension")
 	if err != nil {
 		return nil, "", err
 	}

@@ -1,9 +1,9 @@
 package credentials
 
 import (
-	"fmt"
-	"os"
 	"testing"
+
+	"github.com/newrelic/lambda-extension/config"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/secretsmanager"
@@ -12,14 +12,12 @@ import (
 )
 
 func TestGetLicenseKeySecretId(t *testing.T) {
-	secretId := getLicenseKeySecretId()
+	secretId := getLicenseKeySecretId(&config.Configuration{})
 	assert.Equal(t, defaultSecretId, secretId)
 
-	const testSecretId = "testSecretName"
-	os.Setenv(secretNameEnvVar, testSecretId)
-	defer os.Unsetenv(secretNameEnvVar)
-
-	secretId = getLicenseKeySecretId()
+	var testSecretId = "testSecretName"
+	var conf = &config.Configuration{LicenseKeySecretId: &testSecretId}
+	secretId = getLicenseKeySecretId(conf)
 	assert.Equal(t, testSecretId, secretId)
 }
 
@@ -34,29 +32,20 @@ func (mockSecretManager) GetSecretValue(*secretsmanager.GetSecretValueInput) (*s
 }
 
 func TestGetLicenseKeyImpl(t *testing.T) {
-	lk, err := getLicenseKeyImpl(mockSecretManager{})
-	assert.NoError(t, err)
+	lk, err := getLicenseKeyImpl(mockSecretManager{}, &config.Configuration{})
+	if err != nil {
+		t.Error("Unexpected error", err)
+	}
+
 	assert.Equal(t, "foo", *lk)
 }
 
-type mockSecretManagerFallback struct {
-	secretsmanageriface.SecretsManagerAPI
-}
+func TestGetNewRelicLicenseKeyConfigValue(t *testing.T) {
+	licenseKey := "test_value"
+	resultKey, err := GetNewRelicLicenseKey(&config.Configuration{
+		LicenseKey: &licenseKey,
+	})
 
-func (mockSecretManagerFallback) GetSecretValue(*secretsmanager.GetSecretValueInput) (*secretsmanager.GetSecretValueOutput, error) {
-	return nil, fmt.Errorf("No secret found")
-}
-
-func TestGetLicenseKeyImplFallback(t *testing.T) {
-	expectedKey := "foobar"
-	os.Setenv(defaultSecretId, expectedKey)
-
-	lk, err := getLicenseKeyImpl(mockSecretManagerFallback{})
-	assert.NoError(t, err)
-	assert.Equal(t, *lk, expectedKey)
-
-	os.Unsetenv(defaultSecretId)
-	lk, err = getLicenseKeyImpl(mockSecretManagerFallback{})
-	assert.Error(t, err)
-	assert.Nil(t, lk)
+	assert.Nil(t, err)
+	assert.Equal(t, licenseKey, *resultKey)
 }

@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/newrelic/lambda-extension/api"
+	"github.com/newrelic/lambda-extension/lambda/extension/api"
 	"github.com/newrelic/lambda-extension/util"
 )
 
@@ -42,7 +42,7 @@ type LogsEvent struct {
 }
 
 // BuildRequest builds a Vortex HTTP request
-func BuildRequest(payload []byte, invocationEvent *api.InvocationEvent, registrationResponse *api.RegistrationResponse, licenseKey string, url string, userAgent string) (*http.Request, error) {
+func BuildRequest(payload []byte, invocationEvent *api.InvocationEvent, functionName string, licenseKey string, url string, userAgent string) (*http.Request, error) {
 	logEvent := LogsEvent{ID: util.UUID(), Message: payload, Timestamp: util.Timestamp()}
 	logEntry := LogsEntry{LogEvents: []LogsEvent{logEvent}}
 
@@ -51,7 +51,7 @@ func BuildRequest(payload []byte, invocationEvent *api.InvocationEvent, registra
 		return nil, err
 	}
 
-	context := RequestContext{FunctionName: registrationResponse.FunctionName, InvokedFunctionARN: invocationEvent.InvokedFunctionARN, LogGroupName: fmt.Sprintf("/aws/lambda/%s", registrationResponse.FunctionName)}
+	context := RequestContext{FunctionName: functionName, InvokedFunctionARN: invocationEvent.InvokedFunctionARN, LogGroupName: fmt.Sprintf("/aws/lambda/%s", functionName)}
 	data := RequestData{Context: context, Entry: entry}
 
 	uncompressed, err := json.Marshal(data)

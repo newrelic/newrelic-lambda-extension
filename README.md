@@ -5,22 +5,31 @@
 [1]: https://circleci.com/gh/newrelic/newrelic-lambda-extension.svg?style=svg
 [2]: https://circleci.com/gh/newrelic/newrelic-lambda-extension
 
-`newrelic-lambda-extension` is TODO: write me
+An AWS Lambda Extension to collect, enhance and transport telemetry to New Relic
+for your AWS Lambda functions with hout
+requiring an external transport such as CloudWatch Logs or Kinesis.
+
+This lightweight AWS Lambda Extension runs alongside your AWS Lambda functions
+and automatically handles the collection and transport of telemetry from
+supported New Relic serverless agents.
 
 
 ## Installation
 
-To install the extension, simply include the layer with your instrumented Lambda function. The current 
-layer ARN is 
-`arn:aws:lambda:us-east-1:466768951184:layer:newrelic-lambda-extension:8`
+To install the extension, simply include the layer with your instrumented
+Lambda function. The current layer ARN can be found [here][3].
 
-TODO: Fix the ARN above
+[3]: https://layers.newrelic-external.com
 
-You'll also need to make the New Relic license key available to the extension. Use the `newrelic-lambda`
-CLI to install the managed secret, and then add the permission for the secret to your Lambda execution role.
+**Note:** This extension is included with all New Relic AWS Lambda layers going forward.
 
+You'll also need to make the New Relic license key available to the extension. Use the [New Relic Lambda CLI][4]
+to install the managed secret, and then add the permission for the secret to your Lambda execution role.
+
+[4]: https://github.com/newrelic/newrelic-lambda-cli
 
 ## Getting Started
+
 >[Simple steps to start working with the software similar to a "Hello World"]
 
 TODO: do we need this section, or is installation enough?

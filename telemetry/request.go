@@ -71,7 +71,6 @@ func BuildRequest(
 	data := RequestData{Context: context, Entry: string(entry)}
 
 	uncompressed, err := json.Marshal(data)
-	fmt.Println("Raw payload:", string(uncompressed))
 	if err != nil {
 		return nil, err
 	}

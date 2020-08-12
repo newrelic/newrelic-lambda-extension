@@ -66,10 +66,7 @@ func main() {
 			break
 		}
 
-		log.Printf("Awaiting telemetry channel...")
 		telemetryBytes := <-telemetryChan
-		log.Printf("Telemetry: %s", string(telemetryBytes))
-
 		res, body, err := telemetryClient.Send(event, telemetryBytes)
 		if err != nil {
 			log.Printf("Telemetry client error: %s", err)

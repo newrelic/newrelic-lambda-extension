@@ -14,14 +14,14 @@ type RequestContext struct {
 	FunctionName       string `json:"function_name"`
 	InvokedFunctionARN string `json:"invoked_function_arn"`
 	// Below are not relevant to Lambda Extensions, but ingest requires these to be present
-	LogGroupName  string `json:"logGroupName"`
-	LogStreamName string `json:"logStreamName"`
+	LogGroupName  string `json:"log_group_name"`
+	LogStreamName string `json:"log_stream_name"`
 }
 
 // RequestData is the body of the Vortex request
 type RequestData struct {
 	Context RequestContext `json:"context"`
-	Entry   []byte         `json:"entry"`
+	Entry   string         `json:"entry"`
 }
 
 // LogsEntry is a CloudWatch Logs entry
@@ -37,22 +37,38 @@ type LogsEntry struct {
 // LogsEvent is a CloudWatch Logs event
 type LogsEvent struct {
 	ID        string `json:"id"`
-	Message   []byte `json:"message"`
+	Message   string `json:"message"`
 	Timestamp int64  `json:"timestamp"`
 }
 
 // BuildRequest builds a Vortex HTTP request
-func BuildRequest(payload []byte, invocationEvent *api.InvocationEvent, functionName string, licenseKey string, url string, userAgent string) (*http.Request, error) {
-	logEvent := LogsEvent{ID: util.UUID(), Message: payload, Timestamp: util.Timestamp()}
-	logEntry := LogsEntry{LogEvents: []LogsEvent{logEvent}}
+func BuildRequest(
+	payload []byte,
+	invocationEvent *api.InvocationEvent,
+	functionName string,
+	licenseKey string,
+	url string,
+	userAgent string,
+) (*http.Request, error) {
+	logEvent := LogsEvent{ID: util.UUID(), Message: string(payload), Timestamp: util.Timestamp()}
+	logGroupName := fmt.Sprintf("/aws/lambda/%s", functionName)
+	logEntry := LogsEntry{
+		LogEvents: []LogsEvent{logEvent},
+		LogGroup:  logGroupName,
+	}
 
 	entry, err := json.Marshal(logEntry)
 	if err != nil {
 		return nil, err
 	}
 
-	context := RequestContext{FunctionName: functionName, InvokedFunctionARN: invocationEvent.InvokedFunctionARN, LogGroupName: fmt.Sprintf("/aws/lambda/%s", functionName)}
-	data := RequestData{Context: context, Entry: entry}
+	context := RequestContext{
+		FunctionName:       functionName,
+		InvokedFunctionARN: invocationEvent.InvokedFunctionARN,
+		LogGroupName:       logGroupName,
+		LogStreamName:      "placeholder",
+	}
+	data := RequestData{Context: context, Entry: string(entry)}
 
 	uncompressed, err := json.Marshal(data)
 	if err != nil {

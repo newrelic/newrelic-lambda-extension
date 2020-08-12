@@ -1,45 +1,87 @@
-# newrelic-lambda-extension
+[![Community Project header](https://github.com/newrelic/opensource-website/raw/master/src/images/categories/Community_Project.png)](https://opensource.newrelic.com/oss-category/#community-project)
 
-## Running instructions
+# newrelic-lambda-extension [TODO: build badges go here when available]
 
-1. Pull down s3 object containing source code for extensionsbetashare.
-2. To build the executable: If running locally `make build`. If deploying to AWS Lambda environment or running Docker container below `make dist`.
+`newrelic-lambda-extension` is TODO: write me
 
-### Pulled from extensionsbetashare docs:
 
-3. Build the docker container for sample function code. Give it the tag `lambda_ext`.
-4. Start up your container.
+## Installation
 
-        # Using AWS Secret Manager
-        export AWS_ACCESS_KEY_ID=$(aws configure get aws_access_key_id --profile default)
-        export AWS_SECRET_ACCESS_KEY=$(aws configure get aws_secret_access_key --profile default)
-        export AWS_SESSION_TOKEN=$(aws configure get aws_session_token --profile default)
+To install the extension, simply include the layer with your instrumented Lambda function. The current 
+layer ARN is 
+`arn:aws:lambda:us-east-1:466768951184:layer:newrelic-lambda-extension:8`
 
-        docker run --rm -v $(pwd)/extensions:/opt/extensions -p 9001:8080 \
-            -e AWS_ACCESS_KEY_ID -e AWS_SECRET_ACCESS_KEY -e AWS_SESSION_TOKEN \
-            lambda_ext:latest \
-            -h function.handler -c '{}' -t 60000
+TODO: Fix the ARN above
 
-        # Setting license key directly
-        export NEW_RELIC_LICENSE_KEY=your-license-key-here
+You'll also need to make the New Relic license key available to the extension. Use the `newrelic-lambda`
+CLI to install the managed secret, and then add the permission for the secret to your Lambda execution role.
 
-        docker run --rm \
-            -v $(pwd)/extensions:/opt/extensions \
-            -p 9001:8080 \
-            -e NEW_RELIC_LICENSE_KEY \
-            lambda_ext:latest \
-            -h function.handler -c '{}' -t 60000
 
-From here you should see log lines indicating that start up and registration was successful.
+## Getting Started
+>[Simple steps to start working with the software similar to a "Hello World"]
 
-5. To invoke the sample lambda run: 
+TODO: do we need this section, or is installation enough?
 
-        curl -XPOST 'http://localhost:9001/2015-03-31/functions/function.handler/invocations' \
-            -d 'invoke-payload'
+## Building
 
-    You should see a counter increment as well as an INVOKE event payload.
+Use the included `Makefile` to compile the extension. 
 
-6. Finally, you can exercise the container shutdown lifecycle event with:
+    make dist
+    
+will create the extension binary in `./extensions/newrelic-lambda-extension`
+
+## Testing
+
+To test locally, acquire the AWS extension test harness first. Then:
+
+TODO: Link to the AWS SDK that has the test harness
+
+1. (Optional) Use the `newrelic-lambda` CLI to create the license key managed secret in your AWS account and region.
+2. Build the docker container for sample function code. Give it the tag `lambda_ext`.
+   - Be sure to include your lambda function in the container.
+3. Start up your container.
+
+   - Using AWS Secret Manager
+   
+            export AWS_ACCESS_KEY_ID=$(aws configure get aws_access_key_id --profile default)
+            export AWS_SECRET_ACCESS_KEY=$(aws configure get aws_secret_access_key --profile default)
+            export AWS_SESSION_TOKEN=$(aws configure get aws_session_token --profile default)
+    
+            docker run --rm -v $(pwd)/extensions:/opt/extensions -p 9001:8080 \
+                -e AWS_ACCESS_KEY_ID -e AWS_SECRET_ACCESS_KEY -e AWS_SESSION_TOKEN \
+                lambda_ext:latest \
+                -h function.handler -c '{}' -t 60000
+
+   - Or, setting the license key directly
+   
+            docker run --rm \
+                -v $(pwd)/extensions:/opt/extensions \
+                -p 9001:8080 \
+                lambda_ext:latest \
+                -h function.handler -c '{"NEW_RELIC_LICENSE_KEY": "your-license-key-here"}' -t 60000
+
+4. To invoke the sample lambda run: 
+   
+       curl -XPOST 'http://localhost:9001/2015-03-31/functions/function.handler/invocations' \
+           -d 'invoke-payload'
+
+5. Finally, you can exercise the container shutdown lifecycle event with:
 
         curl -XPOST 'http://localhost:9001/test/shutdown' \
             -d '{"timeoutMs": 5000 }'
+
+## Support
+
+New Relic hosts and moderates an online forum where customers can interact with New Relic employees as well as other customers to get help and share best practices. Like all official New Relic open source projects, there's a related Community topic in the New Relic Explorers Hub. You can find this project's topic/threads here:
+
+>Add the url for the support thread here
+
+TODO: add the URL
+
+## Contributing
+We encourage your contributions to improve `newrelic-lambda-extension`! Keep in mind when you submit your pull request, you'll need to sign the CLA via the click-through using CLA-Assistant. You only have to sign the CLA one time per project.
+If you have any questions, or to execute our corporate CLA, required if your contribution is on behalf of a company,  please drop us an email at opensource@newrelic.com.
+
+## License
+`newrelic-lambda-extension` is licensed under the [Apache 2.0](http://apache.org/licenses/LICENSE-2.0.txt) License.
+The `newrelic-lambda-extension` also uses source code from third-party libraries. You can find full details on which libraries are used and the terms under which they are licensed in the third-party notices document.

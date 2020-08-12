@@ -28,6 +28,17 @@ to install the managed secret, and then add the permission for the secret to you
 
 [4]: https://github.com/newrelic/newrelic-lambda-cli
 
+>[Need example newrelic-lambda commands and example aws cli command to add perms]
+
+After deploying your AWS Lambda function with one of the layer ARNs from the
+link above you should begin seeing telemetry data in New Relic.
+
+See below for details on supported New Relic agents.
+
+## Supported Agents
+
+>[A list or table of supported New Relic agents with version ranges]
+
 ## Getting Started
 
 >[Simple steps to start working with the software similar to a "Hello World"]

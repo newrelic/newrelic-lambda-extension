@@ -1,0 +1,95 @@
+version: 2
+jobs:
+  build:
+    docker:
+      - image: circleci/golang:1
+    environment:
+      TEST_RESULTS: /tmp/test-results
+    steps:
+      - checkout
+      - run: mkdir -p $TEST_RESULTS
+      - restore_cache:
+          keys:
+            - go-mod-{{ checksum "go.sum" }}
+      - run:
+          name: Run unit tests
+          command: |
+            PACKAGE_NAMES=$(go list ./... | circleci tests split --split-by=timings --timings-type=classname)
+            gotestsum --junitfile ${TEST_RESULTS}/gotestsum-report.xml -- $PACKAGE_NAMES
+      - run:
+          name: Run build
+          command: make build
+      - save_cache:
+          key: go-mod-{{ checksum "go.sum" }}
+          paths:
+            - "/go/pkg/mod"
+      - store_artifacts: # upload test summary for display in Artifacts
+          path: /tmp/test-results
+          destination: raw-test-output
+      - store_test_results:
+          path: /tmp/test-results
+
+  build-release:
+    docker:
+      - image: circleci/golang:1
+    steps:
+      - checkout
+      - restore_cache:
+          keys:
+            - go-mod-{{ checksum "go.sum" }}
+      - run:
+          name: Build distribution
+          command: make dist
+      - run:
+          name: Archive distribution
+          command: zip -rq /tmp/newrelic-lambda-extension.zip extensions
+      - store_artifacts:
+          path: /tmp/newrelic-lambda-extension.zip
+          destination: newrelic-lambda-extension.zip
+
+  publish-release:
+    docker:
+      - image: circleci/golang:1
+    steps:
+      - attach_workspace:
+          at: ./artifacts
+      - run:
+          name: "Publish Release on GitHub"
+          command: |
+            go get -u github.com/tcnksm/ghr
+            ghr \
+              -u ${CIRCLE_PROJECT_USERNAME} \
+              -r ${CIRCLE_PROJECT_REPONAME} \
+              -c ${CIRCLE_SHA1} \
+              -n "New Relic Lambda Extension ${CIRCLE_TAG}" \
+              -replace \
+              ${CIRCLE_TAG} \
+              ./artifacts/newrelic-lambda-extension.zip
+
+workflows:
+  version: 2
+  all:
+    jobs:
+      - build
+          filters:
+            branches:
+              only: /.*/
+            tags:
+              only: /.*/
+      - build-release:
+          requires:
+            - build
+          filters:
+            branches:
+              ignore: /.*/
+            tags:
+              only: /v[0-9]+(\.[0-9]+)*/
+      - publish-release:
+          requires:
+            - build
+            - build-release
+          filters:
+            branches:
+              ignore: /.*/
+            tags:
+              only: /v[0-9]+(\.[0-9]+)*/

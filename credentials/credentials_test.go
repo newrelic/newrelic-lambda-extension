@@ -1,6 +1,7 @@
 package credentials
 
 import (
+	"fmt"
 	"os"
 	"testing"
 
@@ -17,6 +18,7 @@ func TestGetLicenseKeySecretId(t *testing.T) {
 	const testSecretId = "testSecretName"
 	os.Setenv(secretNameEnvVar, testSecretId)
 	defer os.Unsetenv(secretNameEnvVar)
+
 	secretId = getLicenseKeySecretId()
 	assert.Equal(t, testSecretId, secretId)
 }
@@ -32,10 +34,29 @@ func (mockSecretManager) GetSecretValue(*secretsmanager.GetSecretValueInput) (*s
 }
 
 func TestGetLicenseKeyImpl(t *testing.T) {
-	lk, err := getLicencesKeyImpl(mockSecretManager{})
-	if err != nil {
-		t.Error("Unexpected error", err)
-	}
-
+	lk, err := getLicenseKeyImpl(mockSecretManager{})
+	assert.NoError(t, err)
 	assert.Equal(t, "foo", *lk)
+}
+
+type mockSecretManagerFallback struct {
+	secretsmanageriface.SecretsManagerAPI
+}
+
+func (mockSecretManagerFallback) GetSecretValue(*secretsmanager.GetSecretValueInput) (*secretsmanager.GetSecretValueOutput, error) {
+	return nil, fmt.Errorf("No secret found")
+}
+
+func TestGetLicenseKeyImplFallback(t *testing.T) {
+	expectedKey := "foobar"
+	os.Setenv(defaultSecretId, expectedKey)
+
+	lk, err := getLicenseKeyImpl(mockSecretManagerFallback{})
+	assert.NoError(t, err)
+	assert.Equal(t, *lk, expectedKey)
+
+	os.Unsetenv(defaultSecretId)
+	lk, err = getLicenseKeyImpl(mockSecretManagerFallback{})
+	assert.Error(t, err)
+	assert.Nil(t, lk)
 }

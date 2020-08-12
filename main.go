@@ -1,7 +1,6 @@
 package main
 
 import (
-	"encoding/json"
 	"io/ioutil"
 	"log"
 	"net/http"
@@ -13,17 +12,10 @@ import (
 	"github.com/newrelic/lambda-extension/client"
 	"github.com/newrelic/lambda-extension/credentials"
 	"github.com/newrelic/lambda-extension/telemetry"
+	"github.com/newrelic/lambda-extension/util"
 )
 
 const telemetryNamedPipePath = "/tmp/newrelic-telemetry"
-
-func logAsJSON(v interface{}) {
-	indent, err := json.MarshalIndent(v, "", "  ")
-	if err != nil {
-		log.Panic(err)
-	}
-	log.Println(string(indent))
-}
 
 func initTelemetryChannel() (chan []byte, error) {
 	_ = os.Remove(telemetryNamedPipePath)
@@ -50,14 +42,15 @@ func pollForTelemetry() []byte {
 	if err != nil {
 		log.Panic("failed to open telemetry pipe", err)
 	}
-	//noinspection GoUnhandledErrorResult
-	defer telemetryPipe.Close()
+
+	defer util.Close(telemetryPipe)
 
 	// When the write side closes, we get an EOF.
 	bytes, err := ioutil.ReadAll(telemetryPipe)
 	if err != nil {
 		log.Panic("failed to read telemetry pipe", err)
 	}
+
 	return bytes
 }
 
@@ -66,11 +59,13 @@ func main() {
 	log.Println("New Relic Lambda Extension starting up")
 
 	registrationClient := client.New(http.Client{})
+
 	invocationClient, registrationResponse, err := registrationClient.RegisterDefault()
 	if err != nil {
 		log.Fatal(err)
 	}
-	logAsJSON(registrationResponse)
+
+	util.LogAsJSON(registrationResponse)
 
 	_, found := os.LookupEnv("NEW_RELIC_CLOUDWATCH_INGEST")
 	if found {
@@ -106,7 +101,7 @@ func main() {
 
 		counter++
 
-		logAsJSON(event)
+		util.LogAsJSON(event)
 
 		if event.EventType == api.Shutdown {
 			break
@@ -123,6 +118,7 @@ func main() {
 			log.Printf("Telemetry client response: [%s] %s", res.Status, body)
 		}
 	}
+
 	log.Printf("Shutting down after %v events\n", counter)
 
 	shutdownAt := time.Now()

@@ -2,6 +2,7 @@ package credentials
 
 import (
 	"encoding/json"
+	"os"
 
 	"github.com/newrelic/lambda-extension/config"
 
@@ -28,9 +29,9 @@ func getLicenseKeySecretId(conf *config.Configuration) string {
 }
 
 func decodeLicenseKey(rawJson *string) (*string, error) {
-	secrets := licenseKeySecret{}
-	err := json.Unmarshal([]byte(*rawJson), &secrets)
+	var secrets licenseKeySecret
 
+	err := json.Unmarshal([]byte(*rawJson), &secrets)
 	if err != nil {
 		return nil, err
 	}
@@ -38,14 +39,20 @@ func decodeLicenseKey(rawJson *string) (*string, error) {
 	return &secrets.LicenseKey, nil
 }
 
-func getLicencesKeyImpl(secrets secretsmanageriface.SecretsManagerAPI, conf *config.Configuration) (*string, error) {
+func getLicenseKeyImpl(secrets secretsmanageriface.SecretsManagerAPI, conf *config.Configuration) (*string, error) {
 	secretId := getLicenseKeySecretId(conf)
 	secretValueInput := secretsmanager.GetSecretValueInput{SecretId: &secretId}
 
 	secretValueOutput, err := secrets.GetSecretValue(&secretValueInput)
 	if err != nil {
+		envLicenseKey, found := os.LookupEnv(defaultSecretId)
+		if found {
+			return &envLicenseKey, nil
+		}
+
 		return nil, err
 	}
+
 	return decodeLicenseKey(secretValueOutput.SecretString)
 }
 
@@ -56,5 +63,5 @@ func GetNewRelicLicenseKey(conf *config.Configuration) (*string, error) {
 	}
 
 	secrets := secretsmanager.New(sess)
-	return getLicencesKeyImpl(secrets, conf)
+	return getLicenseKeyImpl(secrets, conf)
 }

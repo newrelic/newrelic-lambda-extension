@@ -1,7 +1,6 @@
 package main
 
 import (
-	"encoding/json"
 	"log"
 	"net/http"
 	"time"
@@ -11,15 +10,8 @@ import (
 	"github.com/newrelic/lambda-extension/lambda/extension/api"
 	"github.com/newrelic/lambda-extension/lambda/extension/client"
 	"github.com/newrelic/lambda-extension/telemetry"
+	"github.com/newrelic/lambda-extension/util"
 )
-
-func logAsJSON(v interface{}) {
-	indent, err := json.MarshalIndent(v, "", "  ")
-	if err != nil {
-		log.Panic(err)
-	}
-	log.Println(string(indent))
-}
 
 func main() {
 	extensionStartup := time.Now()
@@ -35,7 +27,7 @@ func main() {
 		log.Fatal(err)
 	}
 	conf := config.ParseRegistration(registrationResponse.Configuration)
-	logAsJSON(registrationResponse)
+	util.LogAsJSON(registrationResponse)
 
 	if conf.UseCloudWatchIngest {
 		log.Println("Extension telemetry processing disabled")
@@ -68,7 +60,7 @@ func main() {
 
 		counter++
 
-		logAsJSON(event)
+		util.LogAsJSON(event)
 
 		if event.EventType == api.Shutdown {
 			break
@@ -85,6 +77,7 @@ func main() {
 			log.Printf("Telemetry client response: [%s] %s", res.Status, body)
 		}
 	}
+
 	log.Printf("Shutting down after %v events\n", counter)
 
 	shutdownAt := time.Now()

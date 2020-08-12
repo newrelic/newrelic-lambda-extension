@@ -32,10 +32,20 @@ func (mockSecretManager) GetSecretValue(*secretsmanager.GetSecretValueInput) (*s
 }
 
 func TestGetLicenseKeyImpl(t *testing.T) {
-	lk, err := getLicencesKeyImpl(mockSecretManager{}, &config.Configuration{})
+	lk, err := getLicenseKeyImpl(mockSecretManager{}, &config.Configuration{})
 	if err != nil {
 		t.Error("Unexpected error", err)
 	}
 
 	assert.Equal(t, "foo", *lk)
+}
+
+func TestGetNewRelicLicenseKeyConfigValue(t *testing.T) {
+	licenseKey := "test_value"
+	resultKey, err := GetNewRelicLicenseKey(&config.Configuration{
+		LicenseKey: &licenseKey,
+	})
+
+	assert.Nil(t, err)
+	assert.Equal(t, licenseKey, *resultKey)
 }

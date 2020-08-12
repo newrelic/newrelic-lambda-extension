@@ -70,7 +70,7 @@ workflows:
   version: 2
   all:
     jobs:
-      - build
+      - build:
           filters:
             branches:
               only: /.*/

@@ -1,6 +1,9 @@
 [![Community Project header](https://github.com/newrelic/opensource-website/raw/master/src/images/categories/Community_Project.png)](https://opensource.newrelic.com/oss-category/#community-project)
 
-# newrelic-lambda-extension [TODO: build badges go here when available]
+# newrelic-lambda-extension [![Build Status][1]][2]
+
+[1]: https://circleci.com/gh/newrelic/newrelic-lambda-extension.svg?style=svg
+[2]: https://circleci.com/gh/newrelic/newrelic-lambda-extension
 
 `newrelic-lambda-extension` is TODO: write me
 

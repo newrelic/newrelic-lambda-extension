@@ -1,9 +1,6 @@
 [![Community Project header](https://github.com/newrelic/opensource-website/raw/master/src/images/categories/Community_Project.png)](https://opensource.newrelic.com/oss-category/#community-project)
 
-# newrelic-lambda-extension [![Build Status][1]][2]
-
-[1]: https://circleci.com/gh/newrelic/newrelic-lambda-extension.svg?style=svg
-[2]: https://circleci.com/gh/newrelic/newrelic-lambda-extension
+# newrelic-lambda-extension [![Build Status](https://circleci.com/gh/newrelic/newrelic-lambda-extension.svg?style=svg)](https://circleci.com/gh/newrelic/newrelic-lambda-extension)
 
 An AWS Lambda Extension to collect, enhance and transport telemetry to New Relic
 for your AWS Lambda functions with hout

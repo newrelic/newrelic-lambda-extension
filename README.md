@@ -34,7 +34,13 @@ See below for details on supported New Relic agents.
 
 ## Supported Agents
 
->[A list or table of supported New Relic agents with version ranges]
+TODO: Not yet released, so version numbers are pending.
+
+1. Node Agent, TODO: version
+2. Python Agent, via layer version TODO: version
+3. Go Agent, TODO: version, whatever's after 3.8.1
+4. Java Agent, TODO: version
+5. Dotnet: TODO: write integration 
 
 ## Getting Started
 
@@ -92,11 +98,7 @@ TODO: Link to the AWS SDK that has the test harness
 
 ## Support
 
-New Relic hosts and moderates an online forum where customers can interact with New Relic employees as well as other customers to get help and share best practices. Like all official New Relic open source projects, there's a related Community topic in the New Relic Explorers Hub. You can find this project's topic/threads here:
-
->Add the url for the support thread here
-
-TODO: add the URL
+New Relic hosts and moderates an online forum where customers can interact with New Relic employees as well as other customers to get help and share best practices. Like all official New Relic open source projects, there's a related Community topic in the New Relic Explorers Hub. You can find this project's topic/threads [in the Explorers Hub](https://discuss.newrelic.com/t/new-relic-lambda-extension/111715)
 
 ## Contributing
 We encourage your contributions to improve `newrelic-lambda-extension`! Keep in mind when you submit your pull request, you'll need to sign the CLA via the click-through using CLA-Assistant. You only have to sign the CLA one time per project.

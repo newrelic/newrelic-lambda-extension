@@ -1,0 +1,25 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: And example of a simple instrumented Go Lambda
+Resources:
+  NewRelicExample:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri:
+        Bucket: !Sub newrelic-example-${AWS::Region}
+        Key: go-example.zip
+      Description: A simple Lambda, with New Relic telemetry
+      FunctionName: newrelic-example-go
+      # For go1.x, the handler is the name of your go executable
+      # TODO: Update handler and runtime
+      Handler: bootstrap
+      Runtime: byol
+      Layers:
+        # This layer includes the New Relic Lambda Extension, a sidecar process that sends telemetry
+        - !Sub arn:${AWS::Partition}:lambda:${AWS::Region}:466768951184:layer:newrelic-lambda-extension:8
+        # TODO: final ext layer !Sub arn:${AWS::Partition}:lambda:${AWS::Region}:451483290750:layer:newrelic-lambda-extension:8
+      Policies:
+        # This policy allows the lambda to know the value of the New Relic licence key. We need this so
+        # that we can send telemetry back to New Relic
+        - AWSSecretsManagerGetSecretValuePolicy:
+            SecretArn: !ImportValue NewRelicLicenseKeySecret-NewRelic-LicenseKeySecretARN

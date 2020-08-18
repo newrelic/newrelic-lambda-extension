@@ -1,6 +1,13 @@
 AWSTemplateFormatVersion: '2010-09-09'
 Transform: AWS::Serverless-2016-10-31
 Description: And example of a simple instrumented Go Lambda
+
+Parameters:
+  NRAccountId:
+    Type: String
+    Description: Your New Relic account ID; necessary for distributed tracing.
+    AllowedPattern: '[0-9]+'
+
 Resources:
   NewRelicExample:
     Type: AWS::Serverless::Function
@@ -10,10 +17,14 @@ Resources:
         Key: go-example.zip
       Description: A simple Lambda, with New Relic telemetry
       FunctionName: newrelic-example-go
-      # For go1.x, the handler is the name of your go executable
-      # TODO: Update handler and runtime
-      Handler: bootstrap
+      # For go1.x, the handler is the name of your go executable. With the norpc option, it is ignored.
+      Handler: handler
+      # TODO: Update runtime to provided
       Runtime: byol
+      Environment:
+        Variables:
+          NEW_RELIC_ACCOUNT_ID: !Sub ${NRAccountId}
+          NEW_RELIC_TRUSTED_ACCOUNT_KEY: !Sub ${NRAccountId}
       Layers:
         # This layer includes the New Relic Lambda Extension, a sidecar process that sends telemetry
         - !Sub arn:${AWS::Partition}:lambda:${AWS::Region}:466768951184:layer:newrelic-lambda-extension:8

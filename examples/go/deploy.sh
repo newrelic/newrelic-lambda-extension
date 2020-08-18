@@ -1,17 +1,18 @@
 #!/bin/bash
 
-region="us-east-1"
-if [ -n "$1" ] ; then
-  region=$1
-  echo "region set to ${region}"
-fi
+accountId=$1
 
-#TODO: change byol to provided; default to "go1.x"
+region=$2
+echo "region set to ${region}"
+
+# In this example, our Go lambda can use the "norpc" option to slim down the deployment package
+# a little. That requires some custom packaging though.
+#TODO: change byol to provided
 runtime="byol"
 
 handler="handler"
 build_tags=""
-if [ "byol" == $runtime ] ; then
+if [ "go1.x" != $runtime ] ; then
   echo "Building stand-alone lambda"
   build_tags="-tags lambda.norpc"
   handler="bootstrap"
@@ -23,4 +24,8 @@ zip go-example.zip "${handler}"
 bucket="newrelic-example-${region}"
 aws s3 mb s3://${bucket}
 aws s3 cp go-example.zip s3://${bucket}
-aws cloudformation deploy --region ${region} --template-file template.yaml --stack-name NewrelicExampleGo --capabilities CAPABILITY_NAMED_IAM
+aws cloudformation deploy --region ${region} \
+  --template-file template.yaml \
+  --stack-name NewrelicExampleGo \
+  --capabilities CAPABILITY_IAM \
+  --parameter-overrides "NRAccountId=${accountId}"

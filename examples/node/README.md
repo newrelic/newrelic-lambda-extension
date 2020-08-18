@@ -1,6 +1,6 @@
-# Instrumented Python Lambda
+# Instrumented Node.js Lambda
 
-This is a "Hello, World" style Lambda function in Python, instrumented 
+This is a "Hello, World" style Lambda function in Node.js, instrumented 
 with the New Relic Agent.
 
 This example is both instructive, and a diagnostic tool: if you can
@@ -48,17 +48,17 @@ tell CloudFormation where to find lambda function code, what layers to use, and
 what IAM policies to add to the Lambda function's execution role. We also set
 environment variables that are available to the handler function. 
 
-### app.py
+### app.js
 
-Lambda functions written in Python are Python modules. The runtime loads them
-just like any python module, and then invokes the handler function for each 
+Lambda functions written in JavaScript are Node.js modules. The runtime loads them
+just like any Node module, and then invokes the handler function for each 
 invocation event. New Relic publishes a Lambda Layer that wraps your handler
 function, and initializes the New Relic agent, allowing us to collect telemetry.
 
 There are a couple examples here of how you might add custom events and attributes
 to the default telemetry.
 
-Since Python is a dynamic, interpreted language, the Agent can inject instrumentation
+Since JavaScript is a dynamic, interpreted language, the Agent can inject instrumentation
 into the various client libraries you might be using in your function. This happens 
 once, during cold start, and provides rich, detailed instrumentation out of the box, 
 with minimal developer effort.

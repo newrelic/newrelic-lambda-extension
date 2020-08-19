@@ -1,0 +1,41 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: And example of a simple instrumented Java Lambda
+
+Parameters:
+  NRAccountId:
+    Type: String
+    Description: Your New Relic account ID; necessary for distributed tracing.
+    AllowedPattern: '[0-9]+'
+
+Resources:
+  NewRelicExample:
+    Type: AWS::Serverless::Function
+    Properties:
+      # In this example, we're using the SAM CLI to package and deploy our lambda. SAM will transform this value during the publish step.
+      CodeUri: NewRelicExampleJava/
+      Description: A simple Lambda, with New Relic telemetry
+      FunctionName: newrelic-example-java
+      # The handler for your function needs to be the one provided by the instrumentation layer, below.
+      Handler: com.newrelic.lambda.example.App::handleRequest
+      Runtime: java8
+      MemorySize: 512
+      Environment:
+        Variables:
+          NEW_RELIC_ACCOUNT_ID: !Sub ${NRAccountId}
+      Layers:
+        # This layer includes the New Relic Lambda Extension, a sidecar process that sends telemetry,
+        # as well as the New Relic Agent for Python, and a handler wrapper that makes integration easy.
+        # TODO: bump version to include extension
+        - !Sub arn:${AWS::Partition}:lambda:${AWS::Region}:451483290750:layer:NewRelicPython38:14
+      Policies:
+        # This policy allows the lambda to know the value of the New Relic licence key. We need this so
+        # that we can send telemetry back to New Relic
+        - AWSSecretsManagerGetSecretValuePolicy:
+            SecretArn: !ImportValue NewRelicLicenseKeySecret-NewRelic-LicenseKeySecretARN
+  Logs:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: {"Fn::Join": ["", ["/aws/lambda/", {"Ref": "NewRelicExample"}]]}
+      # Lambda functions will auto-create their log group on first execution, but it retains logs forever, which can get expensive.
+      RetentionInDays: 7

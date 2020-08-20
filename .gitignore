@@ -1,3 +1,5 @@
 extensions/
 .idea/
 /extensions.zip
+/examples/**/packaged.yaml
+/venv/

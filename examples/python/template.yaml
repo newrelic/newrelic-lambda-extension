@@ -1,6 +1,6 @@
 AWSTemplateFormatVersion: '2010-09-09'
 Transform: AWS::Serverless-2016-10-31
-Description: And example of a simple instrumented Go Lambda
+Description: And example of a simple instrumented Python Lambda
 
 Parameters:
   NRAccountId:
@@ -12,23 +12,23 @@ Resources:
   NewRelicExample:
     Type: AWS::Serverless::Function
     Properties:
-      CodeUri:
-        Bucket: !Sub newrelic-example-${AWS::Region}
-        Key: go-example.zip
+      # In this example, we're using the SAM CLI to package and deploy our lambda. SAM will transform this value during the publish step.
+      CodeUri: newrelic_example_python/
       Description: A simple Lambda, with New Relic telemetry
-      FunctionName: newrelic-example-go
-      # For go1.x, the handler is the name of your go executable. With the norpc option, it is ignored.
-      Handler: handler
-      # TODO: Update runtime to provided
-      Runtime: byol
+      FunctionName: newrelic-example-python
+      # The handler for your function needs to be the one provided by the instrumentation layer, below.
+      Handler: newrelic_lambda_wrapper.handler
+      Runtime: python3.8
       Environment:
         Variables:
+          # For the instrumentation handler to invoke your real handler, we need this value
+          NEW_RELIC_LAMBDA_HANDLER: app.lambda_handler
           NEW_RELIC_ACCOUNT_ID: !Sub ${NRAccountId}
-          NEW_RELIC_TRUSTED_ACCOUNT_KEY: !Sub ${NRAccountId}
       Layers:
-        # This layer includes the New Relic Lambda Extension, a sidecar process that sends telemetry
-        - !Sub arn:${AWS::Partition}:lambda:${AWS::Region}:466768951184:layer:newrelic-lambda-extension:8
-        # TODO: final ext layer !Sub arn:${AWS::Partition}:lambda:${AWS::Region}:451483290750:layer:newrelic-lambda-extension:8
+        # This layer includes the New Relic Lambda Extension, a sidecar process that sends telemetry,
+        # as well as the New Relic Agent for Python, and a handler wrapper that makes integration easy.
+        # TODO: bump version to include extension
+        - !Sub arn:${AWS::Partition}:lambda:${AWS::Region}:451483290750:layer:NewRelicPython38:14
       Policies:
         # This policy allows the lambda to know the value of the New Relic licence key. We need this so
         # that we can send telemetry back to New Relic

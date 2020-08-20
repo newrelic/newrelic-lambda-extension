@@ -1,4 +1,4 @@
-module github.com/newrelic/lambda-extension
+module github.com/newrelic/newrelic-lambda-extension
 
 go 1.14
 

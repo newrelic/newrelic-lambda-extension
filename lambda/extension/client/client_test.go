@@ -9,8 +9,8 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/newrelic/lambda-extension/lambda/extension/api"
-	"github.com/newrelic/lambda-extension/util"
+	"github.com/newrelic/newrelic-lambda-extension/lambda/extension/api"
+	"github.com/newrelic/newrelic-lambda-extension/util"
 
 	"github.com/stretchr/testify/assert"
 )

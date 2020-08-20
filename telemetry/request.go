@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/newrelic/lambda-extension/lambda/extension/api"
-	"github.com/newrelic/lambda-extension/util"
+	"github.com/newrelic/newrelic-lambda-extension/lambda/extension/api"
+	"github.com/newrelic/newrelic-lambda-extension/util"
 )
 
 // RequestContext is the Vortex request context

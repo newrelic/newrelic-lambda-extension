@@ -14,8 +14,8 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/newrelic/lambda-extension/lambda/extension/api"
-	"github.com/newrelic/lambda-extension/util"
+	"github.com/newrelic/newrelic-lambda-extension/lambda/extension/api"
+	"github.com/newrelic/newrelic-lambda-extension/util"
 )
 
 // InvocationClient is used to poll for invocation events. It is produced as a result of successful

@@ -5,12 +5,12 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/newrelic/lambda-extension/config"
-	"github.com/newrelic/lambda-extension/credentials"
-	"github.com/newrelic/lambda-extension/lambda/extension/api"
-	"github.com/newrelic/lambda-extension/lambda/extension/client"
-	"github.com/newrelic/lambda-extension/telemetry"
-	"github.com/newrelic/lambda-extension/util"
+	"github.com/newrelic/newrelic-lambda-extension/config"
+	"github.com/newrelic/newrelic-lambda-extension/credentials"
+	"github.com/newrelic/newrelic-lambda-extension/lambda/extension/api"
+	"github.com/newrelic/newrelic-lambda-extension/lambda/extension/client"
+	"github.com/newrelic/newrelic-lambda-extension/telemetry"
+	"github.com/newrelic/newrelic-lambda-extension/util"
 )
 
 func main() {

@@ -1,5 +1,7 @@
 package config
 
+import "os"
+
 type Configuration struct {
 	UseCloudWatchIngest bool
 	LicenseKey          *string
@@ -7,11 +9,11 @@ type Configuration struct {
 	TelemetryEndpoint   *string
 }
 
-func ParseRegistration(conf map[string]string) Configuration {
-	_, useCW := conf["NEW_RELIC_CLOUDWATCH_INGEST"]
-	licenseKey, lkOverride := conf["NEW_RELIC_LICENSE_KEY"]
-	licenseKeySecretId, lkSecretOverride := conf["NEW_RELIC_LICENSE_KEY_SECRET"]
-	telemetryEndpoint, teOverride := conf["NEW_RELIC_TELEMETRY_ENDPOINT"]
+func ConfigurationFromEnvironment() Configuration {
+	_, useCW := os.LookupEnv("NEW_RELIC_CLOUDWATCH_INGEST")
+	licenseKey, lkOverride := os.LookupEnv("NEW_RELIC_LICENSE_KEY")
+	licenseKeySecretId, lkSecretOverride := os.LookupEnv("NEW_RELIC_LICENSE_KEY_SECRET")
+	telemetryEndpoint, teOverride := os.LookupEnv("NEW_RELIC_TELEMETRY_ENDPOINT")
 
 	ret := Configuration{UseCloudWatchIngest: useCW}
 
@@ -26,11 +28,4 @@ func ParseRegistration(conf map[string]string) Configuration {
 	}
 
 	return ret
-}
-
-var ConfigurationKeys = []string{
-	"NEW_RELIC_CLOUDWATCH_INGEST",
-	"NEW_RELIC_LICENSE_KEY",
-	"NEW_RELIC_LICENSE_KEY_SECRET",
-	"NEW_RELIC_TELEMETRY_ENDPOINT",
 }

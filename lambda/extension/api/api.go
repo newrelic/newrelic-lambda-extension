@@ -31,12 +31,10 @@ type InvocationEvent struct {
 
 type RegistrationRequest struct {
 	Events            []LifecycleEvent `json:"events"`
-	ConfigurationKeys []string         `json:"configurationKeys"`
 }
 
 type RegistrationResponse struct {
 	FunctionName    string            `json:"functionName"`
 	FunctionVersion string            `json:"functionVersion"`
 	Handler         string            `json:"handler"`
-	Configuration   map[string]string `json:"configuration"`
 }

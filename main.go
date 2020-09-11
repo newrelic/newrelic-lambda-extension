@@ -20,13 +20,12 @@ func main() {
 	registrationClient := client.New(http.Client{})
 	regReq := api.RegistrationRequest{
 		Events:            []api.LifecycleEvent{api.Invoke, api.Shutdown},
-		ConfigurationKeys: config.ConfigurationKeys,
 	}
 	invocationClient, registrationResponse, err := registrationClient.Register(regReq)
 	if err != nil {
 		log.Fatal(err)
 	}
-	conf := config.ParseRegistration(registrationResponse.Configuration)
+	conf := config.ConfigurationFromEnvironment()
 	util.LogAsJSON(registrationResponse)
 
 	if conf.UseCloudWatchIngest {

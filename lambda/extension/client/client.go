@@ -59,7 +59,7 @@ func (rc *RegistrationClient) getRegisterURL() string {
 // RegisterDefault registers for Invoke and Shutdown events, with no configuration parameters.
 func (rc *RegistrationClient) RegisterDefault() (*InvocationClient, *api.RegistrationResponse, error) {
 	defaultEvents := []api.LifecycleEvent{api.Invoke, api.Shutdown}
-	defaultRequest := api.RegistrationRequest{Events: defaultEvents, ConfigurationKeys: nil}
+	defaultRequest := api.RegistrationRequest{Events: defaultEvents}
 	return rc.Register(defaultRequest)
 }
 

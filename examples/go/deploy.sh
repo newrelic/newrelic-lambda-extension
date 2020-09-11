@@ -7,8 +7,7 @@ echo "region set to ${region}"
 
 # In this example, our Go lambda can use the "norpc" option to slim down the deployment package
 # a little. That requires some custom packaging though.
-#TODO: change byol to provided
-runtime="byol"
+runtime="provided"
 
 handler="handler"
 build_tags=""

@@ -32,7 +32,7 @@ func New(functionName string, licenseKey string, telemetryEndpointOverride *stri
 	return &Client{httpClient, licenseKey, endpoint, functionName}
 }
 
-// NewWithHTTPClient is just like New, but the HTTP client can be voerridden
+// NewWithHTTPClient is just like New, but the HTTP client can be overridden
 func NewWithHTTPClient(httpClient *http.Client, functionName string, licenseKey string, telemetryEndpointOverride *string) *Client {
 	endpoint := getInfraEndpointURL(licenseKey, telemetryEndpointOverride)
 	return &Client{httpClient, licenseKey, endpoint, functionName}

@@ -21,10 +21,12 @@ Resources:
       Environment:
         Variables:
           NEW_RELIC_ACCOUNT_ID: !Sub ${NRAccountId}
-      #Layers:
+          # TODO: Remove this once integration is released
+          NEW_RELIC_CLOUDWATCH_INGEST: "true"
+      Layers:
         # This layer includes the New Relic Lambda Extension, a sidecar process that sends telemetry.
         # TODO: bump version to include extension
-        # - !Sub arn:${AWS::Partition}:lambda:${AWS::Region}:466768951184:layer:newrelic-lambda-extension:10
+        - !Sub arn:${AWS::Partition}:lambda:${AWS::Region}:466768951184:layer:newrelic-lambda-extension:10
       Policies:
         # This policy allows the lambda to know the value of the New Relic licence key. We need this so
         # that we can send telemetry back to New Relic

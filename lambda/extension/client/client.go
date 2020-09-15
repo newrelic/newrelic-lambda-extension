@@ -97,7 +97,7 @@ func (rc *RegistrationClient) Register(registrationRequest api.RegistrationReque
 
 	id, exists := res.Header[api.ExtensionIdHeader]
 	if !exists {
-		return nil, nil, fmt.Errorf("missing extension identifier")
+		return nil, nil, fmt.Errorf("missing extension identifier. Response body %s", bodyBytes)
 	}
 
 	invocationClient := InvocationClient{rc.version, rc.baseUrl, rc.httpClient, id[0]}

@@ -10,7 +10,6 @@ import (
 	"github.com/newrelic/newrelic-lambda-extension/lambda/extension/api"
 	"github.com/newrelic/newrelic-lambda-extension/lambda/extension/client"
 	"github.com/newrelic/newrelic-lambda-extension/telemetry"
-	"github.com/newrelic/newrelic-lambda-extension/util"
 )
 
 func main() {
@@ -26,7 +25,6 @@ func main() {
 		log.Fatal(err)
 	}
 	conf := config.ConfigurationFromEnvironment()
-	util.LogAsJSON(registrationResponse)
 
 	if conf.UseCloudWatchIngest {
 		log.Println("Extension telemetry processing disabled")
@@ -53,13 +51,14 @@ func main() {
 	for {
 		event, err := invocationClient.NextEvent()
 		if err != nil {
-			// TODO: extension error API
+			errErr := invocationClient.ExitError("NextEventError.Main", err)
+			if errErr != nil {
+				log.Println(errErr)
+			}
 			log.Fatal(err)
 		}
 
 		counter++
-
-		util.LogAsJSON(event)
 
 		if event.EventType == api.Shutdown {
 			break
@@ -74,7 +73,7 @@ func main() {
 		}
 	}
 
-	log.Printf("Shutting down after %v events\n", counter)
+	log.Printf("New Relic Extension shutting down after %v events\n", counter)
 
 	shutdownAt := time.Now()
 	ranFor := shutdownAt.Sub(extensionStartup)
@@ -85,7 +84,10 @@ func noopLoop(invocationClient *client.InvocationClient) {
 	for {
 		event, err := invocationClient.NextEvent()
 		if err != nil {
-			// TODO: extension error API
+			errErr := invocationClient.ExitError("NextEventError.Noop", err)
+			if errErr != nil {
+				log.Println(errErr)
+			}
 			log.Fatal(err)
 		}
 

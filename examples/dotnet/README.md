@@ -1,4 +1,4 @@
-# Instrumented Java Lambda
+# Instrumented Dotnet Lambda
 
 This is a "Hello, World" style Lambda function in Dotnet, instrumented 
 with the New Relic OpenTracing Dotnet SDK.

@@ -109,6 +109,16 @@ func (ic *InvocationClient) getNextEventURL() string {
 	return fmt.Sprintf("http://%s/%s/extension/event/next", ic.baseUrl, ic.version)
 }
 
+// getInitErrorURL returns the Lambda Extension next event URL
+func (ic *InvocationClient) getInitErrorURL() string {
+	return fmt.Sprintf("http://%s/%s/extension/init/error", ic.baseUrl, ic.version)
+}
+
+// getExitErrorURL returns the Lambda Extension next event URL
+func (ic *InvocationClient) getExitErrorURL() string {
+	return fmt.Sprintf("http://%s/%s/extension/exit/error", ic.baseUrl, ic.version)
+}
+
 // NextEvent awaits the next event.
 func (ic *InvocationClient) NextEvent() (*api.InvocationEvent, error) {
 	req, err := http.NewRequest("GET", ic.getNextEventURL(), nil)
@@ -137,4 +147,44 @@ func (ic *InvocationClient) NextEvent() (*api.InvocationEvent, error) {
 	}
 
 	return &event, nil
+}
+
+func (ic *InvocationClient) InitError(errorEnum string, initError error) (error) {
+	errorBuf := bytes.NewBufferString(initError.Error())
+	req, err := http.NewRequest("POST", ic.getInitErrorURL(), errorBuf)
+	if err != nil {
+		return fmt.Errorf("error occurred when creating init error request %s", err)
+	}
+
+	req.Header.Set(api.ExtensionIdHeader, ic.extensionId)
+	req.Header.Set(api.ExtensionErrorTypeHeader, errorEnum)
+
+	res, err := ic.httpClient.Do(req)
+	if err != nil {
+		return fmt.Errorf("error occurred when calling extension/init/error %s", err)
+	}
+
+	defer util.Close(res.Body)
+
+	return nil
+}
+
+func (ic *InvocationClient) ExitError(errorEnum string, exitError error) (error) {
+	errorBuf := bytes.NewBufferString(exitError.Error())
+	req, err := http.NewRequest("POST", ic.getExitErrorURL(), errorBuf)
+	if err != nil {
+		return fmt.Errorf("error occurred when creating exit error request %s", err)
+	}
+
+	req.Header.Set(api.ExtensionIdHeader, ic.extensionId)
+	req.Header.Set(api.ExtensionErrorTypeHeader, errorEnum)
+
+	res, err := ic.httpClient.Do(req)
+	if err != nil {
+		return fmt.Errorf("error occurred when calling extension/exit/error %s", err)
+	}
+
+	defer util.Close(res.Body)
+
+	return nil
 }

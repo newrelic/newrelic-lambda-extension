@@ -2,6 +2,7 @@ package credentials
 
 import (
 	"encoding/json"
+	"log"
 	"os"
 
 	"github.com/newrelic/newrelic-lambda-extension/config"
@@ -23,6 +24,7 @@ const defaultSecretId = "NEW_RELIC_LICENSE_KEY"
 
 func getLicenseKeySecretId(conf *config.Configuration) string {
 	if conf.LicenseKeySecretId != nil {
+		log.Println("Fetching license key from secret id " + *conf.LicenseKeySecretId)
 		return *conf.LicenseKeySecretId
 	}
 	return defaultSecretId
@@ -59,6 +61,7 @@ func getLicenseKeyImpl(secrets secretsmanageriface.SecretsManagerAPI, conf *conf
 // GetNewRelicLicenseKey fetches the license key from AWS Secrets Manager.
 func GetNewRelicLicenseKey(conf *config.Configuration) (*string, error) {
 	if conf.LicenseKey != nil {
+		log.Println("Using license key from environment variable")
 		return conf.LicenseKey, nil
 	}
 

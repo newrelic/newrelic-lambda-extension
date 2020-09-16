@@ -5,8 +5,7 @@ accountId=$1
 region=$2
 echo "region set to ${region}"
 
-# TODO --use-container after deps are published
-sam build #--use-container
+sam build --use-container
 
 bucket="newrelic-example-${region}"
 

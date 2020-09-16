@@ -14,6 +14,7 @@ const (
 
 	ExtensionNameHeader = "Lambda-Extension-Name"
 	ExtensionIdHeader   = "Lambda-Extension-Identifier"
+	ExtensionErrorTypeHeader   = "Lambda-Extension-Function-Error-Type"
 )
 
 type InvocationEvent struct {

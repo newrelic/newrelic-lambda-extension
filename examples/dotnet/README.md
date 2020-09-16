@@ -59,13 +59,12 @@ Libraries that implement the standard create spans using the OpenTracing API.
 New Relic gathers these traces, and acts as an "exporter", serializing them
 and sending them to the New Relic collector.
 
->TODO Fix this
-
 For all that to work, two things happen here. First, we register the New Relic
 `LambdaTracer` as the concrete `Tracer` implementation in the static initializer.
 Second, we need to wrap your request handler's business logic so that the trace
 begins and ends correctly, and errors are handled appropriately. That's the call
-to `LambdaTracing.instrument` on the first line of our request handler.
+to `new TracingRequestHandler().LambdaWrapper()` on the first line of our request 
+handler.
 
 There are a couple examples here of how you might use the OpenTracing API in
 your own code. 

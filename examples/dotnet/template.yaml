@@ -21,8 +21,6 @@ Resources:
       Environment:
         Variables:
           NEW_RELIC_ACCOUNT_ID: !Sub ${NRAccountId}
-          # TODO: Remove this once integration is released
-          NEW_RELIC_CLOUDWATCH_INGEST: "true"
       Layers:
         # This layer includes the New Relic Lambda Extension, a sidecar process that sends telemetry.
         # TODO: bump version to include extension

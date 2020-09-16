@@ -1,7 +1,7 @@
-# Instrumented Java Lambda
+# Instrumented Dotnet Lambda
 
-This is a "Hello, World" style Lambda function in Java 8, instrumented 
-with the New Relic OpenTracing Java SDK.
+This is a "Hello, World" style Lambda function in Dotnet, instrumented 
+with the New Relic OpenTracing Dotnet SDK.
 
 This example is both instructive, and a diagnostic tool: if you can
 deploy this Lambda function, and see its events in NR One, you'll
@@ -48,27 +48,23 @@ tell CloudFormation where to find lambda function code, what layers to use, and
 what IAM policies to add to the Lambda function's execution role. We also set
 environment variables that are available to the handler function. 
 
-### App.java
+### Function.cs
 
-Lambda functions written in Java are Java classes. The runtime loads them
-just like any Java class, and then invokes the handler function for each 
+Lambda functions written in Dotnet are C# classes. The runtime loads them
+just like any C# class, and then invokes the handler function for each 
 invocation event.
 
-New Relic's Java instrumentation is based on the OpenTracing API standard. 
+New Relic's Dotnet instrumentation is based on the OpenTracing API standard. 
 Libraries that implement the standard create spans using the OpenTracing API.
 New Relic gathers these traces, and acts as an "exporter", serializing them
 and sending them to the New Relic collector.
-
-If you're familiar with the logging ecosystem in Java, the idea behind 
-OpenTracing and OpenTelemetry is a similar one: standardize the API that 
-libraries use, and let applications choose the concrete implementation 
-responsible for managing the data itself.
 
 For all that to work, two things happen here. First, we register the New Relic
 `LambdaTracer` as the concrete `Tracer` implementation in the static initializer.
 Second, we need to wrap your request handler's business logic so that the trace
 begins and ends correctly, and errors are handled appropriately. That's the call
-to `LambdaTracing.instrument` on the first line of our request handler.
+to `new TracingRequestHandler().LambdaWrapper()` on the first line of our request 
+handler.
 
 There are a couple examples here of how you might use the OpenTracing API in
 your own code. 

@@ -3,13 +3,12 @@
 # newrelic-lambda-extension [![Build Status](https://circleci.com/gh/newrelic/newrelic-lambda-extension.svg?style=svg)](https://circleci.com/gh/newrelic/newrelic-lambda-extension)
 
 An AWS Lambda Extension to collect, enhance and transport telemetry to New Relic
-for your AWS Lambda functions with hout
-requiring an external transport such as CloudWatch Logs or Kinesis.
+for your AWS Lambda functions without requiring an external transport such as 
+CloudWatch Logs or Kinesis.
 
 This lightweight AWS Lambda Extension runs alongside your AWS Lambda functions
 and automatically handles the collection and transport of telemetry from
 supported New Relic serverless agents.
-
 
 ## Installation
 
@@ -25,7 +24,13 @@ to install the managed secret, and then add the permission for the secret to you
 
 [4]: https://github.com/newrelic/newrelic-lambda-cli
 
->[Need example newrelic-lambda commands and example aws cli command to add perms]
+    newrelic-lambda integrations install \
+        --nr-account-id <account id> \
+        --nr-api-key <api key> \
+        --linked-account-name <linked account name> \
+        --enable-license-key-secret
+
+Each of the example functions in the `examples` directory has the appropriate license key secret permission. 
 
 After deploying your AWS Lambda function with one of the layer ARNs from the
 link above you should begin seeing telemetry data in New Relic.
@@ -34,19 +39,19 @@ See below for details on supported New Relic agents.
 
 ## Supported Agents
 
-TODO: Not yet released, so version numbers are pending.
-
 1. Node Agent, version [v6.1.3](https://github.com/newrelic/node-newrelic/releases/tag/v6.13.0), via layer versions NewRelicNodeJS12X:18, NewRelicNodeJS10X:20, NewRelicNodeJS810:18 
 2. Python Agent, version [v5.18.0.148](https://github.com/newrelic/newrelic-python-agent/releases/tag/v5.18.0.148) via layer versions NewRelicPython38:18, NewRelicPython37:22, NewRelicPython36:21, NewRelicPython27:21
-3. Go Agent, TODO: version [v3.9.0](https://github.com/newrelic/go-agent/releases/tag/v3.9.0)
-4. Java Agent, TODO: version
-5. Dotnet: TODO: write integration 
+3. Go Agent, version [v3.9.0](https://github.com/newrelic/go-agent/releases/tag/v3.9.0)
+4. Java
+   - `com.newrelic.opentracing:newrelic-java-lambda` [v2.1.2](https://github.com/newrelic/newrelic-lambda-tracer-java/releases/tag/v2.1.2)
+   - `com.newrelic.opentracing:java-aws-lambda` [v2.1.0](https://github.com/newrelic/java-aws-lambda/releases/tag/v2.1.0)
+5. Dotnet: [v1.1.0](https://github.com/newrelic/newrelic-dotnet-agent/releases/tag/AwsLambdaOpenTracer_v1.1.0)
 
-## Getting Started
+Note that future Agent layers (for Node and Python) will include the extension. To test with a different extension
+version, make sure that the layer for the version you want to run is **after** the agent, so that it overwrites the 
+packaged extension. 
 
->[Simple steps to start working with the software similar to a "Hello World"]
-
-TODO: do we need this section, or is installation enough?
+For other runtimes, be sure to include the latest `NewRelicLambdaExtension` layer.
 
 ## Building
 
@@ -56,11 +61,23 @@ Use the included `Makefile` to compile the extension.
     
 will create the extension binary in `./extensions/newrelic-lambda-extension`
 
+This binary will be compiled for Amazon Linux, which is likely different from the platform you're working on.
+
+## Deploying
+
+To publish the extension to your AWS account, run
+
+    make publish
+
+This will package the extension, and publish a new layer version in your AWS account. Be sure that
+the AWS CLI is configured correctly. You can use the usual [AWS CLI environment variables](https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-envvars.html)
+to control the account and region for the CLI.
+
 ## Testing
 
 To test locally, acquire the AWS extension test harness first. Then:
 
-TODO: Link to the AWS SDK that has the test harness
+>TODO: Link to the AWS SDK that has the test harness, assuming it gets published.
 
 1. (Optional) Use the `newrelic-lambda` CLI to create the license key managed secret in your AWS account and region.
 2. Build the docker container for sample function code. Give it the tag `lambda_ext`.
@@ -106,4 +123,5 @@ If you have any questions, or to execute our corporate CLA, required if your con
 
 ## License
 `newrelic-lambda-extension` is licensed under the [Apache 2.0](http://apache.org/licenses/LICENSE-2.0.txt) License.
-The `newrelic-lambda-extension` also uses source code from third-party libraries. You can find full details on which libraries are used and the terms under which they are licensed in the third-party notices document.
+The `newrelic-lambda-extension` also uses source code from third-party libraries. You can find full details on which
+libraries are used and the terms under which they are licensed in the [third-party notices document](THIRD_PARTY_NOTICES.md).

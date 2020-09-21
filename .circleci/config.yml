@@ -42,7 +42,7 @@ jobs:
           command: make dist
       - run:
           name: Archive distribution
-          command: zip -rq /tmp/newrelic-lambda-extension.zip extensions
+          command: zip -rq /tmp/newrelic-lambda-extension.zip preview-extensions-ggqizro707 extensions
       - store_artifacts:
           path: /tmp/newrelic-lambda-extension.zip
           destination: newrelic-lambda-extension.zip
@@ -54,7 +54,7 @@ jobs:
       - attach_workspace:
           at: ./artifacts
       - run:
-          name: "Publish Release on GitHub"
+          name: Publish Release on GitHub
           command: |
             go get -u github.com/tcnksm/ghr
             ghr \

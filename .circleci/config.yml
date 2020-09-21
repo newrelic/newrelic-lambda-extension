@@ -45,14 +45,18 @@ jobs:
           command: zip -rq /tmp/newrelic-lambda-extension.zip preview-extensions-ggqizro707 extensions
       - store_artifacts:
           path: /tmp/newrelic-lambda-extension.zip
-          destination: newrelic-lambda-extension.zip
+          destination: newrelic-lambda-extension
+      - persist_to_workspace:
+          root: /tmp
+          paths:
+            - newrelic-lambda-extension.zip
 
   publish-release:
     docker:
       - image: circleci/golang:1
     steps:
       - attach_workspace:
-          at: ./artifacts
+          at: /tmp/workspace
       - run:
           name: Publish Release on GitHub
           command: |
@@ -64,7 +68,7 @@ jobs:
               -n "New Relic Lambda Extension ${CIRCLE_TAG}" \
               -replace \
               ${CIRCLE_TAG} \
-              ./artifacts/newrelic-lambda-extension.zip
+              /tmp/workspace/newrelic-lambda-extension.zip
 
 workflows:
   version: 2

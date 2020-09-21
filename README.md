@@ -36,7 +36,7 @@ See below for details on supported New Relic agents.
 
 TODO: Not yet released, so version numbers are pending.
 
-1. Node Agent, version [v6.1.3](https://github.com/newrelic/node-newrelic/releases/tag/v6.13.0), via layer versions NewRelicNodeJS12X:18, NewRelicNodeJS10X:20, NewRelicNodeJS810:18 
+1. Node Agent, version [v6.13.0](https://github.com/newrelic/node-newrelic/releases/tag/v6.13.0), via layer versions NewRelicNodeJS12X:18, NewRelicNodeJS10X:20, NewRelicNodeJS810:18 
 2. Python Agent, version [v5.18.0.148](https://github.com/newrelic/newrelic-python-agent/releases/tag/v5.18.0.148) via layer versions NewRelicPython38:18, NewRelicPython37:22, NewRelicPython36:21, NewRelicPython27:21
 3. Go Agent, TODO: version [v3.9.0](https://github.com/newrelic/go-agent/releases/tag/v3.9.0)
 4. Java Agent, TODO: version

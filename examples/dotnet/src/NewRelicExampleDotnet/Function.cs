@@ -34,10 +34,13 @@ namespace NewRelicExampleDotnet
                     .StartActive(finishSpanOnDispose:true)) 
             {
                 // Here, we add a tag to our custom span
+                // XXX: Note that due to a known issue with dotnet tracer, this does not work.
                 scope.Span.SetTag("zip", "zap");
             }
 
             // This tag gets added to the function invocation's root span, since it's active.
+            // XXX: Note that due to a known issue with dotnet tracer, this results in a custom attribute on
+            // the synthesized AwsLambdaInvocation event, but no custom attribute on the root Span.
             tracer.ActiveSpan.SetTag("customAttribute", "customAttributeValue");
 
             // As normal, anything you write to stdout ends up in CloudWatch

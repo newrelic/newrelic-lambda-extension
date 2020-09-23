@@ -2,12 +2,9 @@
 
 # newrelic-lambda-extension [![Build Status](https://circleci.com/gh/newrelic/newrelic-lambda-extension.svg?style=svg)](https://circleci.com/gh/newrelic/newrelic-lambda-extension)
 
-An AWS Lambda Extension to collect, enhance and transport telemetry to New Relic
-for your AWS Lambda functions without requiring an external transport such as 
-CloudWatch Logs or Kinesis.
+An AWS Lambda extension to collect, enhance, and transport telemetry data from your AWS Lambda functions to New Relic without requiring an external transport such as CloudWatch Logs or Kinesis.
 
-This lightweight AWS Lambda Extension runs alongside your AWS Lambda functions
-and automatically handles the collection and transport of telemetry from
+This lightweight AWS Lambda Extension runs alongside your AWS Lambda functions and automatically handles the collection and transport of telemetry data from
 supported New Relic serverless agents.
 
 ## Installation
@@ -47,9 +44,7 @@ See below for details on supported New Relic agents.
    - `com.newrelic.opentracing:java-aws-lambda` [v2.1.0](https://github.com/newrelic/java-aws-lambda/releases/tag/v2.1.0)
 5. Dotnet: [v1.1.0](https://github.com/newrelic/newrelic-dotnet-agent/releases/tag/AwsLambdaOpenTracer_v1.1.0)
 
-Note that future Agent layers (for Node and Python) will include the extension. To test with a different extension
-version, make sure that the layer for the version you want to run is **after** the agent, so that it overwrites the 
-packaged extension. 
+Note that future agent layers (for Node and Python) will include the extension. To test with a different extension version, make sure that the layer for the version you want to run is **after** the agent, so that it overwrites the packaged extension. 
 
 For other runtimes, be sure to include the latest `NewRelicLambdaExtension` layer.
 
@@ -57,21 +52,21 @@ For other runtimes, be sure to include the latest `NewRelicLambdaExtension` laye
 
 Use the included `Makefile` to compile the extension. 
 
-    make dist
-    
-will create the extension binary in `./extensions/newrelic-lambda-extension`
+```sh
+make dist
+```
 
-This binary will be compiled for Amazon Linux, which is likely different from the platform you're working on.
+This creates the extension binary in `./extensions/newrelic-lambda-extension`. The binary is compiled for Amazon Linux, which is likely different from the platform you're working on.
 
 ## Deploying
 
-To publish the extension to your AWS account, run
+To publish the extension to your AWS account, run the following command:
 
+```sh
     make publish
+```
 
-This will package the extension, and publish a new layer version in your AWS account. Be sure that
-the AWS CLI is configured correctly. You can use the usual [AWS CLI environment variables](https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-envvars.html)
-to control the account and region for the CLI.
+This packages the extension, and publishes a new layer version in your AWS account. Be sure that the AWS CLI is configured correctly. You can use the usual [AWS CLI environment variables](https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-envvars.html) to control the account and region for the CLI.
 
 ## Testing
 
@@ -115,13 +110,13 @@ To test locally, acquire the AWS extension test harness first. Then:
 
 ## Support
 
-New Relic hosts and moderates an online forum where customers can interact with New Relic employees as well as other customers to get help and share best practices. Like all official New Relic open source projects, there's a related Community topic in the New Relic Explorers Hub. You can find this project's topic/threads [in the Explorers Hub](https://discuss.newrelic.com/t/new-relic-lambda-extension/111715)
+New Relic hosts and moderates an online forum where customers can interact with New Relic employees as well as other customers to get help and share best practices. Like all official New Relic open source projects, there's a related Community topic in the New Relic Explorers Hub. You can find this project's topic/threads [in the Explorers Hub](https://discuss.newrelic.com/t/new-relic-lambda-extension/111715).
 
 ## Contributing
+
 We encourage your contributions to improve `newrelic-lambda-extension`! Keep in mind when you submit your pull request, you'll need to sign the CLA via the click-through using CLA-Assistant. You only have to sign the CLA one time per project.
+
 If you have any questions, or to execute our corporate CLA, required if your contribution is on behalf of a company,  please drop us an email at opensource@newrelic.com.
 
 ## License
-`newrelic-lambda-extension` is licensed under the [Apache 2.0](http://apache.org/licenses/LICENSE-2.0.txt) License.
-The `newrelic-lambda-extension` also uses source code from third-party libraries. You can find full details on which
-libraries are used and the terms under which they are licensed in the [third-party notices document](THIRD_PARTY_NOTICES.md).
+`newrelic-lambda-extension` is licensed under the [Apache 2.0](http://apache.org/licenses/LICENSE-2.0.txt) License. The `newrelic-lambda-extension` also uses source code from third-party libraries. You can find full details on which libraries are used and the terms under which they are licensed in the [third-party notices document](THIRD_PARTY_NOTICES.md).

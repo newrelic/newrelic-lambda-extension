@@ -7,7 +7,7 @@ echo "region set to ${region}"
 
 sam build
 
-bucket="newrelic-example-${region}"
+bucket="newrelic-example-${region}-${accountId}"
 
 aws s3 mb s3://${bucket}
 

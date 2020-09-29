@@ -22,6 +22,7 @@ Resources:
       MemorySize: 512
       Environment:
         Variables:
+          NEW_RELIC_LAMBDA_EXTENSION_ENABLED: true
           NEW_RELIC_ACCOUNT_ID: !Sub ${NRAccountId}
       Layers:
         # This layer includes the New Relic Lambda Extension, a sidecar process that sends telemetry,

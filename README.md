@@ -29,6 +29,10 @@ to install the managed secret, and then add the permission for the secret to you
 
 Each of the example functions in the `examples` directory has the appropriate license key secret permission. 
 
+The New Relic Lambda Extension is disabled by default. To enable it, after adding or
+updating the Lambda layer, set the `NEW_RELIC_LAMBDA_EXTENSION_ENABLED` environment
+variable to any value.
+
 After deploying your AWS Lambda function with one of the layer ARNs from the
 link above you should begin seeing telemetry data in New Relic.
 

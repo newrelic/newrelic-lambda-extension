@@ -22,6 +22,7 @@ Resources:
       Runtime: provided
       Environment:
         Variables:
+          NEW_RELIC_LAMBDA_EXTENSION_ENABLED: true
           NEW_RELIC_ACCOUNT_ID: !Sub ${NRAccountId}
           NEW_RELIC_TRUSTED_ACCOUNT_KEY: !Sub ${NRAccountId}
       Layers:

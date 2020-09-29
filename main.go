@@ -18,15 +18,17 @@ func main() {
 
 	registrationClient := client.New(http.Client{})
 	regReq := api.RegistrationRequest{
-		Events:            []api.LifecycleEvent{api.Invoke, api.Shutdown},
+		Events: []api.LifecycleEvent{api.Invoke, api.Shutdown},
 	}
+
 	invocationClient, registrationResponse, err := registrationClient.Register(regReq)
 	if err != nil {
 		log.Fatal(err)
 	}
+
 	conf := config.ConfigurationFromEnvironment()
 
-	if conf.UseCloudWatchIngest {
+	if conf.ExtensionEnabled == false {
 		log.Println("Extension telemetry processing disabled")
 		noopLoop(invocationClient)
 		return

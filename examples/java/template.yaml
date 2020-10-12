@@ -26,8 +26,7 @@ Resources:
           NEW_RELIC_ACCOUNT_ID: !Sub ${NRAccountId}
       Layers:
         # This layer includes the New Relic Lambda Extension, a sidecar process that sends telemetry,
-        # TODO: bump version to include extension
-        - !Sub arn:${AWS::Partition}:lambda:${AWS::Region}:466768951184:layer:newrelic-lambda-extension:17
+        - !Sub arn:${AWS::Partition}:lambda:${AWS::Region}:451483290750:layer:NewRelicLambdaExtension:1
       Policies:
         # This policy allows the lambda to know the value of the New Relic licence key. We need this so
         # that we can send telemetry back to New Relic

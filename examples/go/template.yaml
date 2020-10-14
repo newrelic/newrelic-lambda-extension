@@ -13,7 +13,7 @@ Resources:
     Type: AWS::Serverless::Function
     Properties:
       CodeUri:
-        Bucket: !Sub newrelic-example-${AWS::Region}
+        Bucket: !Sub newrelic-example-${AWS::Region}-${NRAccountId}
         Key: go-example.zip
       Description: A simple Lambda, with New Relic telemetry
       FunctionName: newrelic-example-go

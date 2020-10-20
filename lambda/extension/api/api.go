@@ -1,7 +1,10 @@
 // Package api contains types and constants for interacting with the AWS Lambda Extension API.
 package api
 
-import "fmt"
+import (
+	"fmt"
+	"time"
+)
 
 // LifecycleEvent represents lifecycle events that the extension can express interest in
 type LifecycleEvent string
@@ -99,3 +102,9 @@ const (
 	Function               = "function"
 	Extension              = "extension"
 )
+
+type LogEvent struct {
+	Time time.Time `json:"time"`
+	Type string `json:"type"`
+	Record interface{} `json:"record"`
+}

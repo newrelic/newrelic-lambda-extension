@@ -1,6 +1,7 @@
 package main
 
 import (
+	"github.com/newrelic/newrelic-lambda-extension/logserver"
 	"log"
 	"net/http"
 	"time"
@@ -42,6 +43,26 @@ func main() {
 		return
 	}
 
+	logs, err := logserver.Start()
+	if err != nil {
+		log.Println("Failed to start logs HTTP server", err)
+		err = invocationClient.InitError("logs.start", err)
+		if err != nil {
+			log.Fatal(err)
+		}
+		return
+	}
+	subscriptionRequest := api.DefaultLogSubscription([]api.LogEventType{api.Platform}, logs.Path)
+	err = invocationClient.LogRegister(&subscriptionRequest)
+	if err != nil {
+		log.Println("Failed to register with Logs API", err)
+		err = invocationClient.InitError("logs.register", err)
+		if err != nil {
+			log.Fatal(err)
+		}
+		return
+	}
+
 	telemetryClient := telemetry.New(registrationResponse.FunctionName, *licenseKey, conf.TelemetryEndpoint)
 
 	telemetryChan, err := telemetry.InitTelemetryChannel()
@@ -73,6 +94,10 @@ func main() {
 		} else {
 			log.Printf("Telemetry client response: [%s] %s", res.Status, body)
 		}
+	}
+	err = logs.Close()
+	if err != nil {
+		log.Println("Error shutting down logs server", err)
 	}
 
 	log.Printf("New Relic Extension shutting down after %v events\n", counter)

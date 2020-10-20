@@ -1,6 +1,8 @@
 // Package api contains types and constants for interacting with the AWS Lambda Extension API.
 package api
 
+import "fmt"
+
 // LifecycleEvent represents lifecycle events that the extension can express interest in
 type LifecycleEvent string
 
@@ -9,6 +11,7 @@ const (
 	Shutdown LifecycleEvent = "SHUTDOWN"
 
 	Version = "2020-01-01"
+	LogsApiVersion = "2020-08-15"
 
 	LambdaHostPortEnvVar = "AWS_LAMBDA_RUNTIME_API"
 
@@ -39,3 +42,60 @@ type RegistrationResponse struct {
 	FunctionVersion string            `json:"functionVersion"`
 	Handler         string            `json:"handler"`
 }
+
+type LogSubscription struct {
+	Buffering   BufferingCfg   `json:"buffering"`
+	Destination DestinationCfg `json:"destination"`
+	Types       []LogEventType `json:"types"`
+}
+
+func NewLogSubscription(bufferingCfg BufferingCfg, destinationCfg DestinationCfg, types []LogEventType) LogSubscription {
+	return LogSubscription{
+		Buffering:   bufferingCfg,
+		Destination: destinationCfg,
+		Types:       types,
+	}
+}
+
+func DefaultLogSubscription(types []LogEventType, endpoint string) LogSubscription {
+	return LogSubscription{
+		Buffering: BufferingCfg{
+			MaxBytes:  1024 * 1024,
+			MaxItems:  10000,
+			TimeoutMs: 10000,
+		},
+		Destination: DestinationCfg{
+			URI:      endpoint,
+			Protocol: "HTTP",
+			Encoding: "JSON",
+			Method:   "POST",
+		},
+		Types: types,
+	}
+}
+
+func FormatLogsEndpoint(port uint16, path string) string {
+	return fmt.Sprintf("http://sandbox:%d/%s", port, path)
+}
+
+type BufferingCfg struct {
+	MaxBytes  uint32 `json:"maxBytes"`
+	MaxItems  uint32 `json:"maxItems"`
+	TimeoutMs uint32 `json:"timeoutMs"`
+}
+
+type DestinationCfg struct {
+	URI      string `json:"URI"`
+	Protocol string `json:"protocol"`
+	Encoding string `json:"encoding"`
+	Method   string `json:"method"`
+	//Port uint16 `json:"port"` //Not used by us
+}
+
+type LogEventType string
+
+const (
+	Platform  LogEventType = "platform"
+	Function               = "function"
+	Extension              = "extension"
+)

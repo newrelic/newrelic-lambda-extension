@@ -119,6 +119,39 @@ func (ic *InvocationClient) getExitErrorURL() string {
 	return fmt.Sprintf("http://%s/%s/extension/exit/error", ic.baseUrl, ic.version)
 }
 
+func (ic *InvocationClient) getLogRegistrationURL() string {
+	return fmt.Sprintf("http://%s/%s/runtime/logs", ic.baseUrl, api.LogsApiVersion)
+}
+
+// LogRegister registers for log events
+func (ic *InvocationClient) LogRegister(subscriptionRequest *api.LogSubscription) error {
+	subscriptionRequestJson, err := json.Marshal(subscriptionRequest)
+	if err != nil {
+		return fmt.Errorf("error occurred while marshaling subscription request %s", err)
+	}
+
+	req, err := http.NewRequest("PUT", ic.getLogRegistrationURL(), bytes.NewBuffer(subscriptionRequestJson))
+	if err != nil {
+		return fmt.Errorf("error occurred while creating subscription request %s", err)
+	}
+
+	req.Header.Set(api.ExtensionIdHeader, ic.extensionId)
+
+	res, err := ic.httpClient.Do(req)
+	if err != nil {
+		return fmt.Errorf("error occurred while making log subscription request %s", err)
+	}
+
+	defer util.Close(res.Body)
+
+	_, err = ioutil.ReadAll(res.Body)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
 // NextEvent awaits the next event.
 func (ic *InvocationClient) NextEvent() (*api.InvocationEvent, error) {
 	req, err := http.NewRequest("GET", ic.getNextEventURL(), nil)

@@ -48,5 +48,4 @@ func Test_Logserver(t *testing.T) {
 
 	assert.Equal(t, 200, res.StatusCode)
 	assert.Equal(t, http.NoBody, res.Body)
-
 }

@@ -26,7 +26,6 @@ func (ls *LogServer) Close() error {
 }
 
 func (ls *LogServer) handler(res http.ResponseWriter, req *http.Request) {
-	log.Println("Log Handler Invoked")
 	bodyBytes, err := ioutil.ReadAll(req.Body)
 	if err != nil {
 		log.Printf("Error processing log request: %v", err)
@@ -68,7 +67,6 @@ func Start() (*LogServer, error) {
 	}
 
 	http.HandleFunc("/", func(res http.ResponseWriter, req *http.Request) {
-		log.Println("Invoking handler for request ", req.RequestURI)
 		logServer.handler(res, req)
 	})
 

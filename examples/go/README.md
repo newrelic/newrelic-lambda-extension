@@ -22,9 +22,9 @@ AWS Region, and included the `--enable-license-key-secret` flag.
 
 From a command prompt, in this directory, run
 
-    ./deploy.sh <region>
+    ./deploy.sh <accountId> <region>
     
-where `<region>` is your AWS Region, like "us-west-2".
+where `<accountId>` is your New Relic account ID and `<region>` is your AWS Region, like "us-west-2".
 
 This will compile, package and deploy the CloudFormation stack for
 this example function.

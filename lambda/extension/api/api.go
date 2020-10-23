@@ -63,22 +63,20 @@ func NewLogSubscription(bufferingCfg BufferingCfg, destinationCfg DestinationCfg
 func DefaultLogSubscription(types []LogEventType, endpoint string) LogSubscription {
 	return LogSubscription{
 		Buffering: BufferingCfg{
-			MaxBytes:  1024 * 1024,
-			MaxItems:  10000,
-			TimeoutMs: 10000,
+			MaxBytes:  512 * 1024,
+			MaxItems:  1000,
+			TimeoutMs: 100,
 		},
 		Destination: DestinationCfg{
 			URI:      endpoint,
 			Protocol: "HTTP",
-			Encoding: "JSON",
-			Method:   "POST",
 		},
 		Types: types,
 	}
 }
 
-func FormatLogsEndpoint(port uint16, path string) string {
-	return fmt.Sprintf("http://sandbox:%d/%s", port, path)
+func FormatLogsEndpoint(port uint16) string {
+	return fmt.Sprintf("http://sandbox:%d", port)
 }
 
 type BufferingCfg struct {
@@ -90,8 +88,6 @@ type BufferingCfg struct {
 type DestinationCfg struct {
 	URI      string `json:"URI"`
 	Protocol string `json:"protocol"`
-	Encoding string `json:"encoding"`
-	Method   string `json:"method"`
 	//Port uint16 `json:"port"` //Not used by us
 }
 

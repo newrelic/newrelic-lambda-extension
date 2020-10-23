@@ -52,7 +52,8 @@ func main() {
 		}
 		return
 	}
-	subscriptionRequest := api.DefaultLogSubscription([]api.LogEventType{api.Platform}, logs.Path)
+	endpoint := api.FormatLogsEndpoint(logs.Port())
+	subscriptionRequest := api.DefaultLogSubscription([]api.LogEventType{api.Platform, api.Function}, endpoint)
 	err = invocationClient.LogRegister(&subscriptionRequest)
 	if err != nil {
 		log.Println("Failed to register with Logs API", err)

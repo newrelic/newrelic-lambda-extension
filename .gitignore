@@ -3,3 +3,4 @@ extensions/
 /extensions.zip
 /examples/**/packaged.yaml
 /venv/
+response.out

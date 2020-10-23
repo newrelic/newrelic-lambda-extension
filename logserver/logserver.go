@@ -10,12 +10,9 @@ import (
 	"strconv"
 )
 
-const LogsPath = "/logs"
-
 type LogServer struct {
 	ListenString string
 	Server *http.Server
-	Path string
 }
 
 func (ls *LogServer) Port () uint16 {
@@ -29,6 +26,7 @@ func (ls *LogServer) Close() error {
 }
 
 func (ls *LogServer) handler(res http.ResponseWriter, req *http.Request) {
+	log.Println("Log Handler Invoked")
 	bodyBytes, err := ioutil.ReadAll(req.Body)
 	if err != nil {
 		log.Printf("Error processing log request: %v", err)
@@ -43,7 +41,7 @@ func (ls *LogServer) handler(res http.ResponseWriter, req *http.Request) {
 	for _, event := range logEvents {
 		switch event.Type {
 		case "platform.extension":
-			log.Printf("")
+			log.Printf("%v", event.Record)
 		case "platform.report":
 			//TODO: REPORT line
 			log.Printf("ReportViaLogsApi: %v", event.Record)
@@ -57,7 +55,7 @@ func (ls *LogServer) handler(res http.ResponseWriter, req *http.Request) {
 }
 
 func Start() (*LogServer, error) {
-	listener, err := net.Listen("tcp", "127.0.0.1:")
+	listener, err := net.Listen("tcp", ":")
 	if err != nil {
 		return nil, err
 	}
@@ -67,16 +65,17 @@ func Start() (*LogServer, error) {
 	logServer := LogServer{
 		ListenString: listener.Addr().String(),
 		Server:       &server,
-		Path:         LogsPath,
 	}
 
-	http.HandleFunc(LogsPath, func(res http.ResponseWriter, req *http.Request) {
+	http.HandleFunc("/", func(res http.ResponseWriter, req *http.Request) {
+		log.Println("Invoking handler for request ", req.RequestURI)
 		logServer.handler(res, req)
 	})
 
 	go func() {
+		log.Println("Starting log server.")
 		log.Printf("Log server terminating: %v\n", server.Serve(listener))
 	}()
 
-	return &logServer, nil;
+	return &logServer, nil
 }

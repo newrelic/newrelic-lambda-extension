@@ -120,7 +120,7 @@ func (ic *InvocationClient) getExitErrorURL() string {
 }
 
 func (ic *InvocationClient) getLogRegistrationURL() string {
-	return fmt.Sprintf("http://%s/%s/runtime/logs", ic.baseUrl, api.LogsApiVersion)
+	return fmt.Sprintf("http://%s/%s/logs", ic.baseUrl, api.LogsApiVersion)
 }
 
 // LogRegister registers for log events
@@ -129,6 +129,7 @@ func (ic *InvocationClient) LogRegister(subscriptionRequest *api.LogSubscription
 	if err != nil {
 		return fmt.Errorf("error occurred while marshaling subscription request %s", err)
 	}
+	log.Println("Log registration with request ", string(subscriptionRequestJson))
 
 	req, err := http.NewRequest("PUT", ic.getLogRegistrationURL(), bytes.NewBuffer(subscriptionRequestJson))
 	if err != nil {
@@ -144,10 +145,12 @@ func (ic *InvocationClient) LogRegister(subscriptionRequest *api.LogSubscription
 
 	defer util.Close(res.Body)
 
-	_, err = ioutil.ReadAll(res.Body)
+	responseBody, err := ioutil.ReadAll(res.Body)
 	if err != nil {
 		return err
 	}
+
+	log.Println("Registered for logs. Got response code ", res.StatusCode, string(responseBody))
 
 	return nil
 }

@@ -29,7 +29,7 @@ func main() {
 
 	conf := config.ConfigurationFromEnvironment()
 
-	if conf.ExtensionEnabled == false {
+	if !conf.ExtensionEnabled {
 		log.Println("Extension telemetry processing disabled")
 		noopLoop(invocationClient)
 		return
@@ -42,6 +42,8 @@ func main() {
 		noopLoop(invocationClient)
 		return
 	}
+
+	// TODO: set up the telemetry buffer
 
 	logs, err := logserver.Start()
 	if err != nil {

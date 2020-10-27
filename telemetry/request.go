@@ -66,7 +66,7 @@ func BuildRequest(
 		FunctionName:       functionName,
 		InvokedFunctionARN: invocationEvent.InvokedFunctionARN,
 		LogGroupName:       logGroupName,
-		LogStreamName:      "placeholder",
+		LogStreamName:      "newrelic-lambda-extension:1.1.0",
 	}
 	data := RequestData{Context: context, Entry: string(entry)}
 

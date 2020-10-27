@@ -1,80 +1,113 @@
 package telemetry
 
-import "time"
-
-const (
-	BatchSize uint = Ripe / 100
-	VeryOld = 10_000
-	Ripe = 3000
+import (
+	"math"
+	"time"
 )
 
+// The Unix epoch instant; used as a nil time for eldest and lastHarvest
+var epochStart = time.Unix(0,0)
+
+// Batch represents the unsent invocations and their telemetry, along with timing data.
 type Batch struct {
-	LastSend    time.Time
-	Eldest      time.Time
-	Invocations map[string]Invocation
+	lastHarvest time.Time
+	eldest      time.Time
+	invocations map[string]Invocation
+	ripeDuration time.Duration
+	veryOldDuration time.Duration
 }
 
-func NewBatch() Batch {
+// NewBatch constructs a new batch.
+func NewBatch(ripeMillis int64, rotMillis int64) Batch {
+	initialSize := uint32(math.Min(float64(ripeMillis) / 100, 100))
 	return Batch{
-		LastSend: time.Unix(0, 0),
-		Eldest: time.Unix(0,0),
-		Invocations: make(map[string]Invocation, BatchSize),
+		lastHarvest: epochStart,
+		eldest:      epochStart,
+		invocations: make(map[string]Invocation, initialSize),
+		ripeDuration: time.Duration(ripeMillis) * time.Millisecond,
+		veryOldDuration: time.Duration(rotMillis) * time.Millisecond,
 	}
 }
 
+// AddInvocation should be called just after the next API response. It creates the Invocation record so that we can attach telemetry later.
+func (b *Batch) AddInvocation(requestId string, start time.Time) {
+	b.invocations[requestId] = NewInvocation(requestId, start)
+}
+
+// AddTelemetry attaches telemetry to an existing Invocation, identified by requestId
 func (b *Batch) AddTelemetry(requestId string, telemetry []byte) *Invocation {
-	inv, ok := b.Invocations[requestId]
+	inv, ok := b.invocations[requestId]
 	if ok {
 		inv.Telemetry = append(inv.Telemetry, telemetry)
+		if b.eldest.Equal(epochStart) {
+			b.eldest = inv.Start
+		}
 		return &inv
 	}
 	return nil
 }
 
+// Harvest checks to see if it's time to harvest, and returns harvested invocations, or nil. The caller must ensure that harvested invocations are sent.
 func (b *Batch) Harvest(now time.Time) []Invocation {
-	if len(b.Invocations) == 0 {
+	if len(b.invocations) == 0 {
 		return nil
 	}
 
-	veryOldTime := now.Add(VeryOld * time.Millisecond)
-	if b.LastSend.Before(veryOldTime) {
-		return b.aggressiveHarvest()
+	veryOldTime := now.Add(-b.veryOldDuration)
+	if b.lastHarvest.Before(veryOldTime) {
+		return b.aggressiveHarvest(now)
 	}
 
-	ripeTime := now.Add(Ripe * time.Millisecond)
-	if b.Eldest.Before(ripeTime) {
-		return b.completeHarvest()
+	ripeTime := now.Add(-b.ripeDuration)
+	if b.eldest.Before(ripeTime) {
+		return b.ripeHarvest(now)
 	}
 	return nil
 }
 
-func (b *Batch) aggressiveHarvest() []Invocation {
-	ret := make([]Invocation, len(b.Invocations))
-	for k, v := range b.Invocations{
+// Close aggressively harvests all telemetry from the Batch. The Batch is no longer valid.
+func (b *Batch) Close() []Invocation {
+	return b.aggressiveHarvest(time.Now())
+}
+
+// aggressiveHarvest harvests all invocations, ripe or not. It removes harvested invocations from the batch and updates the lastHarvest timestamp.
+func (b *Batch) aggressiveHarvest(now time.Time) []Invocation {
+	ret := make([]Invocation, len(b.invocations))
+	for k, v := range b.invocations {
 		ret = append(ret, v)
-		delete(b.Invocations, k)
+		delete(b.invocations, k)
 	}
+	b.lastHarvest = now
+	b.eldest = epochStart
 	return ret
 }
 
-func (b *Batch) completeHarvest() []Invocation {
-	ret := make([]Invocation, len(b.Invocations))
-	for k, v := range b.Invocations{
-		if v.IsComplete() {
+// ripeHarvest harvests all ripe invocations. It removes harvested invocations from the batch and updates the lastHarvest and eldest timestamps.
+func (b *Batch) ripeHarvest(now time.Time) []Invocation {
+	ret := make([]Invocation, len(b.invocations))
+	newEldest := epochStart
+	for k, v := range b.invocations {
+		if v.IsRipe() {
 			ret = append(ret, v)
-			delete(b.Invocations, k)
+			delete(b.invocations, k)
+		} else if newEldest.Equal(epochStart) || v.Start.Before(newEldest) {
+			newEldest = v.Start
 		}
 	}
+	b.eldest = newEldest
+	b.lastHarvest = now
 	return ret
 }
 
+// An Invocation holds telemetry for a request, and knows when the request began.
 type Invocation struct {
 	Start time.Time
 	RequestId string
 	Telemetry [][]byte
 }
 
-func NewInvocation(start time.Time, requestId string) Invocation {
+// NewInvocation creates an Invocation, which can hold telemetry
+func NewInvocation(requestId string, start time.Time) Invocation {
 	return Invocation{
 		Start: start,
 		RequestId: requestId,
@@ -82,6 +115,7 @@ func NewInvocation(start time.Time, requestId string) Invocation {
 	}
 }
 
-func (inv *Invocation) IsComplete() bool {
+// An Invocation is "ripe" when it has all the telemetry it's likely to get. Sending a ripe invocation won't omit data.
+func (inv *Invocation) IsRipe() bool {
 	return len(inv.Telemetry) >= 2
 }

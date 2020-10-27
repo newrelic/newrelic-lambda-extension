@@ -70,3 +70,22 @@ func TestWithInvocationAggressiveHarvest(t *testing.T) {
 	harvested := batch.Harvest(requestStart.Add(ripe*time.Millisecond + time.Millisecond))
 	assert.Equal(t, 2, len(harvested))
 }
+
+func TestBatch_Close(t *testing.T) {
+	batch := NewBatch(ripe, rot)
+
+	batch.AddInvocation(testRequestId, requestStart)
+	batch.AddInvocation(testRequestId2, requestStart.Add(100 * time.Millisecond))
+	batch.AddInvocation(testRequestId3, requestStart.Add(200 * time.Millisecond))
+
+	invocation := batch.AddTelemetry(testRequestId, bytes.NewBufferString(testTelemetry).Bytes())
+	assert.NotNil(t, invocation)
+
+	invocation2 := batch.AddTelemetry(testRequestId, bytes.NewBufferString(moreTestTelemetry).Bytes())
+	assert.Equal(t, invocation, invocation2)
+
+	batch.AddTelemetry(testRequestId2, bytes.NewBufferString(testTelemetry).Bytes())
+
+	harvested := batch.Close()
+	assert.Equal(t, 2, len(harvested))
+}

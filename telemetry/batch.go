@@ -119,11 +119,12 @@ func NewInvocation(requestId string, start time.Time) Invocation {
 	}
 }
 
-// An Invocation is "ripe" when it has all the telemetry it's likely to get. Sending a ripe invocation won't omit data.
+// IsRipe indicates that an Invocation has all the telemetry it's likely to get. Sending a ripe invocation won't omit data.
 func (inv *Invocation) IsRipe() bool {
 	return len(inv.Telemetry) >= 2
 }
 
+// IsEmpty is true when the invocation has no telemetry. The invocation has begun, but has received no agent payload, nor platform logs.
 func (inv *Invocation) IsEmpty() bool {
 	return len(inv.Telemetry) == 0
 }

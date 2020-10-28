@@ -6,6 +6,11 @@ import (
 	"strings"
 )
 
+const (
+	DefaultRipeMillis = 3_000
+	DefaultRotMillis = 10_000
+)
+
 type Configuration struct {
 	ExtensionEnabled   bool
 	LicenseKey         *string
@@ -45,12 +50,18 @@ func ConfigurationFromEnvironment() Configuration {
 			ret.RipeMillis = uint32(ripeMillis)
 		}
 	}
+	if ret.RipeMillis == 0 {
+		ret.RipeMillis = DefaultRipeMillis
+	}
 	
 	if rotMillisOverride {
 		rotMillis, err := strconv.ParseUint(rotMillisStr, 10, 32)
 		if err == nil {
 			ret.RotMillis = uint32(rotMillis)
 		}
+	}
+	if ret.RotMillis == 0 {
+		ret.RotMillis = DefaultRotMillis
 	}
 	
 	return ret

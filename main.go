@@ -43,7 +43,8 @@ func main() {
 		return
 	}
 
-	// TODO: set up the telemetry buffer
+	// set up the telemetry buffer
+	batch := telemetry.NewBatch(int64(conf.RipeMillis), int64(conf.RotMillis))
 
 	logs, err := logserver.Start()
 	if err != nil {
@@ -74,8 +75,10 @@ func main() {
 	}
 
 	counter := 0
+	invokedFunctionARN := ""
 	for {
 		event, err := invocationClient.NextEvent()
+		now := time.Now()
 		if err != nil {
 			errErr := invocationClient.ExitError("NextEventError.Main", err)
 			if errErr != nil {
@@ -90,24 +93,47 @@ func main() {
 			break
 		}
 
+		invokedFunctionARN = event.InvokedFunctionARN
+
+		batch.AddInvocation(event.RequestID, now)
+
 		telemetryBytes := <-telemetryChan
-		res, body, err := telemetryClient.Send(event, telemetryBytes)
-		if err != nil {
-			log.Printf("Telemetry client error: %s", err)
-		} else {
-			log.Printf("Telemetry client response: [%s] %s", res.Status, body)
+
+		inv := batch.AddTelemetry(event.RequestID, telemetryBytes)
+		if inv == nil {
+			log.Printf("Failed to add telemetry for request %v", event.RequestID)
 		}
+
+		harvested := batch.Harvest(time.Now())
+		shipHarvest(harvested, telemetryClient, invokedFunctionARN)
 	}
+	log.Printf("New Relic Extension shutting down after %v events\n", counter)
+
 	err = logs.Close()
 	if err != nil {
 		log.Println("Error shutting down logs server", err)
 	}
 
-	log.Printf("New Relic Extension shutting down after %v events\n", counter)
+	finalHarvest := batch.Close()
+	shipHarvest(finalHarvest, telemetryClient, invokedFunctionARN)
 
 	shutdownAt := time.Now()
 	ranFor := shutdownAt.Sub(extensionStartup)
 	log.Printf("Extension shutdown after %vms", ranFor.Milliseconds())
+}
+
+func shipHarvest(harvested []*telemetry.Invocation, telemetryClient *telemetry.Client, invokedFunctionARN string) {
+	if len(harvested) > 0 {
+		telemetrySlice := make([][]byte, 0, 2*len(harvested))
+		for _, inv := range harvested {
+			telemetrySlice = append(telemetrySlice, inv.Telemetry...)
+		}
+
+		err := telemetryClient.SendTelemetry(invokedFunctionARN, telemetrySlice)
+		if err != nil {
+			log.Printf("Failed to send harvested telemetry for %d invocations %s", len(harvested), err)
+		}
+	}
 }
 
 func noopLoop(invocationClient *client.InvocationClient) {

@@ -10,6 +10,8 @@ func TestConfigurationFromEnvironmentZero(t *testing.T) {
 	conf := ConfigurationFromEnvironment()
 	expected := Configuration{
 		ExtensionEnabled: true,
+		RipeMillis: DefaultRipeMillis,
+		RotMillis: DefaultRotMillis,
 	}
 	assert.Equal(t, expected, conf)
 }

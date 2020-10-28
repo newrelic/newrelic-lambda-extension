@@ -50,6 +50,7 @@ func TestWithInvocationRipeHarvest(t *testing.T) {
 	harvested := batch.Harvest(requestStart.Add(ripe*time.Millisecond + time.Millisecond))
 	assert.Equal(t, 1, len(harvested))
 	assert.Equal(t, testRequestId, harvested[0].RequestId)
+	assert.Equal(t, 2, len(harvested[0].Telemetry))
 }
 
 func TestWithInvocationAggressiveHarvest(t *testing.T) {

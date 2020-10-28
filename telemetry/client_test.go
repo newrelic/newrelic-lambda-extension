@@ -7,7 +7,6 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/newrelic/newrelic-lambda-extension/lambda/extension/api"
 	"github.com/newrelic/newrelic-lambda-extension/util"
 	"github.com/stretchr/testify/assert"
 )
@@ -18,7 +17,7 @@ func TestClientSend(t *testing.T) {
 
 		assert.Equal(t, r.Header.Get("Content-Encoding"), "gzip")
 		assert.Equal(t, r.Header.Get("Content-Type"), "application/json")
-		assert.Equal(t, r.Header.Get("User-Agent"), "lambda-extension")
+		assert.Equal(t, r.Header.Get("User-Agent"), "newrelic-lambda-extension")
 		assert.Equal(t, r.Header.Get("X-License-Key"), "a mock license key")
 
 		reqBytes, err := ioutil.ReadAll(r.Body)
@@ -42,9 +41,8 @@ func TestClientSend(t *testing.T) {
 
 	client := NewWithHTTPClient(srv.Client(), "", "a mock license key", &srv.URL)
 
-	res, body, err := client.Send(&api.InvocationEvent{}, []byte("foobar"))
+	bytes := []byte("foobar")
+	err := client.SendTelemetry("fakeArn", [][]byte{bytes})
 
 	assert.NoError(t, err)
-	assert.Equal(t, res.StatusCode, http.StatusOK)
-	assert.Equal(t, body, "")
 }

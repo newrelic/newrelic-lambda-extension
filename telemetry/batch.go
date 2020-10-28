@@ -1,6 +1,7 @@
 package telemetry
 
 import (
+	"log"
 	"math"
 	"time"
 )
@@ -83,6 +84,8 @@ func (b *Batch) aggressiveHarvest(now time.Time) []*Invocation {
 	}
 	b.lastHarvest = now
 	b.eldest = epochStart
+	// TODO: remove excess logging
+	log.Printf("Aggressive harvest yielded %d invocations\n", len(ret))
 	return ret
 }
 
@@ -100,6 +103,8 @@ func (b *Batch) ripeHarvest(now time.Time) []*Invocation {
 	}
 	b.eldest = newEldest
 	b.lastHarvest = now
+	// TODO: remove excess logging
+	log.Printf("Ripe harvest yielded %d invocations\n", len(ret))
 	return ret
 }
 

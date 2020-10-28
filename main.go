@@ -17,6 +17,7 @@ func main() {
 	extensionStartup := time.Now()
 	log.Println("New Relic Lambda Extension starting up")
 
+	// Extensions must register
 	registrationClient := client.New(http.Client{})
 	regReq := api.RegistrationRequest{
 		Events: []api.LifecycleEvent{api.Invoke, api.Shutdown},
@@ -27,6 +28,7 @@ func main() {
 		log.Fatal(err)
 	}
 
+	// Parse various env vars for our config
 	conf := config.ConfigurationFromEnvironment()
 
 	if !conf.ExtensionEnabled {
@@ -35,17 +37,19 @@ func main() {
 		return
 	}
 
+	// Attempt to find the license key for telemetry sending
 	licenseKey, err := credentials.GetNewRelicLicenseKey(&conf)
 	if err != nil {
 		log.Println("Failed to retrieve license key", err)
-		// Don't create the telemetry named pipe, just silently pump events
+		// We fail open; telemetry will go to CloudWatch instead
 		noopLoop(invocationClient)
 		return
 	}
 
-	// set up the telemetry buffer
+	// Set up the telemetry buffer
 	batch := telemetry.NewBatch(int64(conf.RipeMillis), int64(conf.RotMillis))
 
+	// Start the Logs API server, and register it
 	logs, err := logserver.Start()
 	if err != nil {
 		log.Println("Failed to start logs HTTP server", err)
@@ -67,6 +71,7 @@ func main() {
 		return
 	}
 
+	// Init the telemetry sending client
 	telemetryClient := telemetry.New(registrationResponse.FunctionName, *licenseKey, conf.TelemetryEndpoint)
 
 	telemetryChan, err := telemetry.InitTelemetryChannel()
@@ -74,11 +79,20 @@ func main() {
 		log.Fatal("telemetry pipe init failed: ", err)
 	}
 
+	// Call next, and process telemetry, until we're shut down
+	mainLoop(invocationClient, batch, telemetryChan, logs, telemetryClient, err)
+
+	shutdownAt := time.Now()
+	ranFor := shutdownAt.Sub(extensionStartup)
+	log.Printf("Extension shutdown after %vms", ranFor.Milliseconds())
+}
+
+func mainLoop(invocationClient *client.InvocationClient, batch telemetry.Batch, telemetryChan chan []byte, logs *logserver.LogServer, telemetryClient *telemetry.Client, err error) {
 	counter := 0
-	invokedFunctionARN := ""
+	var invokedFunctionARN string
 	for {
 		event, err := invocationClient.NextEvent()
-		now := time.Now()
+		eventStart := time.Now()
 		if err != nil {
 			errErr := invocationClient.ExitError("NextEventError.Main", err)
 			if errErr != nil {
@@ -95,13 +109,20 @@ func main() {
 
 		invokedFunctionARN = event.InvokedFunctionARN
 
-		batch.AddInvocation(event.RequestID, now)
+		batch.AddInvocation(event.RequestID, eventStart)
 
 		telemetryBytes := <-telemetryChan
 
 		inv := batch.AddTelemetry(event.RequestID, telemetryBytes)
 		if inv == nil {
 			log.Printf("Failed to add telemetry for request %v", event.RequestID)
+		}
+
+		for _, report := range logs.PollReport() {
+			inv := batch.AddTelemetry(report.RequestID, report.Content)
+			if inv == nil {
+				log.Printf("Failed to add platform log for request %v", report.RequestID)
+			}
 		}
 
 		harvested := batch.Harvest(time.Now())
@@ -116,10 +137,6 @@ func main() {
 
 	finalHarvest := batch.Close()
 	shipHarvest(finalHarvest, telemetryClient, invokedFunctionARN)
-
-	shutdownAt := time.Now()
-	ranFor := shutdownAt.Sub(extensionStartup)
-	log.Printf("Extension shutdown after %vms", ranFor.Milliseconds())
 }
 
 func shipHarvest(harvested []*telemetry.Invocation, telemetryClient *telemetry.Client, invokedFunctionARN string) {

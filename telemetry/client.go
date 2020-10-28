@@ -65,7 +65,9 @@ func (c *Client) SendTelemetry(invokedFunctionARN string, telemetry [][]byte) er
 
 	successCount := 0
 	transmitStart := time.Now()
+	sentBytes := 0
 	for _, p := range compressedPayloads {
+		sentBytes += p.Len()
 		req, err := BuildVortexRequest(err, c.telemetryEndpoint, p, "newrelic-lambda-extension", c.licenseKey)
 		if err != nil {
 			return err
@@ -83,12 +85,13 @@ func (c *Client) SendTelemetry(invokedFunctionARN string, telemetry [][]byte) er
 	totalTime := end.Sub(start)
 	transmissionTime := end.Sub(transmitStart)
 	log.Printf(
-		"Sent %d/%d New Relic payload batches with %d log events successfully in %.3fms (%dms to transmit).",
+		"Sent %d/%d New Relic payload batches with %d log events successfully in %.3fms (%dms to transmit %.1fkB).\n",
 		successCount,
 		len(compressedPayloads),
 		len(telemetry),
 		float64(totalTime.Microseconds()) / 1000.0,
 		transmissionTime.Milliseconds(),
+		float64(sentBytes) / 1024.0,
 	)
 
 	return nil

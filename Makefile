@@ -14,7 +14,7 @@ zip: dist
 	zip -r extensions.zip preview-extensions-ggqizro707 extensions
 
 publish: zip
-	aws lambda publish-layer-version --layer-name newrelic-lambda-extension --zip-file fileb://extensions.zip
+	aws lambda publish-layer-version --no-cli-pager --layer-name newrelic-lambda-extension --zip-file fileb://extensions.zip
 
 test:
 	go test ./...

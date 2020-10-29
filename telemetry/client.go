@@ -2,11 +2,11 @@ package telemetry
 
 import (
 	"io/ioutil"
+	"log"
 	"net/http"
 	"strings"
 	"time"
 
-	"github.com/newrelic/newrelic-lambda-extension/lambda/extension/api"
 	"github.com/newrelic/newrelic-lambda-extension/util"
 )
 
@@ -50,13 +50,54 @@ func getInfraEndpointURL(licenseKey string, telemetryEndpointOverride *string) s
 	return InfraEndpointUS
 }
 
-// Send sends the payload to the Vortex endpoint
-func (c *Client) Send(invocationEvent *api.InvocationEvent, payload []byte) (*http.Response, string, error) {
-	req, err := BuildRequest(payload, invocationEvent, c.functionName, c.licenseKey, c.telemetryEndpoint, "lambda-extension")
-	if err != nil {
-		return nil, "", err
+func (c *Client) SendTelemetry(invokedFunctionARN string, telemetry [][]byte) error {
+	start := time.Now()
+	logEvents := make([]LogsEvent, 0, len(telemetry))
+	for _, payload := range telemetry {
+		logEvent := LogsEventForBytes(payload)
+		logEvents = append(logEvents, logEvent)
 	}
 
+	compressedPayloads, err := CompressedPayloadsForLogEvents(logEvents, c.functionName, invokedFunctionARN)
+	if err != nil {
+		return err
+	}
+
+	successCount := 0
+	transmitStart := time.Now()
+	sentBytes := 0
+	for _, p := range compressedPayloads {
+		sentBytes += p.Len()
+		req, err := BuildVortexRequest(err, c.telemetryEndpoint, p, "newrelic-lambda-extension", c.licenseKey)
+		if err != nil {
+			return err
+		}
+		res, body, err := c.sendRequest(req)
+		if err != nil {
+			log.Printf("Telemetry client error: %s", err)
+		} else if res.StatusCode >= 300 {
+			log.Printf("Telemetry client response: [%s] %s", res.Status, body)
+		} else {
+			successCount += 1
+		}
+	}
+	end := time.Now()
+	totalTime := end.Sub(start)
+	transmissionTime := end.Sub(transmitStart)
+	log.Printf(
+		"Sent %d/%d New Relic payload batches with %d log events successfully in %.3fms (%dms to transmit %.1fkB).\n",
+		successCount,
+		len(compressedPayloads),
+		len(telemetry),
+		float64(totalTime.Microseconds()) / 1000.0,
+		transmissionTime.Milliseconds(),
+		float64(sentBytes) / 1024.0,
+	)
+
+	return nil
+}
+
+func (c *Client) sendRequest(req *http.Request) (*http.Response, string, error) {
 	res, err := c.httpClient.Do(req)
 	if err != nil {
 		return nil, "", err

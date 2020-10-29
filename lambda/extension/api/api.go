@@ -1,6 +1,11 @@
 // Package api contains types and constants for interacting with the AWS Lambda Extension API.
 package api
 
+import (
+	"fmt"
+	"time"
+)
+
 // LifecycleEvent represents lifecycle events that the extension can express interest in
 type LifecycleEvent string
 
@@ -9,6 +14,7 @@ const (
 	Shutdown LifecycleEvent = "SHUTDOWN"
 
 	Version = "2020-01-01"
+	LogsApiVersion = "2020-08-15"
 
 	LambdaHostPortEnvVar = "AWS_LAMBDA_RUNTIME_API"
 
@@ -38,4 +44,63 @@ type RegistrationResponse struct {
 	FunctionName    string            `json:"functionName"`
 	FunctionVersion string            `json:"functionVersion"`
 	Handler         string            `json:"handler"`
+}
+
+type LogSubscription struct {
+	Buffering   BufferingCfg   `json:"buffering"`
+	Destination DestinationCfg `json:"destination"`
+	Types       []LogEventType `json:"types"`
+}
+
+func NewLogSubscription(bufferingCfg BufferingCfg, destinationCfg DestinationCfg, types []LogEventType) LogSubscription {
+	return LogSubscription{
+		Buffering:   bufferingCfg,
+		Destination: destinationCfg,
+		Types:       types,
+	}
+}
+
+func DefaultLogSubscription(types []LogEventType, endpoint string) LogSubscription {
+	return LogSubscription{
+		Buffering: BufferingCfg{
+			MaxBytes:  512 * 1024,
+			MaxItems:  1000,
+			TimeoutMs: 100,
+		},
+		Destination: DestinationCfg{
+			URI:      endpoint,
+			Protocol: "HTTP",
+		},
+		Types: types,
+	}
+}
+
+func FormatLogsEndpoint(port uint16) string {
+	return fmt.Sprintf("http://sandbox:%d", port)
+}
+
+type BufferingCfg struct {
+	MaxBytes  uint32 `json:"maxBytes"`
+	MaxItems  uint32 `json:"maxItems"`
+	TimeoutMs uint32 `json:"timeoutMs"`
+}
+
+type DestinationCfg struct {
+	URI      string `json:"URI"`
+	Protocol string `json:"protocol"`
+	//Port uint16 `json:"port"` //Not used by us
+}
+
+type LogEventType string
+
+const (
+	Platform  LogEventType = "platform"
+	Function               = "function"
+	Extension              = "extension"
+)
+
+type LogEvent struct {
+	Time time.Time `json:"time"`
+	Type string `json:"type"`
+	Record interface{} `json:"record"`
 }

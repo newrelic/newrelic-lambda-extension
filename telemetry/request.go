@@ -11,7 +11,7 @@ import (
 )
 
 const (
-	maxCompressedPayloadLen = 1000*1024
+	maxCompressedPayloadLen = 1000 * 1024
 )
 
 // RequestContext is the Vortex request context

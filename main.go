@@ -15,6 +15,11 @@ import (
 
 func main() {
 	extensionStartup := time.Now()
+
+	// Go Logging config
+	log.SetPrefix("[NR_EXT] ")
+	log.SetFlags(0)
+
 	log.Println("New Relic Lambda Extension starting up")
 
 	// Extensions must register
@@ -50,21 +55,20 @@ func main() {
 	batch := telemetry.NewBatch(int64(conf.RipeMillis), int64(conf.RotMillis))
 
 	// Start the Logs API server, and register it
-	logs, err := logserver.Start()
+	logServer, err := logserver.Start()
 	if err != nil {
 		log.Println("Failed to start logs HTTP server", err)
-		err = invocationClient.InitError("logs.start", err)
+		err = invocationClient.InitError("logServer.start", err)
 		if err != nil {
 			log.Fatal(err)
 		}
 		return
 	}
-	endpoint := api.FormatLogsEndpoint(logs.Port())
-	subscriptionRequest := api.DefaultLogSubscription([]api.LogEventType{api.Platform, api.Function}, endpoint)
+	subscriptionRequest := api.DefaultLogSubscription([]api.LogEventType{api.Platform}, logServer.Port())
 	err = invocationClient.LogRegister(&subscriptionRequest)
 	if err != nil {
 		log.Println("Failed to register with Logs API", err)
-		err = invocationClient.InitError("logs.register", err)
+		err = invocationClient.InitError("logServer.register", err)
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -80,14 +84,14 @@ func main() {
 	}
 
 	// Call next, and process telemetry, until we're shut down
-	mainLoop(invocationClient, batch, telemetryChan, logs, telemetryClient, err)
+	mainLoop(invocationClient, &batch, telemetryChan, logServer, telemetryClient)
 
 	shutdownAt := time.Now()
 	ranFor := shutdownAt.Sub(extensionStartup)
 	log.Printf("Extension shutdown after %vms", ranFor.Milliseconds())
 }
 
-func mainLoop(invocationClient *client.InvocationClient, batch telemetry.Batch, telemetryChan chan []byte, logs *logserver.LogServer, telemetryClient *telemetry.Client, err error) {
+func mainLoop(invocationClient *client.InvocationClient, batch *telemetry.Batch, telemetryChan chan []byte, logServer *logserver.LogServer, telemetryClient *telemetry.Client) {
 	counter := 0
 	var invokedFunctionARN string
 	for {
@@ -100,6 +104,7 @@ func mainLoop(invocationClient *client.InvocationClient, batch telemetry.Batch, 
 			}
 			log.Fatal(err)
 		}
+		timeout := time.NewTimer(time.Duration(event.DeadlineMs) * time.Microsecond)
 
 		counter++
 
@@ -111,32 +116,54 @@ func mainLoop(invocationClient *client.InvocationClient, batch telemetry.Batch, 
 
 		batch.AddInvocation(event.RequestID, eventStart)
 
-		telemetryBytes := <-telemetryChan
-
-		inv := batch.AddTelemetry(event.RequestID, telemetryBytes)
-		if inv == nil {
-			log.Printf("Failed to add telemetry for request %v", event.RequestID)
-		}
-
-		for _, report := range logs.PollReport() {
-			inv := batch.AddTelemetry(report.RequestID, report.Content)
+		// Await agent telemetry. This may time out.
+		log.Printf(
+			"Event %v started at %v times out in %.3fms",
+			event.RequestID,
+			eventStart,
+			float64(event.DeadlineMs)/1000,
+		)
+		// Race the timeout against the telemetry channel
+		select {
+		case telemetryBytes := <-telemetryChan:
+			// We received telemetry
+			inv := batch.AddTelemetry(event.RequestID, telemetryBytes)
 			if inv == nil {
-				log.Printf("Failed to add platform log for request %v", report.RequestID)
+				log.Printf("Failed to add telemetry for request %v", event.RequestID)
 			}
-		}
+			// Tear down the timer
+			if !timeout.Stop() {
+				<-timeout.C
+			}
 
-		harvested := batch.Harvest(time.Now())
-		shipHarvest(harvested, telemetryClient, invokedFunctionARN)
+			pollLogServer(logServer, batch)
+
+			harvested := batch.Harvest(time.Now())
+			shipHarvest(harvested, telemetryClient, invokedFunctionARN)
+		case <-timeout.C:
+			// Function is timing out
+		}
 	}
 	log.Printf("New Relic Extension shutting down after %v events\n", counter)
 
-	err = logs.Close()
+	err := logServer.Close()
 	if err != nil {
-		log.Println("Error shutting down logs server", err)
+		log.Println("Error shutting down Log API server", err)
 	}
 
+	pollLogServer(logServer, batch)
 	finalHarvest := batch.Close()
 	shipHarvest(finalHarvest, telemetryClient, invokedFunctionARN)
+}
+
+// pollLogServer polls for platform logs, and annotates telemetry
+func pollLogServer(logServer *logserver.LogServer, batch *telemetry.Batch) {
+	for _, platformLog := range logServer.PollPlatformChannel() {
+		inv := batch.AddTelemetry(platformLog.RequestID, platformLog.Content)
+		if inv == nil {
+			log.Printf("Failed to add platform log for request %v", platformLog.RequestID)
+		}
+	}
 }
 
 func shipHarvest(harvested []*telemetry.Invocation, telemetryClient *telemetry.Client, invokedFunctionARN string) {

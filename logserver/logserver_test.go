@@ -21,15 +21,12 @@ func Test_Logserver(t *testing.T) {
 		}
 		return
 	}
-	endpoint := api.FormatLogsEndpoint(logs.Port())
-
-	assert.Equal(t, fmt.Sprintf("http://sandbox:%d", logs.Port()), endpoint)
 
 	testEvents := []api.LogEvent{
 		{
-			Time:  time.Now(),
-			Type:  "platform.extension",
-			Record: map[string]string {
+			Time: time.Now(),
+			Type: "platform.extension",
+			Record: map[string]string{
 				"foo": "bar",
 			},
 		},

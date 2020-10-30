@@ -8,8 +8,14 @@ import (
 	"log"
 	"net"
 	"net/http"
+	"regexp"
 	"strconv"
+	"time"
 )
+
+var uuidPattern, _ = regexp.Compile("\\b[-a-zA-Z0-9]{36}\\b")
+
+const platformLogBufferSize = 100
 
 type LogLine struct {
 	RequestID string
@@ -17,28 +23,35 @@ type LogLine struct {
 }
 
 type LogServer struct {
-	listenString string
-	server       *http.Server
-	reportChan   chan LogLine
+	listenString    string
+	server          *http.Server
+	platformLogChan chan LogLine
 }
 
-func (ls *LogServer) Port () uint16 {
+func (ls *LogServer) Port() uint16 {
 	_, portStr, _ := net.SplitHostPort(ls.listenString)
 	port, _ := strconv.ParseUint(portStr, 10, 16)
 	return uint16(port)
 }
 
 func (ls *LogServer) Close() error {
-	close(ls.reportChan)
+	// Pause briefly to allow final platform logs to arrive
+	time.Sleep(200 * time.Millisecond)
+
+	close(ls.platformLogChan)
 	return ls.server.Close()
 }
 
-func (ls *LogServer) PollReport() []LogLine {
+func (ls *LogServer) PollPlatformChannel() []LogLine {
 	var ret []LogLine
 	for {
 		select {
-		case report := <- ls.reportChan:
-			ret = append(ret, report)
+		case report, more := <-ls.platformLogChan:
+			if more {
+				ret = append(ret, report)
+			} else {
+				return ret
+			}
 		default:
 			return ret
 		}
@@ -84,6 +97,8 @@ func (ls *LogServer) handler(res http.ResponseWriter, req *http.Request) {
 	}
 
 	for _, event := range logEvents {
+		// TODO: remove unnecessary logs
+		log.Println("Got log of type ", event.Type)
 		switch event.Type {
 		case "platform.report":
 			record := event.Record.(map[string]interface{})
@@ -98,7 +113,7 @@ func (ls *LogServer) handler(res http.ResponseWriter, req *http.Request) {
 				RequestID: requestId,
 				Content:   []byte(reportStr),
 			}
-			ls.reportChan <- reportLine
+			ls.platformLogChan <- reportLine
 		case "platform.logsDropped":
 			log.Printf("Platform dropped logs: %v", event.Record)
 		//TODO: handle function logs. NB: they should send directly, as they don't need to decorate telemetry
@@ -118,9 +133,9 @@ func Start() (*LogServer, error) {
 	server := http.Server{}
 
 	logServer := LogServer{
-		listenString: listener.Addr().String(),
-		server:       &server,
-		reportChan: make(chan LogLine, 100),
+		listenString:    listener.Addr().String(),
+		server:          &server,
+		platformLogChan: make(chan LogLine, platformLogBufferSize),
 	}
 
 	http.HandleFunc("/", func(res http.ResponseWriter, req *http.Request) {

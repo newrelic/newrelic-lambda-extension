@@ -185,7 +185,7 @@ func (ic *InvocationClient) NextEvent() (*api.InvocationEvent, error) {
 	return &event, nil
 }
 
-func (ic *InvocationClient) InitError(errorEnum string, initError error) (error) {
+func (ic *InvocationClient) InitError(errorEnum string, initError error) error {
 	errorBuf := bytes.NewBufferString(initError.Error())
 	req, err := http.NewRequest("POST", ic.getInitErrorURL(), errorBuf)
 	if err != nil {
@@ -205,7 +205,7 @@ func (ic *InvocationClient) InitError(errorEnum string, initError error) (error)
 	return nil
 }
 
-func (ic *InvocationClient) ExitError(errorEnum string, exitError error) (error) {
+func (ic *InvocationClient) ExitError(errorEnum string, exitError error) error {
 	errorBuf := bytes.NewBufferString(exitError.Error())
 	req, err := http.NewRequest("POST", ic.getExitErrorURL(), errorBuf)
 	if err != nil {

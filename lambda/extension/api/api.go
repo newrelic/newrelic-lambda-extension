@@ -13,20 +13,20 @@ const (
 	Invoke   LifecycleEvent = "INVOKE"
 	Shutdown LifecycleEvent = "SHUTDOWN"
 
-	Version = "2020-01-01"
+	Version        = "2020-01-01"
 	LogsApiVersion = "2020-08-15"
 
 	LambdaHostPortEnvVar = "AWS_LAMBDA_RUNTIME_API"
 
-	ExtensionNameHeader = "Lambda-Extension-Name"
-	ExtensionIdHeader   = "Lambda-Extension-Identifier"
-	ExtensionErrorTypeHeader   = "Lambda-Extension-Function-Error-Type"
+	ExtensionNameHeader      = "Lambda-Extension-Name"
+	ExtensionIdHeader        = "Lambda-Extension-Identifier"
+	ExtensionErrorTypeHeader = "Lambda-Extension-Function-Error-Type"
 )
 
 type InvocationEvent struct {
 	// Either INVOKE or SHUTDOWN.
 	EventType LifecycleEvent `json:"eventType"`
-	// The time at which the event will timeout, as milliseconds since the epoch.
+	// The time left on the invocation, in microseconds.
 	DeadlineMs int64 `json:"deadlineMs"`
 	// The AWS Request ID, for INVOKE events.
 	RequestID string `json:"requestId"`
@@ -37,13 +37,13 @@ type InvocationEvent struct {
 }
 
 type RegistrationRequest struct {
-	Events            []LifecycleEvent `json:"events"`
+	Events []LifecycleEvent `json:"events"`
 }
 
 type RegistrationResponse struct {
-	FunctionName    string            `json:"functionName"`
-	FunctionVersion string            `json:"functionVersion"`
-	Handler         string            `json:"handler"`
+	FunctionName    string `json:"functionName"`
+	FunctionVersion string `json:"functionVersion"`
+	Handler         string `json:"handler"`
 }
 
 type LogSubscription struct {
@@ -60,10 +60,12 @@ func NewLogSubscription(bufferingCfg BufferingCfg, destinationCfg DestinationCfg
 	}
 }
 
-func DefaultLogSubscription(types []LogEventType, endpoint string) LogSubscription {
+func DefaultLogSubscription(types []LogEventType, port uint16) LogSubscription {
+	endpoint := formatLogsEndpoint(port)
+
 	return LogSubscription{
 		Buffering: BufferingCfg{
-			MaxBytes:  512 * 1024,
+			MaxBytes:  256 * 1024,
 			MaxItems:  1000,
 			TimeoutMs: 100,
 		},
@@ -75,7 +77,7 @@ func DefaultLogSubscription(types []LogEventType, endpoint string) LogSubscripti
 	}
 }
 
-func FormatLogsEndpoint(port uint16) string {
+func formatLogsEndpoint(port uint16) string {
 	return fmt.Sprintf("http://sandbox:%d", port)
 }
 
@@ -100,7 +102,7 @@ const (
 )
 
 type LogEvent struct {
-	Time time.Time `json:"time"`
-	Type string `json:"type"`
+	Time   time.Time   `json:"time"`
+	Type   string      `json:"type"`
 	Record interface{} `json:"record"`
 }

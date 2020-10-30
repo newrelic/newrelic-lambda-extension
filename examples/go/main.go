@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/newrelic/go-agent/v3/integrations/nrlambda"
 	"github.com/newrelic/go-agent/v3/newrelic"
+	"time"
 )
 
 func handler(ctx context.Context) (string, error) {
@@ -22,6 +23,9 @@ func handler(ctx context.Context) (string, error) {
 
 	// As normal, anything you write to stdout ends up in CloudWatch
 	fmt.Println("hello world!")
+
+	// Pause, for timeout
+	time.Sleep(1500 * time.Millisecond)
 
 	return "Success!", nil
 }

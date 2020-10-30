@@ -38,7 +38,7 @@ func NewWithHTTPClient(httpClient *http.Client, functionName string, licenseKey 
 	return &Client{httpClient, licenseKey, endpoint, functionName}
 }
 
-// GetInfraEndpointURL returns the Vortex endpoint for the provided license key
+// getInfraEndpointURL returns the Vortex endpoint for the provided license key
 func getInfraEndpointURL(licenseKey string, telemetryEndpointOverride *string) string {
 	if telemetryEndpointOverride != nil {
 		return *telemetryEndpointOverride
@@ -89,9 +89,9 @@ func (c *Client) SendTelemetry(invokedFunctionARN string, telemetry [][]byte) er
 		successCount,
 		len(compressedPayloads),
 		len(telemetry),
-		float64(totalTime.Microseconds()) / 1000.0,
+		float64(totalTime.Microseconds())/1000.0,
 		transmissionTime.Milliseconds(),
-		float64(sentBytes) / 1024.0,
+		float64(sentBytes)/1024.0,
 	)
 
 	return nil

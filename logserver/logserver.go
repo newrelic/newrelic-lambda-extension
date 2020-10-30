@@ -97,8 +97,6 @@ func (ls *LogServer) handler(res http.ResponseWriter, req *http.Request) {
 	}
 
 	for _, event := range logEvents {
-		// TODO: remove unnecessary logs
-		log.Println("Got log of type ", event.Type)
 		switch event.Type {
 		case "platform.report":
 			record := event.Record.(map[string]interface{})

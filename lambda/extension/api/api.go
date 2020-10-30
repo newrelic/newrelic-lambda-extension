@@ -8,10 +8,15 @@ import (
 
 // LifecycleEvent represents lifecycle events that the extension can express interest in
 type LifecycleEvent string
+type ShutdownReason string
 
 const (
 	Invoke   LifecycleEvent = "INVOKE"
 	Shutdown LifecycleEvent = "SHUTDOWN"
+
+	Spindown ShutdownReason = "spindown"
+	Timeout ShutdownReason = "timeout"
+	Failure ShutdownReason = "failure"
 
 	Version        = "2020-01-01"
 	LogsApiVersion = "2020-08-15"
@@ -34,6 +39,8 @@ type InvocationEvent struct {
 	InvokedFunctionARN string `json:"invokedFunctionArn"`
 	// XRay trace ID, for INVOKE events.
 	Tracing map[string]string `json:"tracing"`
+	// The reason for termination, if this is a shutdown event
+	ShutdownReason ShutdownReason `json:"shutdownReason"`
 }
 
 type RegistrationRequest struct {

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"github.com/newrelic/newrelic-lambda-extension/logserver"
 	"log"
 	"net/http"
@@ -94,6 +95,9 @@ func main() {
 func mainLoop(invocationClient *client.InvocationClient, batch *telemetry.Batch, telemetryChan chan []byte, logServer *logserver.LogServer, telemetryClient *telemetry.Client) {
 	counter := 0
 	var invokedFunctionARN string
+	var lastRequestId string
+	var lastEventStart time.Time
+	probablyTimeout := false
 	for {
 		event, err := invocationClient.NextEvent()
 		eventStart := time.Now()
@@ -104,22 +108,52 @@ func mainLoop(invocationClient *client.InvocationClient, batch *telemetry.Batch,
 			}
 			log.Fatal(err)
 		}
+		// TODO: This is meant to be milliseconds; there's a platform bug.
 		timeout := time.NewTimer(time.Duration(event.DeadlineMs) * time.Microsecond)
 
 		counter++
 
+		if probablyTimeout {
+			// We suspect a timeout. Either way, we've gotten to the next event, so telemetry will
+			// have arrived for the last request if it's going to. Non-blocking poll for telemetry.
+			// If we have indeed timed out, there's a chance we got telemetry out anyway. If we haven't
+			// timed out, this will catch us up to the current state of telemetry.
+			select {
+			case telemetryBytes := <-telemetryChan:
+				// We received telemetry
+				batch.AddTelemetry(lastRequestId, telemetryBytes)
+			default:
+			}
+		}
+
 		if event.EventType == api.Shutdown {
+			if event.ShutdownReason == api.Timeout && lastRequestId != "" {
+				// Synthesize the timeout error message that the platform produces, and LLC parses
+				timestamp := eventStart.UTC()
+				timeoutSecs := eventStart.Sub(lastEventStart).Seconds()
+				timeoutMessage := fmt.Sprintf(
+					"%s %s Task timed out after %.2f seconds",
+					timestamp.Format(time.RFC3339),
+					lastRequestId,
+					timeoutSecs,
+				)
+				batch.AddTelemetry(lastRequestId, []byte(timeoutMessage))
+			} else if event.ShutdownReason == api.Failure && lastRequestId != "" {
+				errorMessage := fmt.Sprintf("RequestId: %s A platform error caused a shutdown", lastRequestId)
+				batch.AddTelemetry(lastRequestId, []byte(errorMessage))
+			}
+
 			break
 		}
 
 		invokedFunctionARN = event.InvokedFunctionARN
-
-		batch.AddInvocation(event.RequestID, eventStart)
+		lastRequestId = event.RequestID
+		batch.AddInvocation(lastRequestId, eventStart)
 
 		// Await agent telemetry. This may time out.
 		log.Printf(
 			"Event %v started at %v times out in %.3fms",
-			event.RequestID,
+			lastRequestId,
 			eventStart,
 			float64(event.DeadlineMs)/1000,
 		)
@@ -127,9 +161,9 @@ func mainLoop(invocationClient *client.InvocationClient, batch *telemetry.Batch,
 		select {
 		case telemetryBytes := <-telemetryChan:
 			// We received telemetry
-			inv := batch.AddTelemetry(event.RequestID, telemetryBytes)
+			inv := batch.AddTelemetry(lastRequestId, telemetryBytes)
 			if inv == nil {
-				log.Printf("Failed to add telemetry for request %v", event.RequestID)
+				log.Printf("Failed to add telemetry for request %v", lastRequestId)
 			}
 			// Tear down the timer
 			if !timeout.Stop() {
@@ -142,7 +176,9 @@ func mainLoop(invocationClient *client.InvocationClient, batch *telemetry.Batch,
 			shipHarvest(harvested, telemetryClient, invokedFunctionARN)
 		case <-timeout.C:
 			// Function is timing out
+			probablyTimeout = true
 		}
+		lastEventStart = eventStart
 	}
 	log.Printf("New Relic Extension shutting down after %v events\n", counter)
 

@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/newrelic/newrelic-lambda-extension/lambda/extension/api"
 	"github.com/newrelic/newrelic-lambda-extension/util"
 )
 
@@ -98,36 +97,10 @@ func CompressedPayloadsForLogEvents(logsEvents []LogsEvent, functionName string,
 
 		return append(leftRet, rightRet...), nil
 	}
-
 }
 
-// BuildRequest builds a Vortex HTTP request
-func BuildRequest(
-	payload []byte,
-	invocationEvent *api.InvocationEvent,
-	functionName string,
-	licenseKey string,
-	url string,
-	userAgent string,
-) ([]*http.Request, error) {
-	logEvent := LogsEventForBytes(payload)
-	compressedPayloads, err := CompressedPayloadsForLogEvents([]LogsEvent{logEvent}, functionName, invocationEvent.InvokedFunctionARN)
-	if err != nil {
-		return nil, err
-	}
-
-	ret := make([]*http.Request, 0, len(compressedPayloads))
-	for _, p := range compressedPayloads {
-		req, err := BuildVortexRequest(err, url, p, userAgent, licenseKey)
-		if err != nil {
-			return nil, err
-		}
-		ret = append(ret, req)
-	}
-	return ret, nil
-}
-
-func BuildVortexRequest(err error, url string, compressed *bytes.Buffer, userAgent string, licenseKey string) (*http.Request, error) {
+// BuildVortexRequest builds a Vortex HTTP request
+func BuildVortexRequest(url string, compressed *bytes.Buffer, userAgent string, licenseKey string) (*http.Request, error) {
 	req, err := http.NewRequest("POST", url, compressed)
 	if err != nil {
 		return nil, fmt.Errorf("error creating request: %v", err)

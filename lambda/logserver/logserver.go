@@ -8,12 +8,9 @@ import (
 	"log"
 	"net"
 	"net/http"
-	"regexp"
 	"strconv"
 	"time"
 )
-
-var uuidPattern, _ = regexp.Compile("\\b[-a-zA-Z0-9]{36}\\b")
 
 const platformLogBufferSize = 100
 

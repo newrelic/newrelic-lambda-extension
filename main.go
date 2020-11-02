@@ -2,7 +2,7 @@ package main
 
 import (
 	"fmt"
-	"github.com/newrelic/newrelic-lambda-extension/logserver"
+	"github.com/newrelic/newrelic-lambda-extension/lambda/logserver"
 	"log"
 	"net/http"
 	"time"

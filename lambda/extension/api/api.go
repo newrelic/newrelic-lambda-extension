@@ -9,23 +9,32 @@ import (
 // LifecycleEvent represents lifecycle events that the extension can express interest in
 type LifecycleEvent string
 type ShutdownReason string
+type LogEventType string
 
 const (
 	Invoke   LifecycleEvent = "INVOKE"
 	Shutdown LifecycleEvent = "SHUTDOWN"
 
 	Spindown ShutdownReason = "spindown"
-	Timeout ShutdownReason = "timeout"
-	Failure ShutdownReason = "failure"
+	Timeout  ShutdownReason = "timeout"
+	Failure  ShutdownReason = "failure"
 
-	Version        = "2020-01-01"
-	LogsApiVersion = "2020-08-15"
+	Platform  LogEventType = "platform"
+	Function               = "function"
+	Extension              = "extension"
+
+	Version        string = "2020-01-01"
+	LogsApiVersion        = "2020-08-15"
 
 	LambdaHostPortEnvVar = "AWS_LAMBDA_RUNTIME_API"
 
 	ExtensionNameHeader      = "Lambda-Extension-Name"
 	ExtensionIdHeader        = "Lambda-Extension-Identifier"
 	ExtensionErrorTypeHeader = "Lambda-Extension-Function-Error-Type"
+
+	LogBufferDefaultBytes   uint32 = 256 * 1024
+	LogBufferDefaultItems   uint32 = 1000
+	LogBufferDefaultTimeout uint32 = 500
 )
 
 type InvocationEvent struct {
@@ -70,18 +79,18 @@ func NewLogSubscription(bufferingCfg BufferingCfg, destinationCfg DestinationCfg
 func DefaultLogSubscription(types []LogEventType, port uint16) LogSubscription {
 	endpoint := formatLogsEndpoint(port)
 
-	return LogSubscription{
-		Buffering: BufferingCfg{
-			MaxBytes:  256 * 1024,
-			MaxItems:  1000,
-			TimeoutMs: 100,
+	return NewLogSubscription(
+		BufferingCfg{
+			MaxBytes:  LogBufferDefaultBytes,
+			MaxItems:  LogBufferDefaultItems,
+			TimeoutMs: LogBufferDefaultTimeout,
 		},
-		Destination: DestinationCfg{
+		DestinationCfg{
 			URI:      endpoint,
 			Protocol: "HTTP",
 		},
-		Types: types,
-	}
+		types,
+	)
 }
 
 func formatLogsEndpoint(port uint16) string {
@@ -99,14 +108,6 @@ type DestinationCfg struct {
 	Protocol string `json:"protocol"`
 	//Port uint16 `json:"port"` //Not used by us
 }
-
-type LogEventType string
-
-const (
-	Platform  LogEventType = "platform"
-	Function               = "function"
-	Extension              = "extension"
-)
 
 type LogEvent struct {
 	Time   time.Time   `json:"time"`

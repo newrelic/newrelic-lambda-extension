@@ -68,7 +68,7 @@ func (c *Client) SendTelemetry(invokedFunctionARN string, telemetry [][]byte) er
 	sentBytes := 0
 	for _, p := range compressedPayloads {
 		sentBytes += p.Len()
-		req, err := BuildVortexRequest(err, c.telemetryEndpoint, p, "newrelic-lambda-extension", c.licenseKey)
+		req, err := BuildVortexRequest(c.telemetryEndpoint, p, "newrelic-lambda-extension", c.licenseKey)
 		if err != nil {
 			return err
 		}

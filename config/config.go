@@ -7,8 +7,8 @@ import (
 )
 
 const (
-	DefaultRipeMillis = 3_000
-	DefaultRotMillis  = 10_000
+	DefaultRipeMillis = 7_000
+	DefaultRotMillis  = 12_000
 )
 
 type Configuration struct {

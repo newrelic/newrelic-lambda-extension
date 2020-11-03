@@ -21,16 +21,20 @@ func Test_Logserver(t *testing.T) {
 		}
 		return
 	}
-	endpoint := api.FormatLogsEndpoint(logs.Port())
-
-	assert.Equal(t, fmt.Sprintf("http://sandbox:%d", logs.Port()), endpoint)
 
 	testEvents := []api.LogEvent{
 		{
-			Time:  time.Now(),
-			Type:  "platform.extension",
-			Record: map[string]string {
-				"foo": "bar",
+			Time: time.Now(),
+			Type: "platform.report",
+			Record: map[string]interface{}{
+				"metrics": map[string]float64{
+					"durationMs":       25.3,
+					"billedDurationMs": 100.0,
+					"memorySizeMB":     128.0,
+					"maxMemoryUsedMB":  73.5,
+					"initDurationMs":   202.0,
+				},
+				"requestId": "testRequestId",
 			},
 		},
 	}
@@ -48,4 +52,9 @@ func Test_Logserver(t *testing.T) {
 
 	assert.Equal(t, 200, res.StatusCode)
 	assert.Equal(t, http.NoBody, res.Body)
+
+	logLines := logs.PollPlatformChannel()
+
+	assert.Equal(t, 1, len(logLines))
+	assert.Equal(t, "REPORT RequestId: testRequestId\tDuration: 25.30 ms\tBilled Duration: 100 ms\tMemory Size: 128 MB\tMax Memory Used: 74 MB\tInit Duration: 202.00 ms", string(logLines[0].Content))
 }

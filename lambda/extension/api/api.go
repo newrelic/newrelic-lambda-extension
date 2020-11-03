@@ -8,25 +8,39 @@ import (
 
 // LifecycleEvent represents lifecycle events that the extension can express interest in
 type LifecycleEvent string
+type ShutdownReason string
+type LogEventType string
 
 const (
 	Invoke   LifecycleEvent = "INVOKE"
 	Shutdown LifecycleEvent = "SHUTDOWN"
 
-	Version = "2020-01-01"
-	LogsApiVersion = "2020-08-15"
+	Spindown ShutdownReason = "spindown"
+	Timeout  ShutdownReason = "timeout"
+	Failure  ShutdownReason = "failure"
+
+	Platform  LogEventType = "platform"
+	Function               = "function"
+	Extension              = "extension"
+
+	Version        string = "2020-01-01"
+	LogsApiVersion        = "2020-08-15"
 
 	LambdaHostPortEnvVar = "AWS_LAMBDA_RUNTIME_API"
 
-	ExtensionNameHeader = "Lambda-Extension-Name"
-	ExtensionIdHeader   = "Lambda-Extension-Identifier"
-	ExtensionErrorTypeHeader   = "Lambda-Extension-Function-Error-Type"
+	ExtensionNameHeader      = "Lambda-Extension-Name"
+	ExtensionIdHeader        = "Lambda-Extension-Identifier"
+	ExtensionErrorTypeHeader = "Lambda-Extension-Function-Error-Type"
+
+	LogBufferDefaultBytes   uint32 = 256 * 1024
+	LogBufferDefaultItems   uint32 = 1000
+	LogBufferDefaultTimeout uint32 = 500
 )
 
 type InvocationEvent struct {
 	// Either INVOKE or SHUTDOWN.
 	EventType LifecycleEvent `json:"eventType"`
-	// The time at which the event will timeout, as milliseconds since the epoch.
+	// The time left on the invocation, in microseconds.
 	DeadlineMs int64 `json:"deadlineMs"`
 	// The AWS Request ID, for INVOKE events.
 	RequestID string `json:"requestId"`
@@ -34,16 +48,18 @@ type InvocationEvent struct {
 	InvokedFunctionARN string `json:"invokedFunctionArn"`
 	// XRay trace ID, for INVOKE events.
 	Tracing map[string]string `json:"tracing"`
+	// The reason for termination, if this is a shutdown event
+	ShutdownReason ShutdownReason `json:"shutdownReason"`
 }
 
 type RegistrationRequest struct {
-	Events            []LifecycleEvent `json:"events"`
+	Events []LifecycleEvent `json:"events"`
 }
 
 type RegistrationResponse struct {
-	FunctionName    string            `json:"functionName"`
-	FunctionVersion string            `json:"functionVersion"`
-	Handler         string            `json:"handler"`
+	FunctionName    string `json:"functionName"`
+	FunctionVersion string `json:"functionVersion"`
+	Handler         string `json:"handler"`
 }
 
 type LogSubscription struct {
@@ -60,22 +76,24 @@ func NewLogSubscription(bufferingCfg BufferingCfg, destinationCfg DestinationCfg
 	}
 }
 
-func DefaultLogSubscription(types []LogEventType, endpoint string) LogSubscription {
-	return LogSubscription{
-		Buffering: BufferingCfg{
-			MaxBytes:  512 * 1024,
-			MaxItems:  1000,
-			TimeoutMs: 100,
+func DefaultLogSubscription(types []LogEventType, port uint16) LogSubscription {
+	endpoint := formatLogsEndpoint(port)
+
+	return NewLogSubscription(
+		BufferingCfg{
+			MaxBytes:  LogBufferDefaultBytes,
+			MaxItems:  LogBufferDefaultItems,
+			TimeoutMs: LogBufferDefaultTimeout,
 		},
-		Destination: DestinationCfg{
+		DestinationCfg{
 			URI:      endpoint,
 			Protocol: "HTTP",
 		},
-		Types: types,
-	}
+		types,
+	)
 }
 
-func FormatLogsEndpoint(port uint16) string {
+func formatLogsEndpoint(port uint16) string {
 	return fmt.Sprintf("http://sandbox:%d", port)
 }
 
@@ -91,16 +109,8 @@ type DestinationCfg struct {
 	//Port uint16 `json:"port"` //Not used by us
 }
 
-type LogEventType string
-
-const (
-	Platform  LogEventType = "platform"
-	Function               = "function"
-	Extension              = "extension"
-)
-
 type LogEvent struct {
-	Time time.Time `json:"time"`
-	Type string `json:"type"`
+	Time   time.Time   `json:"time"`
+	Type   string      `json:"type"`
 	Record interface{} `json:"record"`
 }

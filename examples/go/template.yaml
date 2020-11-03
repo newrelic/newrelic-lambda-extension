@@ -13,13 +13,14 @@ Resources:
     Type: AWS::Serverless::Function
     Properties:
       CodeUri:
-        Bucket: !Sub newrelic-example-${AWS::Region}
+        Bucket: !Sub newrelic-example-${AWS::Region}-${NRAccountId}
         Key: go-example.zip
       Description: A simple Lambda, with New Relic telemetry
       FunctionName: newrelic-example-go
       # For go1.x, the handler is the name of your go executable. With the norpc option, it is ignored.
       Handler: handler
       Runtime: provided
+      Timeout: 1
       Environment:
         Variables:
           NEW_RELIC_LAMBDA_EXTENSION_ENABLED: true
@@ -27,7 +28,7 @@ Resources:
           NEW_RELIC_TRUSTED_ACCOUNT_KEY: !Sub ${NRAccountId}
       Layers:
         # This layer includes the New Relic Lambda Extension, a sidecar process that sends telemetry
-        - !Sub arn:aws:lambda:us-east-1:466768951184:layer:newrelic-lambda-extension:41
+        - !Sub arn:aws:lambda:us-east-1:466768951184:layer:newrelic-lambda-extension:55
       Policies:
         # This policy allows the lambda to know the value of the New Relic licence key. We need this so
         # that we can send telemetry back to New Relic

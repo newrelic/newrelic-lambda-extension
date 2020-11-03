@@ -7,25 +7,25 @@ import (
 )
 
 // The Unix epoch instant; used as a nil time for eldest and lastHarvest
-var epochStart = time.Unix(0,0)
+var epochStart = time.Unix(0, 0)
 
 // Batch represents the unsent invocations and their telemetry, along with timing data.
 type Batch struct {
-	lastHarvest time.Time
-	eldest      time.Time
-	invocations map[string]*Invocation
-	ripeDuration time.Duration
+	lastHarvest     time.Time
+	eldest          time.Time
+	invocations     map[string]*Invocation
+	ripeDuration    time.Duration
 	veryOldDuration time.Duration
 }
 
 // NewBatch constructs a new batch.
 func NewBatch(ripeMillis int64, rotMillis int64) Batch {
-	initialSize := uint32(math.Min(float64(ripeMillis) / 100, 100))
+	initialSize := uint32(math.Min(float64(ripeMillis)/100, 100))
 	return Batch{
-		lastHarvest: epochStart,
-		eldest:      epochStart,
-		invocations: make(map[string]*Invocation, initialSize),
-		ripeDuration: time.Duration(ripeMillis) * time.Millisecond,
+		lastHarvest:     epochStart,
+		eldest:          epochStart,
+		invocations:     make(map[string]*Invocation, initialSize),
+		ripeDuration:    time.Duration(ripeMillis) * time.Millisecond,
 		veryOldDuration: time.Duration(rotMillis) * time.Millisecond,
 	}
 }
@@ -110,7 +110,7 @@ func (b *Batch) ripeHarvest(now time.Time) []*Invocation {
 
 // An Invocation holds telemetry for a request, and knows when the request began.
 type Invocation struct {
-	Start time.Time
+	Start     time.Time
 	RequestId string
 	Telemetry [][]byte
 }
@@ -118,7 +118,7 @@ type Invocation struct {
 // NewInvocation creates an Invocation, which can hold telemetry
 func NewInvocation(requestId string, start time.Time) Invocation {
 	return Invocation{
-		Start: start,
+		Start:     start,
 		RequestId: requestId,
 		Telemetry: make([][]byte, 0, 2),
 	}

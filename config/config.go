@@ -7,8 +7,8 @@ import (
 )
 
 const (
-	DefaultRipeMillis = 3_000
-	DefaultRotMillis = 10_000
+	DefaultRipeMillis = 7_000
+	DefaultRotMillis  = 12_000
 )
 
 type Configuration struct {
@@ -16,8 +16,8 @@ type Configuration struct {
 	LicenseKey         *string
 	LicenseKeySecretId *string
 	TelemetryEndpoint  *string
-	RipeMillis uint32
-	RotMillis uint32
+	RipeMillis         uint32
+	RotMillis          uint32
 }
 
 func ConfigurationFromEnvironment() Configuration {
@@ -53,7 +53,7 @@ func ConfigurationFromEnvironment() Configuration {
 	if ret.RipeMillis == 0 {
 		ret.RipeMillis = DefaultRipeMillis
 	}
-	
+
 	if rotMillisOverride {
 		rotMillis, err := strconv.ParseUint(rotMillisStr, 10, 32)
 		if err == nil {
@@ -63,6 +63,6 @@ func ConfigurationFromEnvironment() Configuration {
 	if ret.RotMillis == 0 {
 		ret.RotMillis = DefaultRotMillis
 	}
-	
+
 	return ret
 }

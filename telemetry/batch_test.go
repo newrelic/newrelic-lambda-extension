@@ -8,14 +8,14 @@ import (
 )
 
 const (
-	testTelemetry = "test_telemetry"
-	moreTestTelemetry = "more_test_telemetry"
-	testRequestId = "test_a"
-	testRequestId2 = "test_b"
-	testRequestId3 = "test_c"
+	testTelemetry       = "test_telemetry"
+	moreTestTelemetry   = "more_test_telemetry"
+	testRequestId       = "test_a"
+	testRequestId2      = "test_b"
+	testRequestId3      = "test_c"
 	testNoSuchRequestId = "test_z"
-	ripe = 1000
-	rot = 10000
+	ripe                = 1000
+	rot                 = 10000
 )
 
 var (
@@ -36,8 +36,8 @@ func TestWithInvocationRipeHarvest(t *testing.T) {
 	batch.Harvest(requestStart)
 
 	batch.AddInvocation(testRequestId, requestStart)
-	batch.AddInvocation(testRequestId2, requestStart.Add(100 * time.Millisecond))
-	batch.AddInvocation(testRequestId3, requestStart.Add(200 * time.Millisecond))
+	batch.AddInvocation(testRequestId2, requestStart.Add(100*time.Millisecond))
+	batch.AddInvocation(testRequestId3, requestStart.Add(200*time.Millisecond))
 
 	invocation := batch.AddTelemetry(testRequestId, bytes.NewBufferString(testTelemetry).Bytes())
 	assert.NotNil(t, invocation)
@@ -57,8 +57,8 @@ func TestWithInvocationAggressiveHarvest(t *testing.T) {
 	batch := NewBatch(ripe, rot)
 
 	batch.AddInvocation(testRequestId, requestStart)
-	batch.AddInvocation(testRequestId2, requestStart.Add(100 * time.Millisecond))
-	batch.AddInvocation(testRequestId3, requestStart.Add(200 * time.Millisecond))
+	batch.AddInvocation(testRequestId2, requestStart.Add(100*time.Millisecond))
+	batch.AddInvocation(testRequestId3, requestStart.Add(200*time.Millisecond))
 
 	invocation := batch.AddTelemetry(testRequestId, bytes.NewBufferString(testTelemetry).Bytes())
 	assert.NotNil(t, invocation)
@@ -76,8 +76,8 @@ func TestBatch_Close(t *testing.T) {
 	batch := NewBatch(ripe, rot)
 
 	batch.AddInvocation(testRequestId, requestStart)
-	batch.AddInvocation(testRequestId2, requestStart.Add(100 * time.Millisecond))
-	batch.AddInvocation(testRequestId3, requestStart.Add(200 * time.Millisecond))
+	batch.AddInvocation(testRequestId2, requestStart.Add(100*time.Millisecond))
+	batch.AddInvocation(testRequestId3, requestStart.Add(200*time.Millisecond))
 
 	invocation := batch.AddTelemetry(testRequestId, bytes.NewBufferString(testTelemetry).Bytes())
 	assert.NotNil(t, invocation)

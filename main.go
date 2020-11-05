@@ -92,6 +92,7 @@ func main() {
 	log.Printf("Extension shutdown after %vms", ranFor.Milliseconds())
 }
 
+// mainLoop repeatedly calls the /next api, and processes telemetry and platform logs. The timing is rather complicated.
 func mainLoop(invocationClient *client.InvocationClient, batch *telemetry.Batch, telemetryChan chan []byte, logServer *logserver.LogServer, telemetryClient *telemetry.Client) {
 	counter := 0
 	var invokedFunctionARN string
@@ -99,7 +100,9 @@ func mainLoop(invocationClient *client.InvocationClient, batch *telemetry.Batch,
 	var lastEventStart time.Time
 	probablyTimeout := false
 	for {
+		// Our call to next blocks. It is likely that the container is frozen immediately after we call NextEvent.
 		event, err := invocationClient.NextEvent()
+		// We've thawed.
 		eventStart := time.Now()
 		if err != nil {
 			errErr := invocationClient.ExitError("NextEventError.Main", err)
@@ -109,22 +112,18 @@ func mainLoop(invocationClient *client.InvocationClient, batch *telemetry.Batch,
 			log.Fatal(err)
 		}
 
-		// The instant when the invocation will time out
-		timeoutInstant := time.Unix(0, event.DeadlineMs*int64(time.Millisecond))
-		// Set the timeout timer for one millisecond before the actual timeout; we can recover from early.
-		timeout := time.NewTimer(timeoutInstant.Sub(time.Now()) - time.Millisecond)
-
 		counter++
 
 		if probablyTimeout {
 			// We suspect a timeout. Either way, we've gotten to the next event, so telemetry will
 			// have arrived for the last request if it's going to. Non-blocking poll for telemetry.
 			// If we have indeed timed out, there's a chance we got telemetry out anyway. If we haven't
-			// timed out, this will catch us up to the current state of telemetry.
+			// timed out, this will catch us up to the current state of telemetry, allowing us to resume.
 			select {
 			case telemetryBytes := <-telemetryChan:
 				// We received telemetry
 				batch.AddTelemetry(lastRequestId, telemetryBytes)
+				log.Printf("We suspected a timeout for request %s but got telemetry anyway", lastRequestId)
 			default:
 			}
 		}
@@ -142,6 +141,7 @@ func mainLoop(invocationClient *client.InvocationClient, batch *telemetry.Batch,
 				)
 				batch.AddTelemetry(lastRequestId, []byte(timeoutMessage))
 			} else if event.ShutdownReason == api.Failure && lastRequestId != "" {
+				// Synthesize a generic platform error. Probably an OOM, though it could be any runtime crash.
 				errorMessage := fmt.Sprintf("RequestId: %s A platform error caused a shutdown", lastRequestId)
 				batch.AddTelemetry(lastRequestId, []byte(errorMessage))
 			}
@@ -151,16 +151,14 @@ func mainLoop(invocationClient *client.InvocationClient, batch *telemetry.Batch,
 
 		invokedFunctionARN = event.InvokedFunctionARN
 		lastRequestId = event.RequestID
+		// Create an invocation record to hold telemetry
 		batch.AddInvocation(lastRequestId, eventStart)
 
-		// Await agent telemetry. This may time out.
-		log.Printf(
-			"Event %v started at %v times out in %.3fms",
-			lastRequestId,
-			eventStart,
-			float64(event.DeadlineMs)/1000,
-		)
-		// Race the timeout against the telemetry channel
+		// Await agent telemetry. This may time out, so we race the timeout against the telemetry channel
+		// timeoutInstant is when the invocation will time out
+		timeoutInstant := time.Unix(0, event.DeadlineMs*int64(time.Millisecond))
+		// Set the timeout timer for a smidge before the actual timeout; we can recover from early.
+		timeout := time.NewTimer(timeoutInstant.Sub(time.Now()) - time.Millisecond)
 		select {
 		case telemetryBytes := <-telemetryChan:
 			// We received telemetry

@@ -12,7 +12,10 @@ import (
 	"time"
 )
 
-const platformLogBufferSize = 100
+const (
+	platformLogBufferSize = 100
+	defaultHost           = "sandbox"
+)
 
 type LogLine struct {
 	RequestID string
@@ -120,7 +123,11 @@ func (ls *LogServer) handler(res http.ResponseWriter, req *http.Request) {
 }
 
 func Start() (*LogServer, error) {
-	listener, err := net.Listen("tcp", ":")
+	return startInternal(defaultHost)
+}
+
+func startInternal(host string) (*LogServer, error) {
+	listener, err := net.Listen("tcp", host+":")
 	if err != nil {
 		return nil, err
 	}

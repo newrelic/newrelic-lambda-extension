@@ -20,7 +20,6 @@ Resources:
       # For go1.x, the handler is the name of your go executable. With the norpc option, it is ignored.
       Handler: handler
       Runtime: provided
-      Timeout: 1
       Environment:
         Variables:
           NEW_RELIC_LAMBDA_EXTENSION_ENABLED: true
@@ -28,7 +27,7 @@ Resources:
           NEW_RELIC_TRUSTED_ACCOUNT_KEY: !Sub ${NRAccountId}
       Layers:
         # This layer includes the New Relic Lambda Extension, a sidecar process that sends telemetry
-        - !Sub arn:aws:lambda:us-east-1:466768951184:layer:newrelic-lambda-extension:55
+        - !Sub arn:${AWS::Partition}:lambda:${AWS::Region}:451483290750:layer:NewRelicLambdaExtension:1
       Policies:
         # This policy allows the lambda to know the value of the New Relic licence key. We need this so
         # that we can send telemetry back to New Relic

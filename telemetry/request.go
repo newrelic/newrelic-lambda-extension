@@ -65,7 +65,7 @@ func CompressedPayloadsForLogEvents(logsEvents []LogsEvent, functionName string,
 		FunctionName:       functionName,
 		InvokedFunctionARN: invokedFunctionARN,
 		LogGroupName:       logGroupName,
-		LogStreamName:      "newrelic-lambda-extension:1.1.0",
+		LogStreamName:      "newrelic-lambda-extension:1.0.0",
 	}
 	data := RequestData{Context: context, Entry: string(entry)}
 

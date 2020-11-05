@@ -108,8 +108,11 @@ func mainLoop(invocationClient *client.InvocationClient, batch *telemetry.Batch,
 			}
 			log.Fatal(err)
 		}
-		// TODO: This is meant to be milliseconds; there's a platform bug.
-		timeout := time.NewTimer(time.Duration(event.DeadlineMs) * time.Microsecond)
+
+		// The instant when the invocation will time out
+		timeoutInstant := time.Unix(0, event.DeadlineMs*int64(time.Millisecond))
+		// Set the timeout timer for one millisecond before the actual timeout; we can recover from early.
+		timeout := time.NewTimer(timeoutInstant.Sub(time.Now()) - time.Millisecond)
 
 		counter++
 

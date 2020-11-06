@@ -13,7 +13,7 @@ import (
 )
 
 func Test_Logserver(t *testing.T) {
-	logs, err := Start()
+	logs, err := startInternal("localhost")
 	if err != nil {
 		log.Println("Failed to start logs HTTP server", err)
 		if err != nil {

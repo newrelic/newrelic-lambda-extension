@@ -40,7 +40,7 @@ const (
 type InvocationEvent struct {
 	// Either INVOKE or SHUTDOWN.
 	EventType LifecycleEvent `json:"eventType"`
-	// The time left on the invocation, in microseconds.
+	// The instant that the invocation times out, as epoch milliseconds
 	DeadlineMs int64 `json:"deadlineMs"`
 	// The AWS Request ID, for INVOKE events.
 	RequestID string `json:"requestId"`

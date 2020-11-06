@@ -21,7 +21,7 @@ env GOARCH=amd64 GOOS=linux go build ${build_tags} -ldflags="-s -w" -o ${handler
 zip go-example.zip "${handler}"
 
 bucket="newrelic-example-${region}-${accountId}"
-aws s3 mb s3://${bucket}
+aws s3 mb --region ${region} s3://${bucket}
 aws s3 cp go-example.zip s3://${bucket}
 aws cloudformation deploy --region ${region} \
   --template-file template.yaml \

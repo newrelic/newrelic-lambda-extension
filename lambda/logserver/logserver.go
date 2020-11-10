@@ -26,6 +26,7 @@ type LogServer struct {
 	listenString    string
 	server          *http.Server
 	platformLogChan chan LogLine
+	functionLogChan chan []LogLine
 }
 
 func (ls *LogServer) Port() uint16 {
@@ -56,6 +57,10 @@ func (ls *LogServer) PollPlatformChannel() []LogLine {
 			return ret
 		}
 	}
+}
+
+func (ls *LogServer) AwaitFunctionLogs() []LogLine {
+	return <- ls.functionLogChan
 }
 
 func formatReport(metrics map[string]interface{}) string {
@@ -96,8 +101,12 @@ func (ls *LogServer) handler(res http.ResponseWriter, req *http.Request) {
 		log.Printf("Error parsing log payload: %v", err)
 	}
 
+	var functionLogs []LogLine
+	var lastRequestId string
 	for _, event := range logEvents {
 		switch event.Type {
+		case "platform.start":
+			lastRequestId = event.Record.(map[string]string)["requestId"]
 		case "platform.report":
 			record := event.Record.(map[string]interface{})
 			metrics := record["metrics"].(map[string]interface{})
@@ -115,8 +124,18 @@ func (ls *LogServer) handler(res http.ResponseWriter, req *http.Request) {
 		case "platform.logsDropped":
 			log.Printf("Platform dropped logs: %v", event.Record)
 		//TODO: handle function logs. NB: they should send directly, as they don't need to decorate telemetry
+		case "function":
+			record := event.Record.(string)
+			functionLogs = append(functionLogs, LogLine{
+				RequestID: lastRequestId,
+				Content:   []byte(record),
+			})
 		default:
+			log.Println("Ignored log event of type ", event.Type, string(bodyBytes))
 		}
+	}
+	if len(functionLogs) > 0 {
+		ls.functionLogChan <- functionLogs
 	}
 
 	_, _ = res.Write(nil)
@@ -138,6 +157,7 @@ func startInternal(host string) (*LogServer, error) {
 		listenString:    listener.Addr().String(),
 		server:          &server,
 		platformLogChan: make(chan LogLine, platformLogBufferSize),
+		functionLogChan: make(chan []LogLine),
 	}
 
 	http.HandleFunc("/", func(res http.ResponseWriter, req *http.Request) {

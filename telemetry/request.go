@@ -13,6 +13,43 @@ const (
 	maxCompressedPayloadLen = 1000 * 1024
 )
 
+// DetailedFunctionLog is the Logs API payload
+type DetailedFunctionLog struct {
+	Common CommonLogAttrs `json:"common"`
+	Logs []FunctionLogMessage `json:"logs"`
+}
+
+type CommonLogAttrs struct {
+	Attributes map[string]interface{} `json:"attributes"`
+}
+
+type FunctionLogMessage struct {
+	Message string `json:"message"`
+	Timestamp int64 `json:"timestamp"`
+	Attributes map[string]interface{} `json:"attributes"`
+}
+
+func NewFunctionLogMessage(timestamp int64, requestId string, message string) FunctionLogMessage {
+	return FunctionLogMessage{
+		Message:    message,
+		Timestamp:  timestamp,
+		Attributes: map[string]interface{} {
+			"aws": map[string]string {
+				"lambda_request_id": requestId,
+			},
+		},
+	}
+}
+
+func NewDetailedFunctionLog(common map[string]interface{}, logs []FunctionLogMessage) DetailedFunctionLog {
+	return DetailedFunctionLog{
+		Common: CommonLogAttrs{
+			Attributes: common,
+		},
+		Logs:   logs,
+	}
+}
+
 // RequestContext is the Vortex request context
 type RequestContext struct {
 	FunctionName       string `json:"function_name"`
@@ -69,14 +106,9 @@ func CompressedPayloadsForLogEvents(logsEvents []LogsEvent, functionName string,
 	}
 	data := RequestData{Context: context, Entry: string(entry)}
 
-	uncompressed, err := json.Marshal(data)
+	compressed, err := CompressedJsonPayload(data)
 	if err != nil {
 		return nil, err
-	}
-
-	compressed, err := util.Compress(uncompressed)
-	if err != nil {
-		return nil, fmt.Errorf("error compressing data: %v", err)
 	}
 
 	if compressed.Len() <= maxCompressedPayloadLen {
@@ -112,4 +144,18 @@ func BuildVortexRequest(url string, compressed *bytes.Buffer, userAgent string, 
 	req.Header.Add("X-License-Key", licenseKey)
 
 	return req, nil
+}
+
+func CompressedJsonPayload(payload interface{}) (*bytes.Buffer, error) {
+	uncompressed, err := json.Marshal(payload)
+	if err != nil {
+		return nil, err
+	}
+
+	compressed, err := util.Compress(uncompressed)
+	if err != nil {
+		return nil, fmt.Errorf("error compressing data: %v", err)
+	}
+
+	return compressed, nil
 }

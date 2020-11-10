@@ -65,7 +65,7 @@ func main() {
 		}
 		return
 	}
-	subscriptionRequest := api.DefaultLogSubscription([]api.LogEventType{api.Platform}, logServer.Port())
+	subscriptionRequest := api.DefaultLogSubscription([]api.LogEventType{api.Platform, api.Function}, logServer.Port())
 	err = invocationClient.LogRegister(&subscriptionRequest)
 	if err != nil {
 		log.Println("Failed to register with Logs API", err)
@@ -83,6 +83,13 @@ func main() {
 	if err != nil {
 		log.Fatal("telemetry pipe init failed: ", err)
 	}
+
+	go func() {
+		for {
+			functionLogs := logServer.AwaitFunctionLogs()
+			telemetryClient.SendFunctionLogs(functionLogs)
+		}
+	}()
 
 	// Call next, and process telemetry, until we're shut down
 	mainLoop(invocationClient, &batch, telemetryChan, logServer, telemetryClient)

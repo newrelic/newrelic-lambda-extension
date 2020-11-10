@@ -1,7 +1,7 @@
 package telemetry
 
 import (
-	"log"
+	"github.com/newrelic/newrelic-lambda-extension/util"
 	"math"
 	"time"
 )
@@ -84,8 +84,7 @@ func (b *Batch) aggressiveHarvest(now time.Time) []*Invocation {
 	}
 	b.lastHarvest = now
 	b.eldest = epochStart
-	// TODO: remove excess logging
-	log.Printf("Aggressive harvest yielded %d invocations\n", len(ret))
+	util.Debugf("Aggressive harvest yielded %d invocations\n", len(ret))
 	return ret
 }
 
@@ -103,8 +102,7 @@ func (b *Batch) ripeHarvest(now time.Time) []*Invocation {
 	}
 	b.eldest = newEldest
 	b.lastHarvest = now
-	// TODO: remove excess logging
-	log.Printf("Ripe harvest yielded %d invocations\n", len(ret))
+	util.Debugf("Ripe harvest yielded %d invocations\n", len(ret))
 	return ret
 }
 

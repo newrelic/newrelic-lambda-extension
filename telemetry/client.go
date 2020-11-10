@@ -2,7 +2,6 @@ package telemetry
 
 import (
 	"io/ioutil"
-	"log"
 	"net/http"
 	"strings"
 	"time"
@@ -74,9 +73,9 @@ func (c *Client) SendTelemetry(invokedFunctionARN string, telemetry [][]byte) er
 		}
 		res, body, err := c.sendRequest(req)
 		if err != nil {
-			log.Printf("Telemetry client error: %s", err)
+			util.Logf("Telemetry client error: %s", err)
 		} else if res.StatusCode >= 300 {
-			log.Printf("Telemetry client response: [%s] %s", res.Status, body)
+			util.Logf("Telemetry client response: [%s] %s", res.Status, body)
 		} else {
 			successCount += 1
 		}
@@ -84,7 +83,7 @@ func (c *Client) SendTelemetry(invokedFunctionARN string, telemetry [][]byte) er
 	end := time.Now()
 	totalTime := end.Sub(start)
 	transmissionTime := end.Sub(transmitStart)
-	log.Printf(
+	util.Logf(
 		"Sent %d/%d New Relic payload batches with %d log events successfully in %.3fms (%dms to transmit %.1fkB).\n",
 		successCount,
 		len(compressedPayloads),

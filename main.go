@@ -1,9 +1,10 @@
 package main
 
 import (
+	"encoding/base64"
 	"fmt"
 	"github.com/newrelic/newrelic-lambda-extension/lambda/logserver"
-	"log"
+	"github.com/newrelic/newrelic-lambda-extension/util"
 	"net/http"
 	"time"
 
@@ -17,11 +18,10 @@ import (
 func main() {
 	extensionStartup := time.Now()
 
-	// Go Logging config
-	log.SetPrefix("[NR_EXT] ")
-	log.SetFlags(0)
+	// Parse various env vars for our config
+	conf := config.ConfigurationFromEnvironment()
 
-	log.Println("New Relic Lambda Extension starting up")
+	util.ConfigLogger(conf.LogLevel == config.DebugLogLevel)
 
 	// Extensions must register
 	registrationClient := client.New(http.Client{})
@@ -31,14 +31,11 @@ func main() {
 
 	invocationClient, registrationResponse, err := registrationClient.Register(regReq)
 	if err != nil {
-		log.Fatal(err)
+		util.Fatal(err)
 	}
 
-	// Parse various env vars for our config
-	conf := config.ConfigurationFromEnvironment()
-
 	if !conf.ExtensionEnabled {
-		log.Println("Extension telemetry processing disabled")
+		util.Logln("Extension telemetry processing disabled")
 		noopLoop(invocationClient)
 		return
 	}
@@ -46,7 +43,7 @@ func main() {
 	// Attempt to find the license key for telemetry sending
 	licenseKey, err := credentials.GetNewRelicLicenseKey(&conf)
 	if err != nil {
-		log.Println("Failed to retrieve license key", err)
+		util.Logln("Failed to retrieve license key", err)
 		// We fail open; telemetry will go to CloudWatch instead
 		noopLoop(invocationClient)
 		return
@@ -58,20 +55,20 @@ func main() {
 	// Start the Logs API server, and register it
 	logServer, err := logserver.Start()
 	if err != nil {
-		log.Println("Failed to start logs HTTP server", err)
+		util.Logln("Failed to start logs HTTP server", err)
 		err = invocationClient.InitError("logServer.start", err)
 		if err != nil {
-			log.Fatal(err)
+			util.Fatal(err)
 		}
 		return
 	}
 	subscriptionRequest := api.DefaultLogSubscription([]api.LogEventType{api.Platform}, logServer.Port())
 	err = invocationClient.LogRegister(&subscriptionRequest)
 	if err != nil {
-		log.Println("Failed to register with Logs API", err)
+		util.Logln("Failed to register with Logs API", err)
 		err = invocationClient.InitError("logServer.register", err)
 		if err != nil {
-			log.Fatal(err)
+			util.Fatal(err)
 		}
 		return
 	}
@@ -81,7 +78,7 @@ func main() {
 
 	telemetryChan, err := telemetry.InitTelemetryChannel()
 	if err != nil {
-		log.Fatal("telemetry pipe init failed: ", err)
+		util.Fatal("telemetry pipe init failed: ", err)
 	}
 
 	// Call next, and process telemetry, until we're shut down
@@ -89,7 +86,7 @@ func main() {
 
 	shutdownAt := time.Now()
 	ranFor := shutdownAt.Sub(extensionStartup)
-	log.Printf("Extension shutdown after %vms", ranFor.Milliseconds())
+	util.Logf("Extension shutdown after %vms", ranFor.Milliseconds())
 }
 
 // mainLoop repeatedly calls the /next api, and processes telemetry and platform logs. The timing is rather complicated.
@@ -107,9 +104,9 @@ func mainLoop(invocationClient *client.InvocationClient, batch *telemetry.Batch,
 		if err != nil {
 			errErr := invocationClient.ExitError("NextEventError.Main", err)
 			if errErr != nil {
-				log.Println(errErr)
+				util.Logln(errErr)
 			}
-			log.Fatal(err)
+			util.Fatal(err)
 		}
 
 		counter++
@@ -123,7 +120,7 @@ func mainLoop(invocationClient *client.InvocationClient, batch *telemetry.Batch,
 			case telemetryBytes := <-telemetryChan:
 				// We received telemetry
 				batch.AddTelemetry(lastRequestId, telemetryBytes)
-				log.Printf("We suspected a timeout for request %s but got telemetry anyway", lastRequestId)
+				util.Logf("We suspected a timeout for request %s but got telemetry anyway", lastRequestId)
 			default:
 			}
 		}
@@ -162,9 +159,10 @@ func mainLoop(invocationClient *client.InvocationClient, batch *telemetry.Batch,
 		select {
 		case telemetryBytes := <-telemetryChan:
 			// We received telemetry
+			util.Debugf("Agent telemetry bytes: %s", base64.URLEncoding.EncodeToString(telemetryBytes))
 			inv := batch.AddTelemetry(lastRequestId, telemetryBytes)
 			if inv == nil {
-				log.Printf("Failed to add telemetry for request %v", lastRequestId)
+				util.Logf("Failed to add telemetry for request %v", lastRequestId)
 			}
 			// Tear down the timer
 			if !timeout.Stop() {
@@ -177,15 +175,16 @@ func mainLoop(invocationClient *client.InvocationClient, batch *telemetry.Batch,
 			shipHarvest(harvested, telemetryClient, invokedFunctionARN)
 		case <-timeout.C:
 			// Function is timing out
+			util.Debugln("Timeout suspected")
 			probablyTimeout = true
 		}
 		lastEventStart = eventStart
 	}
-	log.Printf("New Relic Extension shutting down after %v events\n", counter)
+	util.Logf("New Relic Extension shutting down after %v events\n", counter)
 
 	err := logServer.Close()
 	if err != nil {
-		log.Println("Error shutting down Log API server", err)
+		util.Logln("Error shutting down Log API server", err)
 	}
 
 	pollLogServer(logServer, batch)
@@ -198,7 +197,7 @@ func pollLogServer(logServer *logserver.LogServer, batch *telemetry.Batch) {
 	for _, platformLog := range logServer.PollPlatformChannel() {
 		inv := batch.AddTelemetry(platformLog.RequestID, platformLog.Content)
 		if inv == nil {
-			log.Printf("Failed to add platform log for request %v", platformLog.RequestID)
+			util.Logf("Failed to add platform log for request %v", platformLog.RequestID)
 		}
 	}
 }
@@ -212,7 +211,7 @@ func shipHarvest(harvested []*telemetry.Invocation, telemetryClient *telemetry.C
 
 		err := telemetryClient.SendTelemetry(invokedFunctionARN, telemetrySlice)
 		if err != nil {
-			log.Printf("Failed to send harvested telemetry for %d invocations %s", len(harvested), err)
+			util.Logf("Failed to send harvested telemetry for %d invocations %s", len(harvested), err)
 		}
 	}
 }
@@ -223,9 +222,9 @@ func noopLoop(invocationClient *client.InvocationClient) {
 		if err != nil {
 			errErr := invocationClient.ExitError("NextEventError.Noop", err)
 			if errErr != nil {
-				log.Println(errErr)
+				util.Logln(errErr)
 			}
-			log.Fatal(err)
+			util.Fatal(err)
 		}
 
 		if event.EventType == api.Shutdown {

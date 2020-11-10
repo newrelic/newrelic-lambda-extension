@@ -9,7 +9,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
-	"log"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -39,7 +38,7 @@ type RegistrationClient struct {
 func New(httpClient http.Client) *RegistrationClient {
 	exePath, err := os.Executable()
 	if err != nil {
-		log.Fatal(err)
+		util.Fatal(err)
 	}
 	exeName := filepath.Base(exePath)
 
@@ -129,7 +128,7 @@ func (ic *InvocationClient) LogRegister(subscriptionRequest *api.LogSubscription
 	if err != nil {
 		return fmt.Errorf("error occurred while marshaling subscription request %s", err)
 	}
-	log.Println("Log registration with request ", string(subscriptionRequestJson))
+	util.Debugln("Log registration with request ", string(subscriptionRequestJson))
 
 	req, err := http.NewRequest("PUT", ic.getLogRegistrationURL(), bytes.NewBuffer(subscriptionRequestJson))
 	if err != nil {
@@ -150,7 +149,7 @@ func (ic *InvocationClient) LogRegister(subscriptionRequest *api.LogSubscription
 		return err
 	}
 
-	log.Println("Registered for logs. Got response code ", res.StatusCode, string(responseBody))
+	util.Debugln("Registered for logs. Got response code ", res.StatusCode, string(responseBody))
 
 	return nil
 }

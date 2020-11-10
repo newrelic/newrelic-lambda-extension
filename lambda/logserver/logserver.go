@@ -4,8 +4,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/newrelic/newrelic-lambda-extension/lambda/extension/api"
+	"github.com/newrelic/newrelic-lambda-extension/util"
 	"io/ioutil"
-	"log"
 	"net"
 	"net/http"
 	"strconv"
@@ -87,13 +87,13 @@ func formatReport(metrics map[string]interface{}) string {
 func (ls *LogServer) handler(res http.ResponseWriter, req *http.Request) {
 	bodyBytes, err := ioutil.ReadAll(req.Body)
 	if err != nil {
-		log.Printf("Error processing log request: %v", err)
+		util.Logf("Error processing log request: %v", err)
 	}
 
 	var logEvents []api.LogEvent
 	err = json.Unmarshal(bodyBytes, &logEvents)
 	if err != nil {
-		log.Printf("Error parsing log payload: %v", err)
+		util.Logf("Error parsing log payload: %v", err)
 	}
 
 	for _, event := range logEvents {
@@ -113,7 +113,7 @@ func (ls *LogServer) handler(res http.ResponseWriter, req *http.Request) {
 			}
 			ls.platformLogChan <- reportLine
 		case "platform.logsDropped":
-			log.Printf("Platform dropped logs: %v", event.Record)
+			util.Logf("Platform dropped logs: %v", event.Record)
 		//TODO: handle function logs. NB: they should send directly, as they don't need to decorate telemetry
 		default:
 		}
@@ -145,8 +145,8 @@ func startInternal(host string) (*LogServer, error) {
 	})
 
 	go func() {
-		log.Println("Starting log server.")
-		log.Printf("Log server terminating: %v\n", server.Serve(listener))
+		util.Logln("Starting log server.")
+		util.Logf("Log server terminating: %v\n", server.Serve(listener))
 	}()
 
 	return &logServer, nil

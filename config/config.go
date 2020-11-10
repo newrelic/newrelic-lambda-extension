@@ -9,6 +9,8 @@ import (
 const (
 	DefaultRipeMillis = 7_000
 	DefaultRotMillis  = 12_000
+	DefaultLogLevel   = "INFO"
+	DebugLogLevel     = "DEBUG"
 )
 
 type Configuration struct {
@@ -18,6 +20,7 @@ type Configuration struct {
 	TelemetryEndpoint  *string
 	RipeMillis         uint32
 	RotMillis          uint32
+	LogLevel           string
 }
 
 func ConfigurationFromEnvironment() Configuration {
@@ -27,6 +30,7 @@ func ConfigurationFromEnvironment() Configuration {
 	telemetryEndpoint, teOverride := os.LookupEnv("NEW_RELIC_TELEMETRY_ENDPOINT")
 	ripeMillisStr, ripeMillisOverride := os.LookupEnv("NEW_RELIC_HARVEST_RIPE_MILLIS")
 	rotMillisStr, rotMillisOverride := os.LookupEnv("NEW_RELIC_HARVEST_ROT_MILLIS")
+	logLevelStr, logLevelOverride := os.LookupEnv("NEW_RELIC_EXTENSION_LOG_LEVEL")
 
 	extensionEnabled := true
 	if extensionEnabledOverride && "false" == strings.ToLower(enabledStr) {
@@ -62,6 +66,12 @@ func ConfigurationFromEnvironment() Configuration {
 	}
 	if ret.RotMillis == 0 {
 		ret.RotMillis = DefaultRotMillis
+	}
+
+	if logLevelOverride && logLevelStr == DebugLogLevel {
+		ret.LogLevel = DebugLogLevel
+	} else {
+		ret.LogLevel = DefaultLogLevel
 	}
 
 	return ret

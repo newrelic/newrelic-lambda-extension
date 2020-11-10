@@ -12,6 +12,7 @@ func TestConfigurationFromEnvironmentZero(t *testing.T) {
 		ExtensionEnabled: true,
 		RipeMillis:       DefaultRipeMillis,
 		RotMillis:        DefaultRotMillis,
+		LogLevel:         DefaultLogLevel,
 	}
 	assert.Equal(t, expected, conf)
 }

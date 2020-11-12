@@ -4,8 +4,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/newrelic/newrelic-lambda-extension/lambda/extension/api"
+	"github.com/newrelic/newrelic-lambda-extension/util"
 	"io/ioutil"
-	"log"
 	"net"
 	"net/http"
 	"strconv"
@@ -15,6 +15,7 @@ import (
 const (
 	platformLogBufferSize = 100
 	defaultHost           = "sandbox"
+	fallbackHost          = "169.254.79.130"
 )
 
 type LogLine struct {
@@ -92,13 +93,13 @@ func formatReport(metrics map[string]interface{}) string {
 func (ls *LogServer) handler(res http.ResponseWriter, req *http.Request) {
 	bodyBytes, err := ioutil.ReadAll(req.Body)
 	if err != nil {
-		log.Printf("Error processing log request: %v", err)
+		util.Logf("Error processing log request: %v", err)
 	}
 
 	var logEvents []api.LogEvent
 	err = json.Unmarshal(bodyBytes, &logEvents)
 	if err != nil {
-		log.Printf("Error parsing log payload: %v", err)
+		util.Logf("Error parsing log payload: %v", err)
 	}
 
 	var functionLogs []LogLine
@@ -122,7 +123,7 @@ func (ls *LogServer) handler(res http.ResponseWriter, req *http.Request) {
 			}
 			ls.platformLogChan <- reportLine
 		case "platform.logsDropped":
-			log.Printf("Platform dropped logs: %v", event.Record)
+			util.Logf("Platform dropped logs: %v", event.Record)
 		//TODO: handle function logs. NB: they should send directly, as they don't need to decorate telemetry
 		case "function":
 			record := event.Record.(string)
@@ -146,9 +147,13 @@ func Start() (*LogServer, error) {
 }
 
 func startInternal(host string) (*LogServer, error) {
-	listener, err := net.Listen("tcp", host+":")
+	// TODO: replace fallbackHost with host and remove the fallback in the error handler once 'sandbox' resolves.
+	listener, err := net.Listen("tcp", fallbackHost+":")
 	if err != nil {
-		return nil, err
+		listener, err = net.Listen("tcp", host+":")
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	server := http.Server{}
@@ -165,8 +170,8 @@ func startInternal(host string) (*LogServer, error) {
 	})
 
 	go func() {
-		log.Println("Starting log server.")
-		log.Printf("Log server terminating: %v\n", server.Serve(listener))
+		util.Logln("Starting log server.")
+		util.Logf("Log server terminating: %v\n", server.Serve(listener))
 	}()
 
 	return &logServer, nil

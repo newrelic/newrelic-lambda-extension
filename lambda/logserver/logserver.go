@@ -15,6 +15,7 @@ import (
 const (
 	platformLogBufferSize = 100
 	defaultHost           = "sandbox"
+	fallbackHost          = "169.254.79.130"
 )
 
 type LogLine struct {
@@ -129,7 +130,10 @@ func Start() (*LogServer, error) {
 func startInternal(host string) (*LogServer, error) {
 	listener, err := net.Listen("tcp", host+":")
 	if err != nil {
-		return nil, err
+		listener, err = net.Listen("tcp", fallbackHost+":")
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	server := http.Server{}

@@ -1,12 +1,16 @@
 package telemetry
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"net/http"
 
-	"github.com/newrelic/newrelic-lambda-extension/lambda/extension/api"
 	"github.com/newrelic/newrelic-lambda-extension/util"
+)
+
+const (
+	maxCompressedPayloadLen = 1000 * 1024
 )
 
 // RequestContext is the Vortex request context
@@ -41,19 +45,14 @@ type LogsEvent struct {
 	Timestamp int64  `json:"timestamp"`
 }
 
-// BuildRequest builds a Vortex HTTP request
-func BuildRequest(
-	payload []byte,
-	invocationEvent *api.InvocationEvent,
-	functionName string,
-	licenseKey string,
-	url string,
-	userAgent string,
-) (*http.Request, error) {
-	logEvent := LogsEvent{ID: util.UUID(), Message: string(payload), Timestamp: util.Timestamp()}
+func LogsEventForBytes(payload []byte) LogsEvent {
+	return LogsEvent{ID: util.UUID(), Message: string(payload), Timestamp: util.Timestamp()}
+}
+
+func CompressedPayloadsForLogEvents(logsEvents []LogsEvent, functionName string, invokedFunctionARN string) ([]*bytes.Buffer, error) {
 	logGroupName := fmt.Sprintf("/aws/lambda/%s", functionName)
 	logEntry := LogsEntry{
-		LogEvents: []LogsEvent{logEvent},
+		LogEvents: logsEvents,
 		LogGroup:  logGroupName,
 	}
 
@@ -64,9 +63,9 @@ func BuildRequest(
 
 	context := RequestContext{
 		FunctionName:       functionName,
-		InvokedFunctionARN: invocationEvent.InvokedFunctionARN,
+		InvokedFunctionARN: invokedFunctionARN,
 		LogGroupName:       logGroupName,
-		LogStreamName:      "placeholder",
+		LogStreamName:      "newrelic-lambda-extension:1.0.0",
 	}
 	data := RequestData{Context: context, Entry: string(entry)}
 
@@ -80,6 +79,28 @@ func BuildRequest(
 		return nil, fmt.Errorf("error compressing data: %v", err)
 	}
 
+	if compressed.Len() <= maxCompressedPayloadLen {
+		ret := []*bytes.Buffer{compressed}
+		return ret, nil
+	} else {
+		// Payload is too large, split in half, recursively
+		split := len(logsEvents) / 2
+		leftRet, err := CompressedPayloadsForLogEvents(logsEvents[0:split], functionName, invokedFunctionARN)
+		if err != nil {
+			return nil, err
+		}
+
+		rightRet, err := CompressedPayloadsForLogEvents(logsEvents[split:], functionName, invokedFunctionARN)
+		if err != nil {
+			return nil, err
+		}
+
+		return append(leftRet, rightRet...), nil
+	}
+}
+
+// BuildVortexRequest builds a Vortex HTTP request
+func BuildVortexRequest(url string, compressed *bytes.Buffer, userAgent string, licenseKey string) (*http.Request, error) {
 	req, err := http.NewRequest("POST", url, compressed)
 	if err != nil {
 		return nil, fmt.Errorf("error creating request: %v", err)

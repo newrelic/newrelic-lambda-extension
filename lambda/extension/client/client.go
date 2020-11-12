@@ -9,7 +9,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
-	"log"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -39,7 +38,7 @@ type RegistrationClient struct {
 func New(httpClient http.Client) *RegistrationClient {
 	exePath, err := os.Executable()
 	if err != nil {
-		log.Fatal(err)
+		util.Fatal(err)
 	}
 	exeName := filepath.Base(exePath)
 
@@ -119,6 +118,42 @@ func (ic *InvocationClient) getExitErrorURL() string {
 	return fmt.Sprintf("http://%s/%s/extension/exit/error", ic.baseUrl, ic.version)
 }
 
+func (ic *InvocationClient) getLogRegistrationURL() string {
+	return fmt.Sprintf("http://%s/%s/logs", ic.baseUrl, api.LogsApiVersion)
+}
+
+// LogRegister registers for log events
+func (ic *InvocationClient) LogRegister(subscriptionRequest *api.LogSubscription) error {
+	subscriptionRequestJson, err := json.Marshal(subscriptionRequest)
+	if err != nil {
+		return fmt.Errorf("error occurred while marshaling subscription request %s", err)
+	}
+	util.Debugln("Log registration with request ", string(subscriptionRequestJson))
+
+	req, err := http.NewRequest("PUT", ic.getLogRegistrationURL(), bytes.NewBuffer(subscriptionRequestJson))
+	if err != nil {
+		return fmt.Errorf("error occurred while creating subscription request %s", err)
+	}
+
+	req.Header.Set(api.ExtensionIdHeader, ic.extensionId)
+
+	res, err := ic.httpClient.Do(req)
+	if err != nil {
+		return fmt.Errorf("error occurred while making log subscription request %s", err)
+	}
+
+	defer util.Close(res.Body)
+
+	responseBody, err := ioutil.ReadAll(res.Body)
+	if err != nil {
+		return err
+	}
+
+	util.Debugln("Registered for logs. Got response code ", res.StatusCode, string(responseBody))
+
+	return nil
+}
+
 // NextEvent awaits the next event.
 func (ic *InvocationClient) NextEvent() (*api.InvocationEvent, error) {
 	req, err := http.NewRequest("GET", ic.getNextEventURL(), nil)
@@ -149,7 +184,7 @@ func (ic *InvocationClient) NextEvent() (*api.InvocationEvent, error) {
 	return &event, nil
 }
 
-func (ic *InvocationClient) InitError(errorEnum string, initError error) (error) {
+func (ic *InvocationClient) InitError(errorEnum string, initError error) error {
 	errorBuf := bytes.NewBufferString(initError.Error())
 	req, err := http.NewRequest("POST", ic.getInitErrorURL(), errorBuf)
 	if err != nil {
@@ -169,7 +204,7 @@ func (ic *InvocationClient) InitError(errorEnum string, initError error) (error)
 	return nil
 }
 
-func (ic *InvocationClient) ExitError(errorEnum string, exitError error) (error) {
+func (ic *InvocationClient) ExitError(errorEnum string, exitError error) error {
 	errorBuf := bytes.NewBufferString(exitError.Error())
 	req, err := http.NewRequest("POST", ic.getExitErrorURL(), errorBuf)
 	if err != nil {

@@ -154,6 +154,11 @@ func mainLoop(invocationClient *client.InvocationClient, batch *telemetry.Batch,
 		// Await agent telemetry. This may time out, so we race the timeout against the telemetry channel
 		// timeoutInstant is when the invocation will time out
 		timeoutInstant := time.Unix(0, event.DeadlineMs*int64(time.Millisecond))
+		// TODO: Delete this after the deadlineMs bug is fixed in all regions
+		if timeoutInstant.Before(time.Now()) {
+			timeoutInstant = eventStart.Add(15 * time.Minute) // Max timeout; disables timeout detection
+		}
+
 		// Set the timeout timer for a smidge before the actual timeout; we can recover from early.
 		timeout := time.NewTimer(timeoutInstant.Sub(time.Now()) - time.Millisecond)
 		select {

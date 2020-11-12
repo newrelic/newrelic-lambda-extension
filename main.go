@@ -74,7 +74,7 @@ func main() {
 	}
 
 	// Init the telemetry sending client
-	telemetryClient := telemetry.New(registrationResponse.FunctionName, *licenseKey, conf.TelemetryEndpoint)
+	telemetryClient := telemetry.New(registrationResponse.FunctionName, *licenseKey, conf.TelemetryEndpoint, conf.LogEndpoint)
 
 	telemetryChan, err := telemetry.InitTelemetryChannel()
 	if err != nil {
@@ -84,7 +84,10 @@ func main() {
 	go func() {
 		for {
 			functionLogs := logServer.AwaitFunctionLogs()
-			telemetryClient.SendFunctionLogs(functionLogs)
+			err := telemetryClient.SendFunctionLogs(functionLogs)
+			if err != nil {
+				util.Logf("Failed to send %d function logs", len(functionLogs))
+			}
 		}
 	}()
 

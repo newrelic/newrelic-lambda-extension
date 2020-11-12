@@ -15,8 +15,8 @@ const (
 
 // DetailedFunctionLog is the Logs API payload
 type DetailedFunctionLog struct {
-	Common CommonLogAttrs `json:"common"`
-	Logs []FunctionLogMessage `json:"logs"`
+	Common CommonLogAttrs       `json:"common"`
+	Logs   []FunctionLogMessage `json:"logs"`
 }
 
 type CommonLogAttrs struct {
@@ -24,17 +24,17 @@ type CommonLogAttrs struct {
 }
 
 type FunctionLogMessage struct {
-	Message string `json:"message"`
-	Timestamp int64 `json:"timestamp"`
+	Message    string                 `json:"message"`
+	Timestamp  int64                  `json:"timestamp"`
 	Attributes map[string]interface{} `json:"attributes"`
 }
 
 func NewFunctionLogMessage(timestamp int64, requestId string, message string) FunctionLogMessage {
 	return FunctionLogMessage{
-		Message:    message,
-		Timestamp:  timestamp,
-		Attributes: map[string]interface{} {
-			"aws": map[string]string {
+		Message:   message,
+		Timestamp: timestamp,
+		Attributes: map[string]interface{}{
+			"aws": map[string]string{
 				"lambda_request_id": requestId,
 			},
 		},
@@ -46,7 +46,7 @@ func NewDetailedFunctionLog(common map[string]interface{}, logs []FunctionLogMes
 		Common: CommonLogAttrs{
 			Attributes: common,
 		},
-		Logs:   logs,
+		Logs: logs,
 	}
 }
 
@@ -102,7 +102,7 @@ func CompressedPayloadsForLogEvents(logsEvents []LogsEvent, functionName string,
 		FunctionName:       functionName,
 		InvokedFunctionARN: invokedFunctionARN,
 		LogGroupName:       logGroupName,
-		LogStreamName:      "newrelic-lambda-extension:1.0.1",
+		LogStreamName:      util.Id,
 	}
 	data := RequestData{Context: context, Entry: string(entry)}
 

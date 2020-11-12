@@ -39,7 +39,7 @@ func TestClientSend(t *testing.T) {
 
 	defer srv.Close()
 
-	client := NewWithHTTPClient(srv.Client(), "", "a mock license key", &srv.URL)
+	client := NewWithHTTPClient(srv.Client(), "", "a mock license key", &srv.URL, &srv.URL)
 
 	bytes := []byte("foobar")
 	err := client.SendTelemetry("fakeArn", [][]byte{bytes})

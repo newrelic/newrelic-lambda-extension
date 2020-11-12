@@ -18,6 +18,7 @@ type Configuration struct {
 	LicenseKey         *string
 	LicenseKeySecretId *string
 	TelemetryEndpoint  *string
+	LogEndpoint *string
 	RipeMillis         uint32
 	RotMillis          uint32
 	LogLevel           string
@@ -28,6 +29,7 @@ func ConfigurationFromEnvironment() Configuration {
 	licenseKey, lkOverride := os.LookupEnv("NEW_RELIC_LICENSE_KEY")
 	licenseKeySecretId, lkSecretOverride := os.LookupEnv("NEW_RELIC_LICENSE_KEY_SECRET")
 	telemetryEndpoint, teOverride := os.LookupEnv("NEW_RELIC_TELEMETRY_ENDPOINT")
+	logEndpoint, leOverride := os.LookupEnv("NEW_RELIC_LOG_ENDPOINT")
 	ripeMillisStr, ripeMillisOverride := os.LookupEnv("NEW_RELIC_HARVEST_RIPE_MILLIS")
 	rotMillisStr, rotMillisOverride := os.LookupEnv("NEW_RELIC_HARVEST_ROT_MILLIS")
 	logLevelStr, logLevelOverride := os.LookupEnv("NEW_RELIC_EXTENSION_LOG_LEVEL")
@@ -46,6 +48,10 @@ func ConfigurationFromEnvironment() Configuration {
 
 	if teOverride {
 		ret.TelemetryEndpoint = &telemetryEndpoint
+	}
+
+	if leOverride {
+		ret.LogEndpoint = &logEndpoint
 	}
 
 	if ripeMillisOverride {

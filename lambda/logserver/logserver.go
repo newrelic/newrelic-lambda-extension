@@ -19,6 +19,7 @@ const (
 )
 
 type LogLine struct {
+	Time      time.Time
 	RequestID string
 	Content   []byte
 }
@@ -61,7 +62,7 @@ func (ls *LogServer) PollPlatformChannel() []LogLine {
 }
 
 func (ls *LogServer) AwaitFunctionLogs() []LogLine {
-	return <- ls.functionLogChan
+	return <-ls.functionLogChan
 }
 
 func formatReport(metrics map[string]interface{}) string {
@@ -118,6 +119,7 @@ func (ls *LogServer) handler(res http.ResponseWriter, req *http.Request) {
 				formatReport(metrics),
 			)
 			reportLine := LogLine{
+				Time:      event.Time,
 				RequestID: requestId,
 				Content:   []byte(reportStr),
 			}
@@ -128,11 +130,12 @@ func (ls *LogServer) handler(res http.ResponseWriter, req *http.Request) {
 		case "function":
 			record := event.Record.(string)
 			functionLogs = append(functionLogs, LogLine{
+				Time:      event.Time,
 				RequestID: lastRequestId,
 				Content:   []byte(record),
 			})
 		default:
-			log.Println("Ignored log event of type ", event.Type, string(bodyBytes))
+			util.Logln("Ignored log event of type ", event.Type, string(bodyBytes))
 		}
 	}
 	if len(functionLogs) > 0 {

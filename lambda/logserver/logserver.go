@@ -128,9 +128,10 @@ func Start() (*LogServer, error) {
 }
 
 func startInternal(host string) (*LogServer, error) {
-	listener, err := net.Listen("tcp", host+":")
+	// TODO: replace fallbackHost with host and remove the fallback in the error handler once 'sandbox' resolves.
+	listener, err := net.Listen("tcp", fallbackHost+":")
 	if err != nil {
-		listener, err = net.Listen("tcp", fallbackHost+":")
+		listener, err = net.Listen("tcp", host+":")
 		if err != nil {
 			return nil, err
 		}

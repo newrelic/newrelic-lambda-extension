@@ -18,7 +18,7 @@ type Configuration struct {
 	LicenseKey         *string
 	LicenseKeySecretId *string
 	TelemetryEndpoint  *string
-	LogEndpoint *string
+	LogEndpoint        *string
 	RipeMillis         uint32
 	RotMillis          uint32
 	LogLevel           string

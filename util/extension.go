@@ -1,7 +1,7 @@
 package util
 
 const (
-	Name = "newrelic-lambda-extension"
+	Name    = "newrelic-lambda-extension"
 	Version = "1.0.1"
-	Id = Name + ":" + Version
+	Id      = Name + ":" + Version
 )

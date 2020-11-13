@@ -14,8 +14,8 @@ import (
 const (
 	InfraEndpointEU string = "https://cloud-collector.eu01.nr-data.net/aws/lambda/v1"
 	InfraEndpointUS string = "https://cloud-collector.newrelic.com/aws/lambda/v1"
-	LogEndpointEU string = "https://log-api.eu.newrelic.com/log/v1"
-	LogEndpointUS string = "https://log-api.newrelic.com/log/v1"
+	LogEndpointEU   string = "https://log-api.eu.newrelic.com/log/v1"
+	LogEndpointUS   string = "https://log-api.newrelic.com/log/v1"
 )
 
 type Client struct {
@@ -134,17 +134,19 @@ func (c *Client) sendPayloads(compressedPayloads []*bytes.Buffer, builder reques
 func (c *Client) SendFunctionLogs(lines []logserver.LogLine) error {
 	start := time.Now()
 
-	// TODO: make sensible decisions re: common attrs
 	common := map[string]interface{}{
-		"plugin": util.Id,
+		"plugin":    util.Id,
+		"faas.name": c.functionName,
 	}
 	logMessages := make([]FunctionLogMessage, 0, len(lines))
 	for _, l := range lines {
 		// Unix time in ms
 		ts := l.Time.UnixNano() / 1e6
 		logMessages = append(logMessages, NewFunctionLogMessage(ts, l.RequestID, string(l.Content)))
+		util.Debugf("Sending logs for request %s", l.RequestID)
 	}
-	logData := NewDetailedFunctionLog(common, logMessages)
+	// The Log API expects an array
+	logData := []DetailedFunctionLog{NewDetailedFunctionLog(common, logMessages)}
 
 	// TODO: if necessary, deal with splitting. The buffering settings for the log API should make that unnecessary.
 	compressedPayload, err := CompressedJsonPayload(logData)

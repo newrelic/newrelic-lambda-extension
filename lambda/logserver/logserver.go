@@ -108,7 +108,7 @@ func (ls *LogServer) handler(res http.ResponseWriter, req *http.Request) {
 	for _, event := range logEvents {
 		switch event.Type {
 		case "platform.start":
-			lastRequestId = event.Record.(map[string]string)["requestId"]
+			lastRequestId = event.Record.(map[string]interface{})["requestId"].(string)
 		case "platform.report":
 			record := event.Record.(map[string]interface{})
 			metrics := record["metrics"].(map[string]interface{})
@@ -126,7 +126,6 @@ func (ls *LogServer) handler(res http.ResponseWriter, req *http.Request) {
 			ls.platformLogChan <- reportLine
 		case "platform.logsDropped":
 			util.Logf("Platform dropped logs: %v", event.Record)
-		//TODO: handle function logs. NB: they should send directly, as they don't need to decorate telemetry
 		case "function":
 			record := event.Record.(string)
 			functionLogs = append(functionLogs, LogLine{
@@ -135,7 +134,7 @@ func (ls *LogServer) handler(res http.ResponseWriter, req *http.Request) {
 				Content:   []byte(record),
 			})
 		default:
-			util.Logln("Ignored log event of type ", event.Type, string(bodyBytes))
+			//util.Logln("Ignored log event of type ", event.Type, string(bodyBytes))
 		}
 	}
 	if len(functionLogs) > 0 {

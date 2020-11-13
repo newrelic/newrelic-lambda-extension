@@ -37,6 +37,7 @@ func NewFunctionLogMessage(timestamp int64, requestId string, message string) Fu
 			"aws": map[string]string{
 				"lambda_request_id": requestId,
 			},
+			"faas.execution": requestId,
 		},
 	}
 }

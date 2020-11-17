@@ -5,17 +5,15 @@ accountId=$1
 region=$2
 echo "region set to ${region}"
 
-# In this example, our Go lambda can use the "norpc" option to slim down the deployment package
-# a little. That requires some custom packaging though.
+# The Go1.x runtime does not support Lambda Extensions. Instead, Go Lambdas should be written
+# against the "provided" runtime. The aws-lambda-go SDK provides a build tag that makes this easy.
 runtime="provided"
 
-handler="handler"
-build_tags=""
-if [ "go1.x" != $runtime ] ; then
-  echo "Building stand-alone lambda"
-  build_tags="-tags lambda.norpc"
-  handler="bootstrap"
-fi
+echo "Building stand-alone lambda"
+build_tags="-tags lambda.norpc"
+
+# Custom runtimes need a bootstrap executable. See https://docs.aws.amazon.com/lambda/latest/dg/runtimes-custom.html
+handler="bootstrap"
 
 env GOARCH=amd64 GOOS=linux go build ${build_tags} -ldflags="-s -w" -o ${handler}
 zip go-example.zip "${handler}"

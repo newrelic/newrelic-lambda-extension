@@ -6,6 +6,7 @@ import (
 	"github.com/newrelic/newrelic-lambda-extension/lambda/logserver"
 	"github.com/newrelic/newrelic-lambda-extension/util"
 	"net/http"
+	"sync"
 	"time"
 
 	"github.com/newrelic/newrelic-lambda-extension/config"
@@ -85,22 +86,37 @@ func main() {
 		util.Fatal("telemetry pipe init failed: ", err)
 	}
 
+	// Send function logs as they arrive. When disabled, function logs aren't delivered to the extension.
+	var backgroundTasks sync.WaitGroup
 	go func() {
-		for {
-			functionLogs := logServer.AwaitFunctionLogs()
-			err := telemetryClient.SendFunctionLogs(functionLogs)
-			if err != nil {
-				util.Logf("Failed to send %d function logs", len(functionLogs))
-			}
-		}
+		backgroundTasks.Add(1)
+		defer backgroundTasks.Done()
+		functionLogShipLoop(logServer, telemetryClient)
 	}()
 
 	// Call next, and process telemetry, until we're shut down
 	mainLoop(invocationClient, &batch, telemetryChan, logServer, telemetryClient)
 
+	util.Debugln("Waiting for background tasks to complete")
+	backgroundTasks.Wait()
+
 	shutdownAt := time.Now()
 	ranFor := shutdownAt.Sub(extensionStartup)
 	util.Logf("Extension shutdown after %vms", ranFor.Milliseconds())
+}
+
+// functionLogShipLoop ships function logs to New Relic as they arrive.
+func functionLogShipLoop(logServer *logserver.LogServer, telemetryClient *telemetry.Client) {
+	for {
+		functionLogs, more := logServer.AwaitFunctionLogs()
+		if !more {
+			return
+		}
+		err := telemetryClient.SendFunctionLogs(functionLogs)
+		if err != nil {
+			util.Logf("Failed to send %d function logs", len(functionLogs))
+		}
+	}
 }
 
 // mainLoop repeatedly calls the /next api, and processes telemetry and platform logs. The timing is rather complicated.
@@ -216,7 +232,7 @@ func pollLogServer(logServer *logserver.LogServer, batch *telemetry.Batch) {
 	for _, platformLog := range logServer.PollPlatformChannel() {
 		inv := batch.AddTelemetry(platformLog.RequestID, platformLog.Content)
 		if inv == nil {
-			util.Logf("Failed to add platform log for request %v", platformLog.RequestID)
+			util.Debugf("Failed to add platform log for request %v", platformLog.RequestID)
 		}
 	}
 }

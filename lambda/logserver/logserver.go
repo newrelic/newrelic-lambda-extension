@@ -42,6 +42,7 @@ func (ls *LogServer) Close() error {
 	time.Sleep(200 * time.Millisecond)
 
 	close(ls.platformLogChan)
+	close(ls.functionLogChan)
 	return ls.server.Close()
 }
 
@@ -61,8 +62,9 @@ func (ls *LogServer) PollPlatformChannel() []LogLine {
 	}
 }
 
-func (ls *LogServer) AwaitFunctionLogs() []LogLine {
-	return <-ls.functionLogChan
+func (ls *LogServer) AwaitFunctionLogs() ([]LogLine, bool) {
+	ll, more := <-ls.functionLogChan
+	return ll, more
 }
 
 func formatReport(metrics map[string]interface{}) string {

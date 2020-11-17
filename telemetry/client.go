@@ -5,6 +5,7 @@ import (
 	"github.com/newrelic/newrelic-lambda-extension/lambda/logserver"
 	"io/ioutil"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 
@@ -16,6 +17,8 @@ const (
 	InfraEndpointUS string = "https://cloud-collector.newrelic.com/aws/lambda/v1"
 	LogEndpointEU   string = "https://log-api.eu.newrelic.com/log/v1"
 	LogEndpointUS   string = "https://log-api.newrelic.com/log/v1"
+
+	retries int = 3
 )
 
 type Client struct {
@@ -118,7 +121,7 @@ func (c *Client) sendPayloads(compressedPayloads []*bytes.Buffer, builder reques
 		if err != nil {
 			return successCount, sentBytes, err
 		}
-		res, body, err := c.sendRequest(req)
+		res, body, err := c.sendRequest(req, retries)
 		if err != nil {
 			util.Logf("Telemetry client error: %s", err)
 			sentBytes -= p.Len()
@@ -143,7 +146,7 @@ func (c *Client) SendFunctionLogs(lines []logserver.LogLine) error {
 		// Unix time in ms
 		ts := l.Time.UnixNano() / 1e6
 		logMessages = append(logMessages, NewFunctionLogMessage(ts, l.RequestID, string(l.Content)))
-		util.Debugf("Sending logs for request %s", l.RequestID)
+		util.Debugf("Sending function logs for request %s", l.RequestID)
 	}
 	// The Log API expects an array
 	logData := []DetailedFunctionLog{NewDetailedFunctionLog(common, logMessages)}
@@ -171,7 +174,7 @@ func (c *Client) SendFunctionLogs(lines []logserver.LogLine) error {
 	totalTime := end.Sub(start)
 	transmissionTime := end.Sub(transmitStart)
 	util.Logf(
-		"Sent %d/%d New Relic log batches successfully in %.3fms (%dms to transmit %.1fkB).\n",
+		"Sent %d/%d New Relic function log batches successfully in %.3fms (%dms to transmit %.1fkB).\n",
 		successCount,
 		len(compressedPayloads),
 		float64(totalTime.Microseconds())/1000.0,
@@ -182,9 +185,23 @@ func (c *Client) SendFunctionLogs(lines []logserver.LogLine) error {
 	return nil
 }
 
-func (c *Client) sendRequest(req *http.Request) (*http.Response, string, error) {
+func (c *Client) sendRequest(req *http.Request, triesLeft int) (*http.Response, string, error) {
 	res, err := c.httpClient.Do(req)
 	if err != nil {
+		triesLeft -= 1
+		if triesLeft > 0 {
+			switch err.(type) {
+			case *url.Error:
+				// Retry on timeout
+				if err.(*url.Error).Timeout() {
+					util.Debugln("Retrying after timeout", err)
+					return c.sendRequest(req, triesLeft)
+				}
+			default:
+			}
+		} else {
+			util.Logln("Request failed. Ran out of retries.")
+		}
 		return nil, "", err
 	}
 

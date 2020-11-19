@@ -186,6 +186,7 @@ func mainLoop(invocationClient *client.InvocationClient, batch *telemetry.Batch,
 		timeoutInstant := time.Unix(0, event.DeadlineMs*int64(time.Millisecond))
 		// TODO: Delete this after the deadlineMs bug is fixed in all regions
 		if timeoutInstant.Before(time.Now()) {
+			util.Debugln("Working around deadlineMs bug")
 			timeoutInstant = eventStart.Add(15 * time.Minute) // Max timeout; disables timeout detection
 		}
 

@@ -151,7 +151,7 @@ func (c *Client) SendFunctionLogs(lines []logserver.LogLine) error {
 	// The Log API expects an array
 	logData := []DetailedFunctionLog{NewDetailedFunctionLog(common, logMessages)}
 
-	// TODO: if necessary, deal with splitting. The buffering settings for the log API should make that unnecessary.
+	// Since the Log API won't send us more than 1MB, we shouldn't have any issues with payload size.
 	compressedPayload, err := CompressedJsonPayload(logData)
 	if err != nil {
 		return err

@@ -42,7 +42,7 @@ func TestClientSend(t *testing.T) {
 	client := NewWithHTTPClient(srv.Client(), "", "a mock license key", &srv.URL, &srv.URL)
 
 	bytes := []byte("foobar")
-	err := client.SendTelemetry("fakeArn", [][]byte{bytes})
+	err := client.SendTelemetry("arn:aws:lambda:us-east-1:1234:function:newrelic-example-go", [][]byte{bytes})
 
 	assert.NoError(t, err)
 }

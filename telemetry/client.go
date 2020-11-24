@@ -57,6 +57,16 @@ func (c *Client) SendTelemetry(invokedFunctionARN string, telemetry [][]byte) er
 		logEvents = append(logEvents, logEvent)
 	}
 
+	if len(c.functionName) == 0  {
+		nameStart := strings.Index(invokedFunctionARN, ":function:") + len(":function:")
+		nameLen := strings.Index(invokedFunctionARN[nameStart:], ":")
+		if nameLen < 0 {
+			nameLen = len(invokedFunctionARN) - nameStart
+		}
+		c.functionName = invokedFunctionARN[nameStart:nameStart+nameLen]
+		util.Debugf("Recovered missing function name: %s", c.functionName)
+	}
+
 	compressedPayloads, err := CompressedPayloadsForLogEvents(logEvents, c.functionName, invokedFunctionARN)
 	if err != nil {
 		return err

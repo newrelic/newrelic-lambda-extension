@@ -87,6 +87,7 @@ func (rc *RegistrationClient) Register(registrationRequest api.RegistrationReque
 	if err != nil {
 		return nil, nil, err
 	}
+	util.Debugf("Registration response: %s", bodyBytes)
 
 	var registrationResponse api.RegistrationResponse
 	err = json.Unmarshal(bodyBytes, &registrationResponse)

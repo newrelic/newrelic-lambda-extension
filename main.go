@@ -6,6 +6,7 @@ import (
 	"github.com/newrelic/newrelic-lambda-extension/lambda/logserver"
 	"github.com/newrelic/newrelic-lambda-extension/util"
 	"net/http"
+	"sync"
 	"time"
 
 	"github.com/newrelic/newrelic-lambda-extension/config"
@@ -62,7 +63,11 @@ func main() {
 		}
 		return
 	}
-	subscriptionRequest := api.DefaultLogSubscription([]api.LogEventType{api.Platform}, logServer.Port())
+	eventTypes := []api.LogEventType{api.Platform}
+	if conf.SendFunctionLogs {
+		eventTypes = append(eventTypes, api.Function)
+	}
+	subscriptionRequest := api.DefaultLogSubscription(eventTypes, logServer.Port())
 	err = invocationClient.LogRegister(&subscriptionRequest)
 	if err != nil {
 		util.Logln("Failed to register with Logs API", err)
@@ -74,19 +79,44 @@ func main() {
 	}
 
 	// Init the telemetry sending client
-	telemetryClient := telemetry.New(registrationResponse.FunctionName, *licenseKey, conf.TelemetryEndpoint)
+	telemetryClient := telemetry.New(registrationResponse.FunctionName, *licenseKey, conf.TelemetryEndpoint, conf.LogEndpoint)
 
 	telemetryChan, err := telemetry.InitTelemetryChannel()
 	if err != nil {
 		util.Fatal("telemetry pipe init failed: ", err)
 	}
 
+	// Send function logs as they arrive. When disabled, function logs aren't delivered to the extension.
+	var backgroundTasks sync.WaitGroup
+	go func() {
+		backgroundTasks.Add(1)
+		defer backgroundTasks.Done()
+		functionLogShipLoop(logServer, telemetryClient)
+	}()
+
 	// Call next, and process telemetry, until we're shut down
 	mainLoop(invocationClient, &batch, telemetryChan, logServer, telemetryClient)
+
+	util.Debugln("Waiting for background tasks to complete")
+	backgroundTasks.Wait()
 
 	shutdownAt := time.Now()
 	ranFor := shutdownAt.Sub(extensionStartup)
 	util.Logf("Extension shutdown after %vms", ranFor.Milliseconds())
+}
+
+// functionLogShipLoop ships function logs to New Relic as they arrive.
+func functionLogShipLoop(logServer *logserver.LogServer, telemetryClient *telemetry.Client) {
+	for {
+		functionLogs, more := logServer.AwaitFunctionLogs()
+		if !more {
+			return
+		}
+		err := telemetryClient.SendFunctionLogs(functionLogs)
+		if err != nil {
+			util.Logf("Failed to send %d function logs", len(functionLogs))
+		}
+	}
 }
 
 // mainLoop repeatedly calls the /next api, and processes telemetry and platform logs. The timing is rather complicated.
@@ -154,10 +184,6 @@ func mainLoop(invocationClient *client.InvocationClient, batch *telemetry.Batch,
 		// Await agent telemetry. This may time out, so we race the timeout against the telemetry channel
 		// timeoutInstant is when the invocation will time out
 		timeoutInstant := time.Unix(0, event.DeadlineMs*int64(time.Millisecond))
-		// TODO: Delete this after the deadlineMs bug is fixed in all regions
-		if timeoutInstant.Before(time.Now()) {
-			timeoutInstant = eventStart.Add(15 * time.Minute) // Max timeout; disables timeout detection
-		}
 
 		// Set the timeout timer for a smidge before the actual timeout; we can recover from early.
 		timeout := time.NewTimer(timeoutInstant.Sub(time.Now()) - time.Millisecond)
@@ -202,7 +228,7 @@ func pollLogServer(logServer *logserver.LogServer, batch *telemetry.Batch) {
 	for _, platformLog := range logServer.PollPlatformChannel() {
 		inv := batch.AddTelemetry(platformLog.RequestID, platformLog.Content)
 		if inv == nil {
-			util.Logf("Failed to add platform log for request %v", platformLog.RequestID)
+			util.Debugf("Failed to add platform log for request %v", platformLog.RequestID)
 		}
 	}
 }

@@ -15,10 +15,10 @@ import (
 const (
 	platformLogBufferSize = 100
 	defaultHost           = "sandbox"
-	fallbackHost          = "169.254.79.130"
 )
 
 type LogLine struct {
+	Time      time.Time
 	RequestID string
 	Content   []byte
 }
@@ -27,6 +27,7 @@ type LogServer struct {
 	listenString    string
 	server          *http.Server
 	platformLogChan chan LogLine
+	functionLogChan chan []LogLine
 }
 
 func (ls *LogServer) Port() uint16 {
@@ -40,6 +41,7 @@ func (ls *LogServer) Close() error {
 	time.Sleep(200 * time.Millisecond)
 
 	close(ls.platformLogChan)
+	close(ls.functionLogChan)
 	return ls.server.Close()
 }
 
@@ -57,6 +59,11 @@ func (ls *LogServer) PollPlatformChannel() []LogLine {
 			return ret
 		}
 	}
+}
+
+func (ls *LogServer) AwaitFunctionLogs() ([]LogLine, bool) {
+	ll, more := <-ls.functionLogChan
+	return ll, more
 }
 
 func formatReport(metrics map[string]interface{}) string {
@@ -97,8 +104,12 @@ func (ls *LogServer) handler(res http.ResponseWriter, req *http.Request) {
 		util.Logf("Error parsing log payload: %v", err)
 	}
 
+	var functionLogs []LogLine
+	var lastRequestId string
 	for _, event := range logEvents {
 		switch event.Type {
+		case "platform.start":
+			lastRequestId = event.Record.(map[string]interface{})["requestId"].(string)
 		case "platform.report":
 			record := event.Record.(map[string]interface{})
 			metrics := record["metrics"].(map[string]interface{})
@@ -109,15 +120,26 @@ func (ls *LogServer) handler(res http.ResponseWriter, req *http.Request) {
 				formatReport(metrics),
 			)
 			reportLine := LogLine{
+				Time:      event.Time,
 				RequestID: requestId,
 				Content:   []byte(reportStr),
 			}
 			ls.platformLogChan <- reportLine
 		case "platform.logsDropped":
 			util.Logf("Platform dropped logs: %v", event.Record)
-		//TODO: handle function logs. NB: they should send directly, as they don't need to decorate telemetry
+		case "function":
+			record := event.Record.(string)
+			functionLogs = append(functionLogs, LogLine{
+				Time:      event.Time,
+				RequestID: lastRequestId,
+				Content:   []byte(record),
+			})
 		default:
+			//util.Logln("Ignored log event of type ", event.Type, string(bodyBytes))
 		}
+	}
+	if len(functionLogs) > 0 {
+		ls.functionLogChan <- functionLogs
 	}
 
 	_, _ = res.Write(nil)
@@ -128,13 +150,9 @@ func Start() (*LogServer, error) {
 }
 
 func startInternal(host string) (*LogServer, error) {
-	// TODO: replace fallbackHost with host and remove the fallback in the error handler once 'sandbox' resolves.
-	listener, err := net.Listen("tcp", fallbackHost+":")
+	listener, err := net.Listen("tcp", host+":")
 	if err != nil {
-		listener, err = net.Listen("tcp", host+":")
-		if err != nil {
-			return nil, err
-		}
+		return nil, err
 	}
 
 	server := http.Server{}
@@ -143,6 +161,7 @@ func startInternal(host string) (*LogServer, error) {
 		listenString:    listener.Addr().String(),
 		server:          &server,
 		platformLogChan: make(chan LogLine, platformLogBufferSize),
+		functionLogChan: make(chan []LogLine),
 	}
 
 	http.HandleFunc("/", func(res http.ResponseWriter, req *http.Request) {

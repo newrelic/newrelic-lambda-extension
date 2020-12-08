@@ -18,9 +18,11 @@ type Configuration struct {
 	LicenseKey         *string
 	LicenseKeySecretId *string
 	TelemetryEndpoint  *string
+	LogEndpoint        *string
 	RipeMillis         uint32
 	RotMillis          uint32
 	LogLevel           string
+	SendFunctionLogs   bool
 }
 
 func ConfigurationFromEnvironment() Configuration {
@@ -28,9 +30,11 @@ func ConfigurationFromEnvironment() Configuration {
 	licenseKey, lkOverride := os.LookupEnv("NEW_RELIC_LICENSE_KEY")
 	licenseKeySecretId, lkSecretOverride := os.LookupEnv("NEW_RELIC_LICENSE_KEY_SECRET")
 	telemetryEndpoint, teOverride := os.LookupEnv("NEW_RELIC_TELEMETRY_ENDPOINT")
+	logEndpoint, leOverride := os.LookupEnv("NEW_RELIC_LOG_ENDPOINT")
 	ripeMillisStr, ripeMillisOverride := os.LookupEnv("NEW_RELIC_HARVEST_RIPE_MILLIS")
 	rotMillisStr, rotMillisOverride := os.LookupEnv("NEW_RELIC_HARVEST_ROT_MILLIS")
 	logLevelStr, logLevelOverride := os.LookupEnv("NEW_RELIC_EXTENSION_LOG_LEVEL")
+	sendFunctionLogsStr, sendFunctionLogsOverride := os.LookupEnv("NEW_RELIC_EXTENSION_SEND_FUNCTION_LOGS")
 
 	extensionEnabled := true
 	if extensionEnabledOverride && "false" == strings.ToLower(enabledStr) {
@@ -46,6 +50,10 @@ func ConfigurationFromEnvironment() Configuration {
 
 	if teOverride {
 		ret.TelemetryEndpoint = &telemetryEndpoint
+	}
+
+	if leOverride {
+		ret.LogEndpoint = &logEndpoint
 	}
 
 	if ripeMillisOverride {
@@ -72,6 +80,10 @@ func ConfigurationFromEnvironment() Configuration {
 		ret.LogLevel = DebugLogLevel
 	} else {
 		ret.LogLevel = DefaultLogLevel
+	}
+
+	if sendFunctionLogsOverride && sendFunctionLogsStr == "true" {
+		ret.SendFunctionLogs = true
 	}
 
 	return ret

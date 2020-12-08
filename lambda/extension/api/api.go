@@ -32,8 +32,8 @@ const (
 	ExtensionIdHeader        = "Lambda-Extension-Identifier"
 	ExtensionErrorTypeHeader = "Lambda-Extension-Function-Error-Type"
 
-	LogBufferDefaultBytes   uint32 = 256 * 1024
-	LogBufferDefaultItems   uint32 = 1000
+	LogBufferDefaultBytes   uint32 = 1024 * 1024
+	LogBufferDefaultItems   uint32 = 10_000
 	LogBufferDefaultTimeout uint32 = 500
 )
 

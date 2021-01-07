@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/base64"
 	"fmt"
+	"github.com/newrelic/newrelic-lambda-extension/checks"
 	"github.com/newrelic/newrelic-lambda-extension/lambda/logserver"
 	"github.com/newrelic/newrelic-lambda-extension/util"
 	"net/http"
@@ -34,6 +35,10 @@ func main() {
 	if err != nil {
 		util.Fatal(err)
 	}
+
+	go func() {
+		checks.RunChecks(&conf, registrationResponse)
+	}()
 
 	if !conf.ExtensionEnabled {
 		util.Logln("Extension telemetry processing disabled")

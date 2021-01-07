@@ -36,10 +36,6 @@ func main() {
 		util.Fatal(err)
 	}
 
-	go func() {
-		checks.RunChecks(&conf, registrationResponse)
-	}()
-
 	if !conf.ExtensionEnabled {
 		util.Logln("Extension telemetry processing disabled")
 		noopLoop(invocationClient)
@@ -90,6 +86,10 @@ func main() {
 	if err != nil {
 		util.Fatal("telemetry pipe init failed: ", err)
 	}
+
+	go func() {
+		checks.RunChecks(&conf, registrationResponse, telemetryClient)
+	}()
 
 	// Send function logs as they arrive. When disabled, function logs aren't delivered to the extension.
 	var backgroundTasks sync.WaitGroup

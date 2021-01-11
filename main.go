@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/base64"
 	"fmt"
+	"github.com/newrelic/newrelic-lambda-extension/checks"
 	"github.com/newrelic/newrelic-lambda-extension/lambda/logserver"
 	"github.com/newrelic/newrelic-lambda-extension/util"
 	"net/http"
@@ -85,6 +86,10 @@ func main() {
 	if err != nil {
 		util.Fatal("telemetry pipe init failed: ", err)
 	}
+
+	go func() {
+		checks.RunChecks(&conf, registrationResponse, telemetryClient)
+	}()
 
 	// Send function logs as they arrive. When disabled, function logs aren't delivered to the extension.
 	var backgroundTasks sync.WaitGroup

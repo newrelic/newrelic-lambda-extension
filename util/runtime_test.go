@@ -1,25 +1,30 @@
 package util
 
 import (
-	"github.com/stretchr/testify/assert"
 	"os"
+
+	"github.com/stretchr/testify/assert"
 	"testing"
 )
 
 func TestDetectRuntime(t *testing.T) {
-	assert.Equal(t, DetectRuntime(), "unknown")
+	nodeDirExists := false
+	_, err := os.Stat("/opt/nodejs")
+	nodeDirExists = !os.IsNotExist(err)
 
-	defer func() {
-		os.Unsetenv("AWS_EXECUTION_ENV")
-	}()
+	pythonDirExists := false
+	_, err = os.Stat("/opt/python")
+	pythonDirExists = !os.IsNotExist(err)
 
-	os.Setenv("AWS_EXECUTION_ENV", "")
-	assert.Equal(t, DetectRuntime(), "unknown")
+	if !nodeDirExists && !pythonDirExists {
+		assert.Equal(t, DetectRuntime(), "unknown")
+	}
 
-	// AWS capitalizes the value according to the docs
-	os.Setenv("AWS_EXECUTION_ENV", "aws_lambda_python3.6")
-	assert.Equal(t, DetectRuntime(), "unknown")
+	if nodeDirExists {
+		assert.Equal(t, DetectRuntime(), "nodejs")
+	}
 
-	os.Setenv("AWS_EXECUTION_ENV", "AWS_Lambda_python3.6")
-	assert.Equal(t, DetectRuntime(), "python3.6")
+	if !nodeDirExists && pythonDirExists {
+		assert.Equal(t, DetectRuntime(), "python")
+	}
 }

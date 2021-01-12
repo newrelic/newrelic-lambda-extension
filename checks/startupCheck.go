@@ -13,7 +13,6 @@ import (
 )
 
 type checkFn func(*config.Configuration, *api.RegistrationResponse) error
-
 type checkRuntime func(handlerConfigs) error
 
 type handlerConfigs struct {
@@ -70,9 +69,8 @@ func exampleCheckFunction(*config.Configuration, *api.RegistrationResponse) erro
 }
 
 // TODO:
-// validate that java handler ends with ::handleRequest
+// validate that java handler ends with interface method handleRequest
 // check on custom runtimes
-// error messaging
 // tests
 func checkHandler(conf *config.Configuration, reg *api.RegistrationResponse) error {
 	functionHandler := reg.Handler
@@ -89,6 +87,9 @@ func checkHandler(conf *config.Configuration, reg *api.RegistrationResponse) err
 				conf:        conf,
 			}
 			err = v(h)
+			if err != nil {
+				return fmt.Errorf("Lambda handler is set incorrectly: %s", err)
+			}
 			break
 		}
 	}

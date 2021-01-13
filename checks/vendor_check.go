@@ -24,11 +24,11 @@ var (
 // with their function while also using a layer that includes the agent
 func vendorCheck(*config.Configuration, *api.RegistrationResponse) error {
 	if util.PathExists(vendorAgentPathNode) && util.PathExists(layerAgentPathNode) {
-		return fmt.Errorf("Vendored agent found at '%s', a layer already includes this agent at '%s'. Recommend using one or the other to avoid unexpected agent behavior.", vendorAgentPathNode, layerAgentPathNode)
+		return fmt.Errorf("Vendored agent found at '%s', a layer already includes this agent at '%s'. Recommend using the layer agent to avoid unexpected agent behavior.", vendorAgentPathNode, layerAgentPathNode)
 	}
 
 	if util.PathExists(vendorAgentPathPython) && util.AnyPathsExist(layerAgentPathsPython) {
-		return fmt.Errorf("Vendored agent found at '%s', a layer already includes this agent at '%s'. Recommend using one or the other to avoid unexpected agent behavior.", vendorAgentPathPython, util.AnyPathsExistString(layerAgentPathsPython))
+		return fmt.Errorf("Vendored agent found at '%s', a layer already includes this agent at '%s'. Recommend using the layer agent to avoid unexpected agent behavior.", vendorAgentPathPython, util.AnyPathsExistString(layerAgentPathsPython))
 	}
 
 	return nil

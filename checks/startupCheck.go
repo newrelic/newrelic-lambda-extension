@@ -12,12 +12,13 @@ import (
 type checkFn func(*config.Configuration, *api.RegistrationResponse) error
 
 type LogSender interface {
-	SendFunctionLogs(lines []logserver.LogLine) error;
+	SendFunctionLogs(lines []logserver.LogLine) error
 }
 
 /// Register checks here
-var checks = []checkFn {
+var checks = []checkFn{
 	exampleCheckFunction,
+	vendorCheck,
 }
 
 func RunChecks(conf *config.Configuration, reg *api.RegistrationResponse, logSender LogSender) {

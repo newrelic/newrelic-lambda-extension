@@ -4,7 +4,7 @@ import (
 	"os"
 )
 
-// PathExists returns true of a path exists, false if it does not
+// PathExists returns true if a path exists, false if it does not
 func PathExists(path string) bool {
 	_, err := os.Stat(path)
 	return !os.IsNotExist(err)

@@ -10,18 +10,19 @@ import (
 )
 
 var testHandler = "path/to/app.handler"
+var conf = config.Configuration{}
+var reg = api.RegistrationResponse{}
 
 func TestHandlerCheckSuccess(t *testing.T) {
+
 	pathExists = func(p string) error {
 		return nil
 	}
-	checkAndReturnRuntime = func() handlerRuntime {
-		return node
+	checkAndReturnRuntime = func() RuntimeHandlerCheck {
+		return handlerCheck["node"]
 	}
-	conf := config.Configuration{}
-	resp := api.RegistrationResponse{}
-	err := checkHandler(&conf, &resp)
 
+	err := checkHandler(&conf, &reg)
 	assert.Nil(t, err)
 }
 
@@ -29,71 +30,63 @@ func TestHandlerCheckError(t *testing.T) {
 	pathExists = func(p string) error {
 		return errors.New("Error!")
 	}
-	checkAndReturnRuntime = func() handlerRuntime {
-		return node
+	checkAndReturnRuntime = func() RuntimeHandlerCheck {
+		return handlerCheck["node"]
 	}
-	conf := config.Configuration{}
-	resp := api.RegistrationResponse{}
-	err := checkHandler(&conf, &resp)
-
-	assert.EqualError(t, err, "Lambda handler is set incorrectly: Error!")
+	reg.Handler = testHandler
+	conf.NRHandler = &config.EmptyNRWrapper
+	err := checkHandler(&conf, &reg)
+	assert.EqualError(t, err, "Missing handler file path/to/app.handler (NEW_RELIC_LAMBDA_HANDLER=Undefined): Error!")
 }
 
-func TestPathPython(t *testing.T) {
-	c := config.Configuration{NRHandler: &testHandler}
-	h := handlerConfigs{
-		handlerName: "newrelic_lambda_wrapper.handler",
-		conf:        &c,
+func TestNode(t *testing.T) {
+	w := wrapperCheck{
+		wrapperName: "newrelic-lambda-wrapper.handler",
+		fileType:    "js",
 	}
-	t1 := getTrueHandler(h, "newrelic_lambda_wrapper.handler")
-	t2 := removePathMethodName(t1)
-	t3 := pathFormatter(t2, "py")
 
-	e1 := "path/to/app.handler"
-	e2 := "path/to/app"
-	e3 := "/var/task/path/to/app.py"
-
-	assert.Equal(t, e1, e1)
-	assert.Equal(t, e2, t2)
-	assert.Equal(t, e3, t3)
-}
-
-func TestPathNode(t *testing.T) {
-	c := config.Configuration{NRHandler: &testHandler}
 	h := handlerConfigs{
-		handlerName: "newrelic-lambda-wrapper.handler",
-		conf:        &c,
+		handlerName: w.wrapperName,
+		conf:        &conf,
 	}
-	t1 := getTrueHandler(h, "newrelic-lambda-wrapper.handler")
-	t2 := removePathMethodName(t1)
-	t3 := pathFormatter(t2, "js")
 
-	e1 := "path/to/app.handler"
+	conf.NRHandler = &testHandler
+
+	t1 := w.getTrueHandler(h)
+	t2 := w.removePathMethodName(t1)
+	t3 := pathFormatter(t2, w.fileType)
+
+	e1 := testHandler
 	e2 := "path/to/app"
 	e3 := "/var/task/path/to/app.js"
 
-	assert.Equal(t, e1, e1)
-	assert.Equal(t, e2, t2)
-	assert.Equal(t, e3, t3)
+	assert.Equal(t, t1, e1)
+	assert.Equal(t, t2, e2)
+	assert.Equal(t, t3, e3)
 }
 
-func TestGetTrueHandlerWith(t *testing.T) {
-	e := "path/to/app.lambda_handler"
-	c := config.Configuration{}
-	c.NRHandler = &e
-	h := handlerConfigs{
-		handlerName: "newrelic-lambda-wrapper.handler",
-		conf:        &c,
+func TestPython(t *testing.T) {
+	w := wrapperCheck{
+		wrapperName: "newrelic_lambda_wrapper.handler",
+		fileType:    "py",
 	}
-	r := getTrueHandler(h, "newrelic-lambda-wrapper.handler")
-	assert.Equal(t, e, r)
-}
 
-func TestGetTrueHandlerWithout(t *testing.T) {
 	h := handlerConfigs{
-		handlerName: testHandler,
-		conf:        &config.Configuration{},
+		handlerName: w.wrapperName,
+		conf:        &conf,
 	}
-	r := getTrueHandler(h, "newrelic_lambda_wrapper.handler")
-	assert.Equal(t, h.handlerName, r)
+
+	conf.NRHandler = &testHandler
+
+	t1 := w.getTrueHandler(h)
+	t2 := w.removePathMethodName(t1)
+	t3 := pathFormatter(t2, w.fileType)
+
+	e1 := testHandler
+	e2 := "path/to/app"
+	e3 := "/var/task/path/to/app.py"
+
+	assert.Equal(t, t1, e1)
+	assert.Equal(t, t2, e2)
+	assert.Equal(t, t3, e3)
 }

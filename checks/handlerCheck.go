@@ -7,18 +7,32 @@ import (
 
 	"github.com/newrelic/newrelic-lambda-extension/config"
 	"github.com/newrelic/newrelic-lambda-extension/lambda/extension/api"
+	"github.com/newrelic/newrelic-lambda-extension/util"
 )
 
-type handlerRuntime func(handlerConfigs) error
+type RuntimeHandlerCheck interface {
+	check(handlerConfigs) error
+}
+
+type wrapperCheck struct {
+	wrapperName string
+	fileType    string
+}
 
 type handlerConfigs struct {
 	handlerName string
 	conf        *config.Configuration
 }
 
-var handlerCheck = map[string]handlerRuntime{
-	"node":   node,
-	"python": python,
+var handlerCheck = map[string]RuntimeHandlerCheck{
+	"node": wrapperCheck{
+		wrapperName: "newrelic-lambda-wrapper.handler",
+		fileType:    "js",
+	},
+	"python": wrapperCheck{
+		wrapperName: "newrelic_lambda_wrapper.handler",
+		fileType:    "py",
+	},
 }
 
 var pathExists = func(p string) error {
@@ -28,20 +42,21 @@ var pathExists = func(p string) error {
 	return nil
 }
 
-var checkAndReturnRuntime = func() handlerRuntime {
+var checkAndReturnRuntime = func() RuntimeHandlerCheck {
 	for k, v := range handlerCheck {
 		p := fmt.Sprintf("/var/lang/bin/%s", k)
 		err := pathExists(p)
+
 		if err == nil {
 			return v
 		}
 	}
-	// If we make it here that means the runtime is
-	// custom and we don't want to throw an error
+	// If we make it here that means the runtime is not one we
+	// currently validate so we don't want to warn against anything
 	return nil
 }
 
-var handlerPath = "/var/task"
+const handlerPath = "/var/task"
 
 func checkHandler(conf *config.Configuration, reg *api.RegistrationResponse) error {
 	r := checkAndReturnRuntime()
@@ -50,47 +65,35 @@ func checkHandler(conf *config.Configuration, reg *api.RegistrationResponse) err
 			handlerName: reg.Handler,
 			conf:        conf,
 		}
-		err := r(h)
+		err := r.check(h)
 		if err != nil {
-			return fmt.Errorf("Lambda handler is set incorrectly: %s", err)
+			return fmt.Errorf("Missing handler file %s (NEW_RELIC_LAMBDA_HANDLER=%s): %s", h.handlerName, *conf.NRHandler, err)
 		}
 	}
 	return nil
 }
 
-// Handler format for node functions: file.function
-// we can validate that the handler has been set to newrelic-lambda-wrapper.handler"
-// and that the file name provided in the env var NEW_RELIC_LAMBDA_HANDLER exists
-func node(h handlerConfigs) error {
-	functionHandler := getTrueHandler(h, "newrelic-lambda-wrapper.handler")
-	p := removePathMethodName(functionHandler)
-	p = pathFormatter(p, "js")
+func (w wrapperCheck) check(h handlerConfigs) error {
+	functionHandler := w.getTrueHandler(h)
+	p := w.removePathMethodName(functionHandler)
+	p = pathFormatter(p, w.fileType)
 	return pathExists(p)
 }
 
-// Handler format for python functions: file.function
-// we can validate that the handler has been set to newrelic_lambda_wrapper.handler
-// and that the file name provided in the env var NEW_RELIC_LAMBDA_HANDLER exists
-func python(h handlerConfigs) error {
-	functionHandler := getTrueHandler(h, "newrelic_lambda_wrapper.handler")
-	p := removePathMethodName(functionHandler)
-	p = pathFormatter(functionHandler, "py")
-	return pathExists(p)
-}
-
-func getTrueHandler(h handlerConfigs, w string) string {
-	if h.handlerName != w {
+func (w wrapperCheck) getTrueHandler(h handlerConfigs) string {
+	if h.handlerName != w.wrapperName {
+		util.Logln("Warning: handler not set to New Relic layer wrapper", w.wrapperName)
 		return h.handlerName
 	}
 	return *h.conf.NRHandler
 }
 
+func (w wrapperCheck) removePathMethodName(p string) string {
+	s := strings.Split(p, ".")
+	return strings.Join(s[:len(s)-1], "/")
+}
+
 func pathFormatter(functionHandler string, fileType string) string {
 	p := fmt.Sprintf("%s/%s.%s", handlerPath, functionHandler, fileType)
 	return p
-}
-
-func removePathMethodName(p string) string {
-	s := strings.Split(p, ".")
-	return strings.Join(s[:len(s)-1], "/")
 }

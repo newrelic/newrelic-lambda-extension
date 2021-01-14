@@ -13,6 +13,8 @@ const (
 	DebugLogLevel     = "DEBUG"
 )
 
+var EmptyNRWrapper = "Undefined"
+
 type Configuration struct {
 	ExtensionEnabled   bool
 	LicenseKey         *string
@@ -52,6 +54,8 @@ func ConfigurationFromEnvironment() Configuration {
 
 	if nrOverride {
 		ret.NRHandler = &nrHandler
+	} else {
+		ret.NRHandler = &EmptyNRWrapper
 	}
 
 	if teOverride {

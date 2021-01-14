@@ -1,9 +1,10 @@
 package config
 
 import (
-	"github.com/stretchr/testify/assert"
 	"os"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestConfigurationFromEnvironmentZero(t *testing.T) {
@@ -13,6 +14,7 @@ func TestConfigurationFromEnvironmentZero(t *testing.T) {
 		RipeMillis:       DefaultRipeMillis,
 		RotMillis:        DefaultRotMillis,
 		LogLevel:         DefaultLogLevel,
+		NRHandler:        &EmptyNRWrapper,
 	}
 	assert.Equal(t, expected, conf)
 }

@@ -2,11 +2,12 @@ package checks
 
 import (
 	"fmt"
+	"time"
+
 	"github.com/newrelic/newrelic-lambda-extension/config"
 	"github.com/newrelic/newrelic-lambda-extension/lambda/extension/api"
 	"github.com/newrelic/newrelic-lambda-extension/lambda/logserver"
 	"github.com/newrelic/newrelic-lambda-extension/util"
-	"time"
 )
 
 type checkFn func(*config.Configuration, *api.RegistrationResponse) error
@@ -18,6 +19,7 @@ type LogSender interface {
 /// Register checks here
 var checks = []checkFn{
 	exampleCheckFunction,
+	checkHandler,
 	vendorCheck,
 }
 

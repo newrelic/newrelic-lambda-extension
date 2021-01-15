@@ -41,7 +41,8 @@ func decodeLicenseKey(rawJson *string) (*string, error) {
 	return &secrets.LicenseKey, nil
 }
 
-func getLicenseKeyImpl(secrets secretsmanageriface.SecretsManagerAPI, conf *config.Configuration) (*string, error) {
+// GetLicenseKeyImpl retrieves the license key from AWS Secrets Manager
+func GetLicenseKeyImpl(secrets secretsmanageriface.SecretsManagerAPI, conf *config.Configuration) (*string, error) {
 	secretId := getLicenseKeySecretId(conf)
 	secretValueInput := secretsmanager.GetSecretValueInput{SecretId: &secretId}
 
@@ -58,7 +59,8 @@ func getLicenseKeyImpl(secrets secretsmanageriface.SecretsManagerAPI, conf *conf
 	return decodeLicenseKey(secretValueOutput.SecretString)
 }
 
-// GetNewRelicLicenseKey fetches the license key from AWS Secrets Manager.
+// GetNewRelicLicenseKey fetches the license key from AWS Secrets Manager, falling back
+// to the NEW_RELIC_LICENSE_KEY environment varaible if set.
 func GetNewRelicLicenseKey(conf *config.Configuration) (*string, error) {
 	if conf.LicenseKey != nil {
 		util.Logln("Using license key from environment variable")
@@ -66,5 +68,5 @@ func GetNewRelicLicenseKey(conf *config.Configuration) (*string, error) {
 	}
 
 	secrets := secretsmanager.New(sess)
-	return getLicenseKeyImpl(secrets, conf)
+	return GetLicenseKeyImpl(secrets, conf)
 }

@@ -18,8 +18,8 @@ type LogSender interface {
 
 /// Register checks here
 var checks = []checkFn{
-	exampleCheckFunction,
 	checkHandler,
+	sanityCheck,
 	vendorCheck,
 	agentVersionCheck,
 }
@@ -42,7 +42,7 @@ func runCheck(conf *config.Configuration, reg *api.RegistrationResponse, r runti
 		util.Logln(errLog)
 
 		//Send a log line to NR as well
-		_ = logSender.SendFunctionLogs([]logserver.LogLine{
+		logSender.SendFunctionLogs([]logserver.LogLine{
 			{
 				Time:      time.Now(),
 				RequestID: "0",
@@ -50,8 +50,7 @@ func runCheck(conf *config.Configuration, reg *api.RegistrationResponse, r runti
 			},
 		})
 	}
-	return err
-}
+
 
 func exampleCheckFunction(*config.Configuration, *api.RegistrationResponse, runtimeConfig) error {
 	return nil

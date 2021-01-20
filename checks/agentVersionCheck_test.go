@@ -20,11 +20,16 @@ func TestAgentVersion(t *testing.T) {
 
 	// Error
 	dirname, err := os.Getwd()
-	testFile := dirname + "/opt/python/lib/python3.8/site-packages/newrelic/"
 
+	// We want to make sure our working directory doesn't end up being root
+	assert.NotEqual(t, dirname, "")
+	assert.Nil(t, err)
+
+	testFile := dirname + "/opt/python/lib/python3.8/site-packages/newrelic/"
 	r = runtimeConfigs[Python]
 	r.AgentVersion = "10.1.2"
 	r.layerAgentPaths = []string{testFile}
+
 	os.MkdirAll(testFile, os.ModePerm)
 	defer os.RemoveAll(dirname + "/opt")
 	f, _ := os.Create(testFile + r.agentVersionFile)

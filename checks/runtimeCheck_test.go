@@ -9,7 +9,12 @@ import (
 )
 
 func TestRuntimeCheck(t *testing.T) {
-	dirname, _ := os.Getwd()
+	dirname, err := os.Getwd()
+
+	// Want to make sure working directory isn't root
+	assert.NotEqual(t, dirname, "")
+	assert.Nil(t, err)
+
 	runtimeLookupPath = fmt.Sprintf("%s/%s", dirname, runtimeLookupPath)
 	os.MkdirAll(runtimeLookupPath+"/node", os.ModePerm)
 	defer os.RemoveAll(dirname + "/var")

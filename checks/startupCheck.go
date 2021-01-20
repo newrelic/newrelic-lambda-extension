@@ -19,7 +19,6 @@ type LogSender interface {
 /// Register checks here
 var checks = []checkFn{
 	checkHandler,
-	sanityCheck,
 	vendorCheck,
 	agentVersionCheck,
 }
@@ -31,12 +30,13 @@ func RunChecks(conf *config.Configuration, reg *api.RegistrationResponse, logSen
 		util.Logln(errLog)
 	}
 	for _, check := range checks {
-		_ = runCheck(conf, reg, runtimeConfig, logSender, check)
+		runCheck(conf, reg, runtimeConfig, logSender, check)
 	}
 }
 
 func runCheck(conf *config.Configuration, reg *api.RegistrationResponse, r runtimeConfig, logSender LogSender, check checkFn) error {
 	err := check(conf, reg, r)
+
 	if err != nil {
 		errLog := fmt.Sprintf("Startup check failed: %v", err)
 		util.Logln(errLog)
@@ -51,7 +51,5 @@ func runCheck(conf *config.Configuration, reg *api.RegistrationResponse, r runti
 		})
 	}
 
-
-func exampleCheckFunction(*config.Configuration, *api.RegistrationResponse, runtimeConfig) error {
-	return nil
+	return err
 }

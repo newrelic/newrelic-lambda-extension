@@ -4,17 +4,19 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
-	"strings"
 
 	"github.com/newrelic/newrelic-lambda-extension/config"
 	"github.com/newrelic/newrelic-lambda-extension/lambda/extension/api"
 	"github.com/newrelic/newrelic-lambda-extension/util"
+	"golang.org/x/mod/semver"
 )
 
 type LayerAgentVersion struct {
 	Version string `json:"version"`
 }
 
+// We are only returning an error message when an out of date agent version is detected.
+// All other errors will result in a nil return value.
 func agentVersionCheck(conf *config.Configuration, reg *api.RegistrationResponse, r runtimeConfig) error {
 	if r.AgentVersion == "" {
 		return nil
@@ -31,23 +33,16 @@ func agentVersionCheck(conf *config.Configuration, reg *api.RegistrationResponse
 			if r.language == Python {
 				v.Version = string(b)
 			} else {
-				_ = json.Unmarshal([]byte(b), &v)
+				err = json.Unmarshal([]byte(b), &v)
+				if err != nil {
+					return nil
+				}
 			}
-			return r.semverValidation(v.Version)
-		}
-	}
-	return nil
-}
-
-func (r runtimeConfig) semverValidation(v string) error {
-	l := strings.Split(v, ".")
-	a := strings.Split(r.AgentVersion, ".")
-
-	for i := 0; i < len(l); i++ {
-		if l[i] > a[i] {
+			// semver requires a prepended v on version string
+			if semver.Compare("v"+v.Version, "v"+r.AgentVersion) < 0 {
+				return fmt.Errorf("Agent version out of date: %s, in order access up to date features please upgrade to the latest New Relic %s layer that includes agent version %s", v.Version, r.language, r.AgentVersion)
+			}
 			return nil
-		} else if l[i] < a[i] {
-			return fmt.Errorf("Agent version out of date: v%s, in order access up to date features please upgrade to the latest New Relic %s layer that includes agent version %s", v, r.language, r.AgentVersion)
 		}
 	}
 	return nil

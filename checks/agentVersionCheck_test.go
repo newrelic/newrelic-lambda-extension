@@ -25,17 +25,16 @@ func TestAgentVersion(t *testing.T) {
 	r = runtimeConfigs[Python]
 	r.AgentVersion = "10.1.2"
 	r.layerAgentPaths = []string{testFile}
-	err = os.MkdirAll(testFile, os.ModePerm)
-	f, err := os.Create(testFile + r.agentVersionFile)
+	os.MkdirAll(testFile, os.ModePerm)
+	defer os.RemoveAll(dirname + "/opt")
+	f, _ := os.Create(testFile + r.agentVersionFile)
 	f.WriteString("10.1.0")
 
 	err = agentVersionCheck(&conf, &reg, r)
-	assert.EqualError(t, err, "Agent version out of date: v10.1.0, in order access up to date features please upgrade to the latest New Relic python layer that includes agent version 10.1.2")
+	assert.EqualError(t, err, "Agent version out of date: 10.1.0, in order access up to date features please upgrade to the latest New Relic python layer that includes agent version 10.1.2")
 
 	// Success
 	r.AgentVersion = "10.1.0"
 	err = agentVersionCheck(&conf, &reg, r)
 	assert.Nil(t, err)
-
-	os.RemoveAll(dirname + "/opt")
 }

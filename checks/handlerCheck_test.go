@@ -68,14 +68,13 @@ func TestHandlerCheck(t *testing.T) {
 	assert.EqualError(t, err, "Missing handler file path/to/app.handler (NEW_RELIC_LAMBDA_HANDLER=Undefined)")
 
 	// Success
-	dirname, err := os.Getwd()
+	dirname, _ := os.Getwd()
 	handlerPath = dirname + "/var/task"
-	err = os.MkdirAll(dirname+"/var/task/path/to/", os.ModePerm)
+	os.MkdirAll(dirname+"/var/task/path/to/", os.ModePerm)
 	os.Create(dirname + "/var/task/path/to/app.js")
+	defer os.RemoveAll(dirname + "/var")
 	reg.Handler = testHandler
 	conf.NRHandler = &config.EmptyNRWrapper
 	err = checkHandler(&conf, &reg, r)
 	assert.Nil(t, err)
-
-	os.RemoveAll(dirname + "/var")
 }

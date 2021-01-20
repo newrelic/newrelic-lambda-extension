@@ -11,8 +11,8 @@ import (
 
 func TestSanityCheck(t *testing.T) {
 	if util.AnyEnvVarsExist(awsLogIngestionEnvVars) {
-		assert.Error(t, sanityCheck(&config.Configuration{}, &api.RegistrationResponse{}))
+		assert.Error(t, sanityCheck(&config.Configuration{}, &api.RegistrationResponse{}, runtimeConfig{}))
 	} else {
-		assert.Nil(t, sanityCheck(&config.Configuration{}, &api.RegistrationResponse{}))
+		assert.Nil(t, sanityCheck(&config.Configuration{}, &api.RegistrationResponse{}, runtimeConfig{}))
 	}
 }

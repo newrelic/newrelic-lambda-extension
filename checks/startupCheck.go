@@ -18,9 +18,10 @@ type LogSender interface {
 
 /// Register checks here
 var checks = []checkFn{
-	checkHandler,
-	vendorCheck,
 	agentVersionCheck,
+	checkHandler,
+	sanityCheck,
+	vendorCheck,
 }
 
 func RunChecks(conf *config.Configuration, reg *api.RegistrationResponse, logSender LogSender) {

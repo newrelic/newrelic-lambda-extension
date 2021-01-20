@@ -10,15 +10,24 @@ import (
 )
 
 func TestVendorCheck(t *testing.T) {
-	if !util.PathExists(layerAgentPathNode) && !util.AnyPathsExist(layerAgentPathsPython) && !util.PathExists(vendorAgentPathNode) && !util.PathExists(vendorAgentPathPython) {
-		assert.Nil(t, vendorCheck(&config.Configuration{}, &api.RegistrationResponse{}))
+
+	n := runtimeConfigs[Node]
+
+	if !util.AnyPathsExist(n.layerAgentPaths) && !util.PathExists(n.vendorAgentPath) {
+		assert.Nil(t, vendorCheck(&config.Configuration{}, &api.RegistrationResponse{}, n))
 	}
 
-	if util.PathExists(layerAgentPathNode) && util.PathExists(vendorAgentPathNode) {
-		assert.Error(t, vendorCheck(&config.Configuration{}, &api.RegistrationResponse{}))
+	if util.PathExists(n.layerAgentPaths[0]) && util.PathExists(n.vendorAgentPath) {
+		assert.Error(t, vendorCheck(&config.Configuration{}, &api.RegistrationResponse{}, n))
 	}
 
-	if util.AnyPathsExist(layerAgentPathsPython) && util.PathExists(vendorAgentPathPython) {
-		assert.Error(t, vendorCheck(&config.Configuration{}, &api.RegistrationResponse{}))
+	p := runtimeConfigs[Python]
+
+	if !util.AnyPathsExist(p.layerAgentPaths) && !util.PathExists(p.vendorAgentPath) {
+		assert.Nil(t, vendorCheck(&config.Configuration{}, &api.RegistrationResponse{}, n))
+	}
+
+	if util.AnyPathsExist(p.layerAgentPaths) && util.PathExists(p.vendorAgentPath) {
+		assert.Error(t, vendorCheck(&config.Configuration{}, &api.RegistrationResponse{}, n))
 	}
 }

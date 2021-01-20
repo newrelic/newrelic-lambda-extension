@@ -26,7 +26,7 @@ var (
 )
 
 // sanityCheck checks for configuration that is either misplaced or in conflict
-func sanityCheck(conf *config.Configuration, res *api.RegistrationResponse) error {
+func sanityCheck(conf *config.Configuration, res *api.RegistrationResponse, _ runtimeConfig) error {
 	if util.AnyEnvVarsExist(awsLogIngestionEnvVars) {
 		return fmt.Errorf("Environment varaible '%s' is used by aws-log-ingestion and has no effect here. Recommend unsetting this environment variable within this function.", util.AnyEnvVarsExistString(awsLogIngestionEnvVars))
 	}

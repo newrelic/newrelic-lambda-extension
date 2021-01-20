@@ -1,7 +1,7 @@
 package checks
 
 import (
-	"errors"
+	"os"
 	"testing"
 
 	"github.com/newrelic/newrelic-lambda-extension/config"
@@ -10,83 +10,71 @@ import (
 )
 
 var testHandler = "path/to/app.handler"
-var conf = config.Configuration{}
-var reg = api.RegistrationResponse{}
 
-func TestHandlerCheckSuccess(t *testing.T) {
-
-	pathExists = func(p string) error {
-		return nil
-	}
-	checkAndReturnRuntime = func() RuntimeHandlerCheck {
-		return handlerCheck["node"]
-	}
-
-	err := checkHandler(&conf, &reg)
-	assert.Nil(t, err)
-}
-
-func TestHandlerCheckError(t *testing.T) {
-	pathExists = func(p string) error {
-		return errors.New("Error!")
-	}
-	checkAndReturnRuntime = func() RuntimeHandlerCheck {
-		return handlerCheck["node"]
-	}
-	reg.Handler = testHandler
-	conf.NRHandler = &config.EmptyNRWrapper
-	err := checkHandler(&conf, &reg)
-	assert.EqualError(t, err, "Missing handler file path/to/app.handler (NEW_RELIC_LAMBDA_HANDLER=Undefined): Error!")
-}
-
-func TestNode(t *testing.T) {
-	w := wrapperCheck{
-		wrapperName: "newrelic-lambda-wrapper.handler",
-		fileType:    "js",
-	}
-
+func TestRuntimeMethods(t *testing.T) {
+	conf := config.Configuration{}
+	r := runtimeConfigs[Node]
 	h := handlerConfigs{
-		handlerName: w.wrapperName,
+		handlerName: r.wrapperName,
 		conf:        &conf,
 	}
-
 	conf.NRHandler = &testHandler
 
-	t1 := w.getTrueHandler(h)
-	t2 := w.removePathMethodName(t1)
-	t3 := pathFormatter(t2, w.fileType)
+	t1 := r.getTrueHandler(h)
+	t2 := removePathMethodName(t1)
+	t3 := pathFormatter(t2, r.fileType)
 
 	e1 := testHandler
 	e2 := "path/to/app"
 	e3 := "/var/task/path/to/app.js"
 
-	assert.Equal(t, t1, e1)
-	assert.Equal(t, t2, e2)
-	assert.Equal(t, t3, e3)
-}
+	assert.Equal(t, e1, t1)
+	assert.Equal(t, e2, t2)
+	assert.Equal(t, e3, t3)
 
-func TestPython(t *testing.T) {
-	w := wrapperCheck{
-		wrapperName: "newrelic_lambda_wrapper.handler",
-		fileType:    "py",
-	}
+	r = runtimeConfigs[Python]
 
-	h := handlerConfigs{
-		handlerName: w.wrapperName,
+	h = handlerConfigs{
+		handlerName: r.wrapperName,
 		conf:        &conf,
 	}
 
-	conf.NRHandler = &testHandler
+	t1 = r.getTrueHandler(h)
+	t2 = removePathMethodName(t1)
+	t3 = pathFormatter(t2, r.fileType)
 
-	t1 := w.getTrueHandler(h)
-	t2 := w.removePathMethodName(t1)
-	t3 := pathFormatter(t2, w.fileType)
+	e1 = testHandler
+	e2 = "path/to/app"
+	e3 = "/var/task/path/to/app.py"
 
-	e1 := testHandler
-	e2 := "path/to/app"
-	e3 := "/var/task/path/to/app.py"
+	assert.Equal(t, e1, t1)
+	assert.Equal(t, e2, t2)
+	assert.Equal(t, e3, t3)
+}
 
-	assert.Equal(t, t1, e1)
-	assert.Equal(t, t2, e2)
-	assert.Equal(t, t3, e3)
+func TestHandlerCheck(t *testing.T) {
+	conf := config.Configuration{}
+	reg := api.RegistrationResponse{}
+	r := runtimeConfigs[Node]
+
+	// No Runtime
+	err := checkHandler(&conf, &reg, runtimeConfig{})
+	assert.Nil(t, err)
+
+	// Error
+	reg.Handler = testHandler
+	conf.NRHandler = &config.EmptyNRWrapper
+	err = checkHandler(&conf, &reg, r)
+	assert.EqualError(t, err, "Missing handler file path/to/app.handler (NEW_RELIC_LAMBDA_HANDLER=Undefined)")
+
+	// Success
+	dirname, _ := os.Getwd()
+	handlerPath = dirname + "/var/task"
+	os.MkdirAll(dirname+"/var/task/path/to/", os.ModePerm)
+	os.Create(dirname + "/var/task/path/to/app.js")
+	defer os.RemoveAll(dirname + "/var")
+	reg.Handler = testHandler
+	conf.NRHandler = &config.EmptyNRWrapper
+	err = checkHandler(&conf, &reg, r)
+	assert.Nil(t, err)
 }

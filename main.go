@@ -191,7 +191,8 @@ func mainLoop(invocationClient *client.InvocationClient, batch *telemetry.Batch,
 		timeoutInstant := time.Unix(0, event.DeadlineMs*int64(time.Millisecond))
 
 		// Set the timeout timer for a smidge before the actual timeout; we can recover from early.
-		timeout := time.NewTimer(timeoutInstant.Sub(time.Now()) - time.Millisecond)
+		timeoutWatchBegins := time.Millisecond * 15
+		timeout := time.NewTimer(timeoutInstant.Sub(time.Now()) - timeoutWatchBegins)
 		select {
 		case telemetryBytes := <-telemetryChan:
 			// We received telemetry

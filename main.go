@@ -3,12 +3,13 @@ package main
 import (
 	"encoding/base64"
 	"fmt"
-	"github.com/newrelic/newrelic-lambda-extension/checks"
-	"github.com/newrelic/newrelic-lambda-extension/lambda/logserver"
-	"github.com/newrelic/newrelic-lambda-extension/util"
 	"net/http"
 	"sync"
 	"time"
+
+	"github.com/newrelic/newrelic-lambda-extension/checks"
+	"github.com/newrelic/newrelic-lambda-extension/lambda/logserver"
+	"github.com/newrelic/newrelic-lambda-extension/util"
 
 	"github.com/newrelic/newrelic-lambda-extension/config"
 	"github.com/newrelic/newrelic-lambda-extension/credentials"
@@ -191,7 +192,7 @@ func mainLoop(invocationClient *client.InvocationClient, batch *telemetry.Batch,
 		timeoutInstant := time.Unix(0, event.DeadlineMs*int64(time.Millisecond))
 
 		// Set the timeout timer for a smidge before the actual timeout; we can recover from early.
-		timeoutWatchBegins := time.Millisecond * 500
+		timeoutWatchBegins := time.Millisecond * 100
 		timeout := time.NewTimer(timeoutInstant.Sub(time.Now()) - timeoutWatchBegins)
 		select {
 		case telemetryBytes := <-telemetryChan:

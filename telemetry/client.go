@@ -2,12 +2,13 @@ package telemetry
 
 import (
 	"bytes"
-	"github.com/newrelic/newrelic-lambda-extension/lambda/logserver"
 	"io/ioutil"
 	"net/http"
 	"net/url"
 	"strings"
 	"time"
+
+	"github.com/newrelic/newrelic-lambda-extension/lambda/logserver"
 
 	"github.com/newrelic/newrelic-lambda-extension/util"
 )
@@ -81,16 +82,6 @@ func (c *Client) SendTelemetry(invokedFunctionARN string, telemetry [][]byte) er
 	for _, payload := range telemetry {
 		logEvent := LogsEventForBytes(payload)
 		logEvents = append(logEvents, logEvent)
-	}
-
-	if len(c.functionName) == 0 {
-		nameStart := strings.Index(invokedFunctionARN, ":function:") + len(":function:")
-		nameLen := strings.Index(invokedFunctionARN[nameStart:], ":")
-		if nameLen < 0 {
-			nameLen = len(invokedFunctionARN) - nameStart
-		}
-		c.functionName = invokedFunctionARN[nameStart : nameStart+nameLen]
-		util.Debugf("Recovered missing function name: %s", c.functionName)
 	}
 
 	compressedPayloads, err := CompressedPayloadsForLogEvents(logEvents, c.functionName, invokedFunctionARN)

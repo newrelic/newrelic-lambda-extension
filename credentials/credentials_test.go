@@ -32,7 +32,7 @@ func (mockSecretManager) GetSecretValue(*secretsmanager.GetSecretValueInput) (*s
 }
 
 func TestGetLicenseKeyImpl(t *testing.T) {
-	lk, err := getLicenseKeyImpl(mockSecretManager{}, &config.Configuration{})
+	lk, err := GetLicenseKeyImpl(mockSecretManager{}, &config.Configuration{})
 	if err != nil {
 		t.Error("Unexpected error", err)
 	}

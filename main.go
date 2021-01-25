@@ -3,11 +3,13 @@ package main
 import (
 	"encoding/base64"
 	"fmt"
-	"github.com/newrelic/newrelic-lambda-extension/lambda/logserver"
-	"github.com/newrelic/newrelic-lambda-extension/util"
 	"net/http"
 	"sync"
 	"time"
+
+	"github.com/newrelic/newrelic-lambda-extension/checks"
+	"github.com/newrelic/newrelic-lambda-extension/lambda/logserver"
+	"github.com/newrelic/newrelic-lambda-extension/util"
 
 	"github.com/newrelic/newrelic-lambda-extension/config"
 	"github.com/newrelic/newrelic-lambda-extension/credentials"
@@ -85,6 +87,10 @@ func main() {
 	if err != nil {
 		util.Fatal("telemetry pipe init failed: ", err)
 	}
+
+	go func() {
+		checks.RunChecks(&conf, registrationResponse, telemetryClient)
+	}()
 
 	// Send function logs as they arrive. When disabled, function logs aren't delivered to the extension.
 	var backgroundTasks sync.WaitGroup
@@ -186,7 +192,8 @@ func mainLoop(invocationClient *client.InvocationClient, batch *telemetry.Batch,
 		timeoutInstant := time.Unix(0, event.DeadlineMs*int64(time.Millisecond))
 
 		// Set the timeout timer for a smidge before the actual timeout; we can recover from early.
-		timeout := time.NewTimer(timeoutInstant.Sub(time.Now()) - time.Millisecond)
+		timeoutWatchBegins := time.Millisecond * 100
+		timeout := time.NewTimer(timeoutInstant.Sub(time.Now()) - timeoutWatchBegins)
 		select {
 		case telemetryBytes := <-telemetryChan:
 			// We received telemetry

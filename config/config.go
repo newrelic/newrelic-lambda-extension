@@ -13,10 +13,13 @@ const (
 	DebugLogLevel     = "DEBUG"
 )
 
+var EmptyNRWrapper = "Undefined"
+
 type Configuration struct {
 	ExtensionEnabled   bool
 	LicenseKey         *string
 	LicenseKeySecretId *string
+	NRHandler          *string
 	TelemetryEndpoint  *string
 	LogEndpoint        *string
 	RipeMillis         uint32
@@ -29,6 +32,7 @@ func ConfigurationFromEnvironment() Configuration {
 	enabledStr, extensionEnabledOverride := os.LookupEnv("NEW_RELIC_LAMBDA_EXTENSION_ENABLED")
 	licenseKey, lkOverride := os.LookupEnv("NEW_RELIC_LICENSE_KEY")
 	licenseKeySecretId, lkSecretOverride := os.LookupEnv("NEW_RELIC_LICENSE_KEY_SECRET")
+	nrHandler, nrOverride := os.LookupEnv("NEW_RELIC_LAMBDA_HANDLER")
 	telemetryEndpoint, teOverride := os.LookupEnv("NEW_RELIC_TELEMETRY_ENDPOINT")
 	logEndpoint, leOverride := os.LookupEnv("NEW_RELIC_LOG_ENDPOINT")
 	ripeMillisStr, ripeMillisOverride := os.LookupEnv("NEW_RELIC_HARVEST_RIPE_MILLIS")
@@ -46,6 +50,12 @@ func ConfigurationFromEnvironment() Configuration {
 		ret.LicenseKey = &licenseKey
 	} else if lkSecretOverride {
 		ret.LicenseKeySecretId = &licenseKeySecretId
+	}
+
+	if nrOverride {
+		ret.NRHandler = &nrHandler
+	} else {
+		ret.NRHandler = &EmptyNRWrapper
 	}
 
 	if teOverride {

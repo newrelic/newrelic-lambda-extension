@@ -73,6 +73,21 @@ To publish the extension to your AWS account, run the following command:
 
 This packages the extension, and publishes a new layer version in your AWS account. Be sure that the AWS CLI is configured correctly. You can use the usual [AWS CLI environment variables](https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-envvars.html) to control the account and region for the CLI.
 
+## Startup Checks
+
+This Lambda Extension will perform a series of checks on initialization. Should any of
+these checks fail, the extension wil attempt to output troubleshooting recommendations to both
+CloudWatch Logs and New Relic Logs. If you have any issues using this extension, be sure
+to check your logs for messages starting with `Startup check failed:` for
+troubleshooting recommendations.
+
+Startup checks include:
+
+* New Relic agent version checks
+* Lambda handler configuration checks
+* Lambda environment variable checks
+* Vendored New Relic agent checks
+
 ## Testing
 
 To test locally, acquire the AWS extension test harness first. Then:

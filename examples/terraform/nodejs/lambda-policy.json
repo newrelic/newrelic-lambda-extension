@@ -1,0 +1,17 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "",
+      "Action": "logs:*",
+      "Effect": "Allow",
+      "Resource": "*"
+    },
+    {
+      "Sid": "",
+      "Action": "s3:*",
+      "Effect": "Allow",
+      "Resource": "*"
+    }
+  ]
+}

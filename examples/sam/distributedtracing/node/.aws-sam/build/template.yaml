@@ -1,0 +1,70 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: Distribute Tracing examples
+Parameters:
+  NRAccountId:
+    Type: String
+    Description: Your New Relic account ID; necessary for distributed tracing.
+    AllowedPattern: '[0-9]+'
+Transform:
+- AWS::Serverless-2016-10-31
+Resources:
+  SimpleQueue:
+    Type: AWS::SQS::Queue
+  NodeAndSQS:
+    Type: AWS::Serverless::Function
+    Properties:
+      Description: A Lambda function that logs the payload of messages sent to an
+        associated SQS queue.
+      Runtime: nodejs12.x
+      FunctionName: newrelic-dt-example-nodejs-sqs
+      Handler: newrelic-lambda-wrapper.handler
+      Environment:
+        Variables:
+          NEW_RELIC_LAMBDA_HANDLER: src/handlers/sqs-payload-logger.sqsPayloadLoggerHandler
+          NEW_RELIC_ACCOUNT_ID:
+            Fn::Sub: ${NRAccountId}
+          NEW_RELIC_TRUSTED_ACCOUNT_KEY:
+            Fn::Sub: ${NRAccountId}
+      Events:
+        QueueEvent:
+          Type: SQS
+          Properties:
+            Queue:
+              Fn::GetAtt:
+              - SimpleQueue
+              - Arn
+      MemorySize: 128
+      Timeout: 25
+      Layers:
+      - Fn::Sub: arn:${AWS::Partition}:lambda:${AWS::Region}:451483290750:layer:NewRelicNodeJS12X:28
+      Policies:
+      - AWSSecretsManagerGetSecretValuePolicy:
+          SecretArn:
+            Fn::ImportValue: NewRelicLicenseKeySecret-NewRelic-LicenseKeySecretARN
+      CodeUri: NodeAndSQS
+  Logs:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName:
+        Fn::Join:
+        - ''
+        - - /aws/lambda/
+          - Ref: NodeAndSQS
+      RetentionInDays: 7
+Outputs:
+  QueueUrl:
+    Description: URL of SQS Queue
+    Value:
+      Ref: SimpleQueue
+    Export:
+      Name:
+        Fn::Sub: ${AWS::StackName}-QueueUrl
+  QueueName:
+    Description: Name of the sqs queue
+    Value:
+      Fn::GetAtt:
+      - SimpleQueue
+      - QueueName
+    Export:
+      Name:
+        Fn::Sub: ${AWS::StackName}-QueueName

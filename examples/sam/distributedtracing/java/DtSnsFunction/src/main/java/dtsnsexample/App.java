@@ -3,12 +3,7 @@ package dtsnsexample;
 import com.amazonaws.services.lambda.runtime.Context;
 import com.amazonaws.services.lambda.runtime.RequestHandler;
 import com.amazonaws.services.lambda.runtime.events.SNSEvent;
-
 import com.newrelic.opentracing.LambdaTracer;
-import com.newrelic.opentracing.aws.LambdaTracing;
-import io.opentracing.Scope;
-import io.opentracing.Span;
-import io.opentracing.Tracer;
 import io.opentracing.util.GlobalTracer;
 
 /**
@@ -21,13 +16,16 @@ public class App implements RequestHandler<SNSEvent, Object> {
     }
 
     public Object handleRequest(final SNSEvent snsEvent, final Context context) {
-        return LambdaTracing.instrument(snsEvent, context, this::handleInvocation);
+        // Note the use of a custom LambdaTracing subclass.
+        return new SNSEventLambdaTracing<>().instrumentRequest(snsEvent, context, this::handleInvocation);
     }
-
 
     public Object handleInvocation(final SNSEvent snsEvent, final Context context) {
         for (SNSEvent.SNSRecord r : snsEvent.getRecords()) {
-            context.getLogger().log(r.getSNS().getMessage());
+            final SNSEvent.SNS sns = r.getSNS();
+            final String message = sns.getMessage();
+            context.getLogger().log(message);
+            GlobalTracer.get().activeSpan().setTag("snsMessage", message);
         }
 
         return null;

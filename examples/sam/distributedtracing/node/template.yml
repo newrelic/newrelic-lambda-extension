@@ -13,7 +13,10 @@ Transform:
 Resources:
   SimpleQueue:
     Type: AWS::SQS::Queue
-  
+
+  SnsTopic:
+    Type: AWS::SNS::Topic
+
   NodeAndSQS:
     Type: AWS::Serverless::Function
     Properties:
@@ -27,6 +30,9 @@ Resources:
           NEW_RELIC_LAMBDA_HANDLER: src/handlers/sqs-payload-logger.sqsPayloadLoggerHandler
           NEW_RELIC_ACCOUNT_ID: !Sub ${NRAccountId}
           NEW_RELIC_TRUSTED_ACCOUNT_KEY: !Sub ${NRAccountId}
+
+          SNS_TOPIC: !Ref SnsTopic
+
           # NEW_RELIC_EXTENSION_SEND_FUNCTION_LOGS: true
           # NEW_RELIC_EXTENSION_LOG_LEVEL: DEBUG
       Events:
@@ -45,13 +51,27 @@ Resources:
         # that we can send telemetry back to New Relic
         - AWSSecretsManagerGetSecretValuePolicy:
             SecretArn: !ImportValue NewRelicLicenseKeySecret-NewRelic-LicenseKeySecretARN
+        - SNSPublishMessagePolicy:
+            TopicName: !GetAtt SnsTopic.TopicName
   Logs:
     Type: AWS::Logs::LogGroup
     Properties:
       LogGroupName: {"Fn::Join": ["", ["/aws/lambda/", {"Ref": "NodeAndSQS"}]]}
       # Lambda functions will auto-create their log group on first execution, but it retains logs forever, which can get expensive.
       RetentionInDays: 7
+
+
 Outputs:
+  SnsTopicArn:
+    Description: "ARN of SNS Topic"
+    Value: !Ref SnsTopic
+    Export:
+      Name: !Sub "${AWS::StackName}-SnsTopic"
+  SnsTopicName:
+    Description: "Name of SNS Topic"
+    Value: !GetAtt SnsTopic.TopicName
+    Export:
+      Name: !Sub "${AWS::StackName}-SnsTopicName"
   QueueUrl:
     Description: "URL of SQS Queue"
     Value: !Ref SimpleQueue

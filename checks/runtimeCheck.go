@@ -28,11 +28,16 @@ func latestAgentTag(r *runtimeConfig) error {
 		return err
 	}
 	defer resp.Body.Close()
+	if resp.StatusCode >= 300 {
+		// The version check HTTP request failed; this doesn't tell us anything
+		util.Debugf("Can't query latest agent version. Request to %v returned status %v", r.agentVersionUrl, resp.StatusCode)
+		return nil
+	}
 	body, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
 		return err
 	}
-	err = json.Unmarshal([]byte(body), &r)
+	err = json.Unmarshal(body, &r)
 	if err != nil {
 		return err
 	}

@@ -15,7 +15,12 @@ func TestRuntimeCheck(t *testing.T) {
 	assert.NotEqual(t, dirname, "")
 	assert.Nil(t, err)
 
+	oldPath := runtimeLookupPath;
+	defer func() {
+		runtimeLookupPath = oldPath
+	}()
 	runtimeLookupPath = fmt.Sprintf("%s/%s", dirname, runtimeLookupPath)
+
 	os.MkdirAll(runtimeLookupPath+"/node", os.ModePerm)
 	defer os.RemoveAll(dirname + "/var")
 	r, err := checkAndReturnRuntime()

@@ -26,15 +26,15 @@ Resources:
       Environment:
         Variables:
           NEW_RELIC_ACCOUNT_ID: !Sub ${NRAccountId}
-          NEW_RELIC_TRUSTED_ACCOUNT_KEY: !Sub ${NRAccountId}
+          NEW_RELIC_TRUSTED_ACCOUNT_KEY: 1 #!Sub ${NRAccountId}
       Events:
-        SnsTopice:
+        SnsTopic:
           Type: SNS
           Properties:
             Topic: !ImportValue NewRelic-Dt-Example-Node-SnsTopic
       Layers:
         # This layer includes the New Relic Lambda Extension, a sidecar process that sends telemetry,
-        - !Sub arn:${AWS::Partition}:lambda:${AWS::Region}:451483290750:layer:NewRelicLambdaExtension:5
+        - !Sub arn:${AWS::Partition}:lambda:${AWS::Region}:451483290750:layer:NewRelicLambdaExtension:6
       Policies:
         # This policy allows the lambda to know the value of the New Relic licence key. We need this so
         # that we can send telemetry back to New Relic

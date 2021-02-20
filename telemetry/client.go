@@ -118,11 +118,52 @@ func (c *Client) sendPayloads(compressedPayloads []*bytes.Buffer, builder reques
 	sentBytes = 0
 	for _, p := range compressedPayloads {
 		sentBytes += p.Len()
-		req, err := builder(p)
-		if err != nil {
-			return successCount, sentBytes, err
+
+		var res *http.Response
+		var err error
+		var body string
+		for attemptNum := 1; attemptNum <= retries; attemptNum++ {
+			// Construct request for this try
+			var req *http.Request
+			req, err = builder(p)
+			if err != nil {
+				break
+			}
+			//Make request, check for timeout
+			res, err = c.httpClient.Do(req)
+			if err == nil {
+				// Success. Process response and exit retry loop
+				defer util.Close(res.Body)
+
+				bodyBytes, err := ioutil.ReadAll(res.Body)
+				if err != nil {
+					break
+				}
+
+				body = string(bodyBytes)
+				break
+			} else {
+				switch err.(type) {
+				case *url.Error:
+					// Retry on timeout
+					if err.(*url.Error).Timeout() {
+						if attemptNum < retries {
+							util.Debugln("Retrying after timeout", err)
+						} else {
+							util.Logf("Request failed. Ran out of retries after %v attempts.", attemptNum)
+							//We'll exit the loop naturally at this point
+						}
+					} else {
+						//Other errors are fatal
+						break
+					}
+				default:
+					//Other errors are fatal
+					break
+				}
+			}
 		}
-		res, body, err := c.sendRequest(req, retries)
+
 		if err != nil {
 			util.Logf("Telemetry client error: %s", err)
 			sentBytes -= p.Len()
@@ -184,34 +225,4 @@ func (c *Client) SendFunctionLogs(lines []logserver.LogLine) error {
 	)
 
 	return nil
-}
-
-func (c *Client) sendRequest(req *http.Request, triesLeft int) (*http.Response, string, error) {
-	res, err := c.httpClient.Do(req)
-	if err != nil {
-		triesLeft -= 1
-		if triesLeft > 0 {
-			switch err.(type) {
-			case *url.Error:
-				// Retry on timeout
-				if err.(*url.Error).Timeout() {
-					util.Debugln("Retrying after timeout", err)
-					return c.sendRequest(req, triesLeft)
-				}
-			default:
-			}
-		} else {
-			util.Logln("Request failed. Ran out of retries.")
-		}
-		return nil, "", err
-	}
-
-	defer util.Close(res.Body)
-
-	bodyBytes, err := ioutil.ReadAll(res.Body)
-	if err != nil {
-		return nil, "", err
-	}
-
-	return res, string(bodyBytes), nil
 }

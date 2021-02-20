@@ -102,7 +102,5 @@ def lambda_handler(event, context):
             "body": GET_RESPONSE
         }
     elif event['httpMethod'] == 'POST':
-        # newrelic.agent.accept_distributed_trace_headers(event.get('headers'))
-        print(json.dumps(event))
         words = event['body'].split()
         return send_sqs_messages(words)

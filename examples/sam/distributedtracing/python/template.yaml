@@ -28,7 +28,7 @@ Resources:
           NEW_RELIC_TRUSTED_ACCOUNT_KEY: 1 #!Sub ${NRAccountId}
           QUEUE_URL: !ImportValue NewRelic-Dt-Example-Node-QueueUrl
           # NEW_RELIC_EXTENSION_SEND_FUNCTION_LOGS: true
-          NEW_RELIC_EXTENSION_LOG_LEVEL: DEBUG
+          # NEW_RELIC_EXTENSION_LOG_LEVEL: DEBUG
       Layers:
         # This layer includes the New Relic Lambda Extension, a sidecar process that sends telemetry,
         # as well as the New Relic Agent for Python, and a handler wrapper that makes integration easy.

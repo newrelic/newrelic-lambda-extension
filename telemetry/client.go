@@ -76,7 +76,7 @@ func getLogEndpointURL(licenseKey string, logEndpointOverride *string) string {
 	return LogEndpointUS
 }
 
-func (c *Client) SendTelemetry(invokedFunctionARN string, telemetry [][]byte) error {
+func (c *Client) SendTelemetry(invokedFunctionARN string, telemetry [][]byte) (error, int) {
 	start := time.Now()
 	logEvents := make([]LogsEvent, 0, len(telemetry))
 	for _, payload := range telemetry {
@@ -86,7 +86,7 @@ func (c *Client) SendTelemetry(invokedFunctionARN string, telemetry [][]byte) er
 
 	compressedPayloads, err := CompressedPayloadsForLogEvents(logEvents, c.functionName, invokedFunctionARN)
 	if err != nil {
-		return err
+		return err, 0
 	}
 
 	var builder requestBuilder = func(buffer *bytes.Buffer) (*http.Request, error) {
@@ -108,7 +108,7 @@ func (c *Client) SendTelemetry(invokedFunctionARN string, telemetry [][]byte) er
 		float64(sentBytes)/1024.0,
 	)
 
-	return nil
+	return nil, successCount
 }
 
 type requestBuilder func(buffer *bytes.Buffer) (*http.Request, error)
@@ -118,14 +118,15 @@ func (c *Client) sendPayloads(compressedPayloads []*bytes.Buffer, builder reques
 	sentBytes = 0
 	for _, p := range compressedPayloads {
 		sentBytes += p.Len()
+		currentPayloadBytes := p.Bytes()
 
 		var res *http.Response
 		var err error
-		var body string
+		var responseBody string
 		for attemptNum := 1; attemptNum <= retries; attemptNum++ {
 			// Construct request for this try
 			var req *http.Request
-			req, err = builder(p)
+			req, err = builder(bytes.NewBuffer(currentPayloadBytes))
 			if err != nil {
 				break
 			}
@@ -140,7 +141,7 @@ func (c *Client) sendPayloads(compressedPayloads []*bytes.Buffer, builder reques
 					break
 				}
 
-				body = string(bodyBytes)
+				responseBody = string(bodyBytes)
 				break
 			} else {
 				switch err.(type) {
@@ -168,7 +169,7 @@ func (c *Client) sendPayloads(compressedPayloads []*bytes.Buffer, builder reques
 			util.Logf("Telemetry client error: %s", err)
 			sentBytes -= p.Len()
 		} else if res.StatusCode >= 300 {
-			util.Logf("Telemetry client response: [%s] %s", res.Status, body)
+			util.Logf("Telemetry client response: [%s] %s", res.Status, responseBody)
 		} else {
 			successCount += 1
 		}

@@ -76,7 +76,7 @@ func getLogEndpointURL(licenseKey string, logEndpointOverride *string) string {
 	return LogEndpointUS
 }
 
-func (c *Client) SendTelemetry(invokedFunctionARN string, telemetry [][]byte) error {
+func (c *Client) SendTelemetry(invokedFunctionARN string, telemetry [][]byte) (error, int) {
 	start := time.Now()
 	logEvents := make([]LogsEvent, 0, len(telemetry))
 	for _, payload := range telemetry {
@@ -86,7 +86,7 @@ func (c *Client) SendTelemetry(invokedFunctionARN string, telemetry [][]byte) er
 
 	compressedPayloads, err := CompressedPayloadsForLogEvents(logEvents, c.functionName, invokedFunctionARN)
 	if err != nil {
-		return err
+		return err, 0
 	}
 
 	var builder requestBuilder = func(buffer *bytes.Buffer) (*http.Request, error) {
@@ -108,7 +108,7 @@ func (c *Client) SendTelemetry(invokedFunctionARN string, telemetry [][]byte) er
 		float64(sentBytes)/1024.0,
 	)
 
-	return nil
+	return nil, successCount
 }
 
 type requestBuilder func(buffer *bytes.Buffer) (*http.Request, error)
@@ -118,16 +118,58 @@ func (c *Client) sendPayloads(compressedPayloads []*bytes.Buffer, builder reques
 	sentBytes = 0
 	for _, p := range compressedPayloads {
 		sentBytes += p.Len()
-		req, err := builder(p)
-		if err != nil {
-			return successCount, sentBytes, err
+		currentPayloadBytes := p.Bytes()
+
+		var res *http.Response
+		var err error
+		var responseBody string
+		for attemptNum := 1; attemptNum <= retries; attemptNum++ {
+			// Construct request for this try
+			var req *http.Request
+			req, err = builder(bytes.NewBuffer(currentPayloadBytes))
+			if err != nil {
+				break
+			}
+			//Make request, check for timeout
+			res, err = c.httpClient.Do(req)
+			if err == nil {
+				// Success. Process response and exit retry loop
+				defer util.Close(res.Body)
+
+				bodyBytes, err := ioutil.ReadAll(res.Body)
+				if err != nil {
+					break
+				}
+
+				responseBody = string(bodyBytes)
+				break
+			} else {
+				switch err.(type) {
+				case *url.Error:
+					// Retry on timeout
+					if err.(*url.Error).Timeout() {
+						if attemptNum < retries {
+							util.Debugln("Retrying after timeout", err)
+						} else {
+							util.Logf("Request failed. Ran out of retries after %v attempts.", attemptNum)
+							//We'll exit the loop naturally at this point
+						}
+					} else {
+						//Other errors are fatal
+						break
+					}
+				default:
+					//Other errors are fatal
+					break
+				}
+			}
 		}
-		res, body, err := c.sendRequest(req, retries)
+
 		if err != nil {
 			util.Logf("Telemetry client error: %s", err)
 			sentBytes -= p.Len()
 		} else if res.StatusCode >= 300 {
-			util.Logf("Telemetry client response: [%s] %s", res.Status, body)
+			util.Logf("Telemetry client response: [%s] %s", res.Status, responseBody)
 		} else {
 			successCount += 1
 		}
@@ -184,34 +226,4 @@ func (c *Client) SendFunctionLogs(lines []logserver.LogLine) error {
 	)
 
 	return nil
-}
-
-func (c *Client) sendRequest(req *http.Request, triesLeft int) (*http.Response, string, error) {
-	res, err := c.httpClient.Do(req)
-	if err != nil {
-		triesLeft -= 1
-		if triesLeft > 0 {
-			switch err.(type) {
-			case *url.Error:
-				// Retry on timeout
-				if err.(*url.Error).Timeout() {
-					util.Debugln("Retrying after timeout", err)
-					return c.sendRequest(req, triesLeft)
-				}
-			default:
-			}
-		} else {
-			util.Logln("Request failed. Ran out of retries.")
-		}
-		return nil, "", err
-	}
-
-	defer util.Close(res.Body)
-
-	bodyBytes, err := ioutil.ReadAll(res.Body)
-	if err != nil {
-		return nil, "", err
-	}
-
-	return res, string(bodyBytes), nil
 }

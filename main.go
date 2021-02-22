@@ -247,7 +247,7 @@ func shipHarvest(harvested []*telemetry.Invocation, telemetryClient *telemetry.C
 			telemetrySlice = append(telemetrySlice, inv.Telemetry...)
 		}
 
-		err := telemetryClient.SendTelemetry(invokedFunctionARN, telemetrySlice)
+		err, _ := telemetryClient.SendTelemetry(invokedFunctionARN, telemetrySlice)
 		if err != nil {
 			util.Logf("Failed to send harvested telemetry for %d invocations %s", len(harvested), err)
 		}

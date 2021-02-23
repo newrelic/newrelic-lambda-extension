@@ -25,7 +25,8 @@ Resources:
           # For the instrumentation handler to invoke your real handler, we need this value
           NEW_RELIC_LAMBDA_HANDLER: app.lambda_handler
           NEW_RELIC_ACCOUNT_ID: !Sub ${NRAccountId}
-          NEW_RELIC_TRUSTED_ACCOUNT_KEY: 1 #!Sub ${NRAccountId}
+          # TODO: replace the account ID with the parent account ID, where appropriate
+          NEW_RELIC_TRUSTED_ACCOUNT_KEY: !Sub ${NRAccountId}
           QUEUE_URL: !ImportValue NewRelic-Dt-Example-Node-QueueUrl
           # NEW_RELIC_EXTENSION_SEND_FUNCTION_LOGS: true
           # NEW_RELIC_EXTENSION_LOG_LEVEL: DEBUG

@@ -22,14 +22,14 @@ Resources:
     Properties:
       Description: A Lambda function that logs the payload of messages sent to an associated SQS queue.
       Runtime: nodejs12.x
-      FunctionName: newrelic-dt-example-nodejs-sqs
       Handler: newrelic-lambda-wrapper.handler
       Environment:
         Variables:
           # For the instrumentation handler to invoke your real handler, we need this value
           NEW_RELIC_LAMBDA_HANDLER: src/handlers/sqs-payload-logger.sqsPayloadLoggerHandler
           NEW_RELIC_ACCOUNT_ID: !Sub ${NRAccountId}
-          NEW_RELIC_TRUSTED_ACCOUNT_KEY: 1 #!Sub ${NRAccountId}
+          # TODO: replace the account ID with the parent account ID, where appropriate
+          NEW_RELIC_TRUSTED_ACCOUNT_KEY: !Sub ${NRAccountId}
 
           SNS_TOPIC: !Ref SnsTopic
 

@@ -2,10 +2,14 @@ import json
 import os
 import uuid
 
+# Note that neither of these dependencies needs to be packaged with your function. boto3 is part of the Lambda
+# platform and newrelic is packaged with the layer
 import boto3
 import newrelic
 
 QUEUE_URL = os.environ.get('QUEUE_URL')
+
+# We're using the copy-paste style of browser agent integration here.
 BROWSER_AGENT = """
 <script type="text/javascript">
 ;window.NREUM||(NREUM={});NREUM.init={distributed_tracing:{enabled:true},privacy:{cookies_enabled:true}};
@@ -15,6 +19,8 @@ window.NREUM||(NREUM={}),__nr_require=function(t,e,n){function r(n){if(!e[n]){va
 </script>
 """
 
+# This string literal is our response to GET requests. It's probably best to manage static resources differently,
+# such as by using an S3 bucket. But this approach keeps the example simple.
 GET_RESPONSE = """
 <html>
 <head>
@@ -53,12 +59,31 @@ formElem.addEventListener("submit", (ev) => {
 
 
 def nr_trace_context_json():
+    """Generate a distributed trace context as a JSON document"""
+    # The Python agent expects a list as an out-param
     dt_headers = []
     newrelic.agent.insert_distributed_trace_headers(headers=dt_headers)
+    # At this point, dt_headers is a list of tuples. We first convert it to a dict, then serialize as a JSON object.
+    # The resulting string can be used as a SQS message attribute string value.
     return json.dumps(dict(dt_headers))
 
 
+def nr_trace_context_sqs_attributes():
+    dt_headers = []
+    newrelic.agent.insert_distributed_trace_headers(headers=dt_headers)
+    # An alternative implementation that avoids a layer of JSON encoding,
+    # but requires more complex decoding on the receiving side
+    return {
+        k: {
+            'DataType': 'String',
+            'StringValue': v
+        }
+        for (k, v) in dt_headers
+    }
+
+
 def make_sqs_entry(message):
+    """Creates an SQS message, with a trace context header."""
     return {
                'Id': str(uuid.uuid1()),
                'MessageBody': message,
@@ -72,27 +97,22 @@ def make_sqs_entry(message):
 
 
 def send_sqs_messages(messages):
+    """Turn a list of strings into a batch of SQS messages"""
+    # Get the SQS client
     sqs = boto3.client("sqs")
 
+    # Construct the message entries for our batch, with their Distributed Trace Context headers
     entries = list(map(make_sqs_entry, messages))
 
-    send_status = sqs.send_message_batch(
+    return sqs.send_message_batch(
         QueueUrl=QUEUE_URL,
         Entries=entries
     )
 
-    return {
-        "statusCode": 200,
-        "headers": {
-            "Content-Type": "application/json"
-        },
-        "isBase64Encoded": False,
-        "body": json.dumps(send_status),
-    }
-
 
 def lambda_handler(event, context):
     if event['httpMethod'] == 'GET':
+        # For our example, we return a static HTML page in response to GET requests
         return {
             "statusCode": 200,
             "headers": {
@@ -102,5 +122,15 @@ def lambda_handler(event, context):
             "body": GET_RESPONSE
         }
     elif event['httpMethod'] == 'POST':
+        # Handle POST requests by splitting the post body into words, and sending each as an SQS message
         words = event['body'].split()
-        return send_sqs_messages(words)
+        send_status = send_sqs_messages(words)
+        # Returns the raw batch status. A real application would want to process the API response.
+        return {
+            "statusCode": 200,
+            "headers": {
+                "Content-Type": "application/json"
+            },
+            "isBase64Encoded": False,
+            "body": json.dumps(send_status),
+        }

@@ -28,8 +28,9 @@ public class SNSEventLambdaTracing<O> extends LambdaTracing<SNSEvent, O> {
                 final Map<String, String> parsedJson = (Map<String, String>) new JSONParser().parse(traceContextJson);
                 TextMapAdapter carrier = new TextMapAdapter(parsedJson);
                 return tracer.extract(Format.Builtin.HTTP_HEADERS, carrier);
-            } catch (ParseException | ClassCastException e) {
-                Log.getInstance().out(e.getMessage());
+            } catch (ParseException | ClassCastException | IllegalArgumentException e) {
+                Log.getInstance().out(e.toString());
+                Log.getInstance().out(traceContextJson);
             }
         }
         return null;

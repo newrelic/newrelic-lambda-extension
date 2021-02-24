@@ -2,10 +2,12 @@
 
 accountId=$1
 
-region=$2
-echo "region set to ${region}"
+trustedAccountId=$2
 
-sam build --use-container
+region=$3
+echo "Deploying example in region ${region} for NR account ${accountId} with trustedAccountId ${trustedAccountId}"
+
+sam build --use-container --skip-pull-image
 
 bucket="newrelic-example-${region}-${accountId}"
 
@@ -14,6 +16,6 @@ aws s3 mb --region ${region} s3://${bucket}
 sam package --region ${region} --s3-bucket=${bucket} --output-template-file packaged.yaml
 aws cloudformation deploy --region ${region} \
   --template-file packaged.yaml \
-  --stack-name Newrelic-Dt-Example-Python \
+  --stack-name Newrelic-Dt-Example \
   --capabilities CAPABILITY_IAM \
-  --parameter-overrides "NRAccountId=${accountId}"
+  --parameter-overrides "NRAccountId=${accountId}" "TrustedAccountId=${trustedAccountId}"

@@ -38,7 +38,7 @@ func latestAgentTag(r *runtimeConfig) error {
 		return err
 	}
 	defer resp.Body.Close()
-	if resp.StatusCode < 300 || resp.StatusCode == 302 {
+	if resp.StatusCode >= 300 && resp.StatusCode != 302 {
 		// The version check HTTP request failed; this doesn't tell us anything
 		util.Debugf("Can't query latest agent version. Request to %v returned status %v", r.agentVersionUrl, resp.StatusCode)
 		return nil

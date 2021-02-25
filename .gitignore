@@ -4,3 +4,4 @@ extensions/
 /examples/**/packaged.yaml
 /venv/
 response.out
+coverage.txt

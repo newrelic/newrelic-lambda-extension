@@ -18,3 +18,6 @@ publish: zip
 
 test:
 	go test ./...
+
+coverage:
+	./coverage.sh

@@ -39,8 +39,8 @@ func agentVersionCheck(conf *config.Configuration, reg *api.RegistrationResponse
 				}
 			}
 			// semver requires a prepended v on version string
-			if semver.Compare("v"+v.Version, "v"+r.AgentVersion) < 0 {
-				return fmt.Errorf("Agent version out of date: %s, in order access up to date features please upgrade to the latest New Relic %s layer that includes agent version %s", v.Version, r.language, r.AgentVersion)
+			if semver.Compare("v"+v.Version, r.AgentVersion) < 0 {
+				return fmt.Errorf("Agent version out of date: v%s, in order access up to date features please upgrade to the latest New Relic %s layer that includes agent version %s", v.Version, r.language, r.AgentVersion)
 			}
 			return nil
 		}

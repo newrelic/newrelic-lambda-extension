@@ -14,7 +14,7 @@ var (
 )
 
 type runtimeConfig struct {
-	AgentVersion     string `json:"latest_release_number"`
+	AgentVersion     string
 	agentVersionUrl  string
 	agentVersionFile string
 	fileType         string
@@ -40,7 +40,7 @@ var runtimeConfigs = map[Runtime]runtimeConfig{
 		layerAgentPaths:  layerAgentPathNode,
 		vendorAgentPath:  vendorAgentPathNode,
 		agentVersionFile: "package.json",
-		agentVersionUrl:  "https://libraries.io/api/npm/newrelic/",
+		agentVersionUrl:  "https://github.com/newrelic/node-newrelic/releases/latest",
 	},
 	Python: {
 		language:         Python,
@@ -49,6 +49,6 @@ var runtimeConfigs = map[Runtime]runtimeConfig{
 		layerAgentPaths:  layerAgentPathsPython,
 		vendorAgentPath:  vendorAgentPathPython,
 		agentVersionFile: "version.txt",
-		agentVersionUrl:  "https://libraries.io/api/pypi/newrelic/",
+		agentVersionUrl:  "https://github.com/newrelic/newrelic-python-agent/releases/latest",
 	},
 }

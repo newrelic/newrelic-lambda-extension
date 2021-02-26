@@ -6,7 +6,7 @@ const AWS = require('aws-sdk')
 /**
  * A Lambda function that logs the payload received from SQS.
  */
-exports.sqsPayloadLoggerHandler = async (event, context) => {
+exports.sqsHandler = async (event, context) => {
     // An SQS invocation event consists of a batch of one or more messages
     console.info(JSON.stringify(event));
     const SNS_TOPIC_ARN = process.env.SNS_TOPIC;

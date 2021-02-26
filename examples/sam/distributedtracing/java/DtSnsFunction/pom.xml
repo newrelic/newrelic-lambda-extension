@@ -13,6 +13,8 @@
 
     <dependencyManagement>
         <dependencies>
+            <!-- The Java 11 Lambda runtime does not appear to supply the 1.x AWS SDK. We'll use the BOM to
+            manage versions, and be explicit about our dependencies below. -->
             <dependency>
                 <groupId>com.amazonaws</groupId>
                 <artifactId>aws-java-sdk-bom</artifactId>
@@ -24,6 +26,7 @@
     </dependencyManagement>
 
     <dependencies>
+        <!-- Dependencies we need for our own handler function -->
         <dependency>
             <groupId>com.amazonaws</groupId>
             <artifactId>aws-lambda-java-core</artifactId>
@@ -35,6 +38,8 @@
           <version>3.1.0</version>
         </dependency>
 
+        <!-- These SDK components are "provided" dependencies of the New Relic OpenTracing agent, except
+        that the Java 11 runtime does not appear to provide them, so we need to be explicit here. -->
         <dependency>
             <groupId>com.amazonaws</groupId>
             <artifactId>aws-java-sdk-core</artifactId>

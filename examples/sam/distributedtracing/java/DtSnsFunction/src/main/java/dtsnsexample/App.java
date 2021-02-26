@@ -7,7 +7,7 @@ import com.newrelic.opentracing.LambdaTracer;
 import io.opentracing.util.GlobalTracer;
 
 /**
- * Handler for requests to Lambda function.
+ * SNS request handler, with New Relic distributed tracing integration with SNS events
  */
 public class App implements RequestHandler<SNSEvent, Object> {
     static {
@@ -16,7 +16,8 @@ public class App implements RequestHandler<SNSEvent, Object> {
     }
 
     public Object handleRequest(final SNSEvent snsEvent, final Context context) {
-        // Note the use of a custom LambdaTracing subclass.
+        // Note the use of a custom LambdaTracing subclass. The base class does not support our custom
+        // trace context propagation, so we need to implement extractContext ourselves
         return new SNSEventLambdaTracing<>().instrumentRequest(snsEvent, context, this::handleInvocation);
     }
 

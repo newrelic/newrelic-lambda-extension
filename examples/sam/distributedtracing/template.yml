@@ -44,7 +44,7 @@ Resources:
       Layers:
         # This layer includes the New Relic Lambda Extension, a sidecar process that sends telemetry,
         # as well as the New Relic Agent for Python, and a handler wrapper that makes integration easy.
-        - !Sub arn:${AWS::Partition}:lambda:${AWS::Region}:451483290750:layer:NewRelicPython38:31
+        - !Sub arn:${AWS::Partition}:lambda:${AWS::Region}:451483290750:layer:NewRelicPython38:33
       Policies:
         # This policy allows the lambda to know the value of the New Relic license key. We need this so
         # that we can send telemetry back to New Relic
@@ -80,7 +80,7 @@ Resources:
       Environment:
         Variables:
           # For the instrumentation handler to invoke your real handler, we need this value
-          NEW_RELIC_LAMBDA_HANDLER: src/handlers/sqs-payload-logger.sqsPayloadLoggerHandler
+          NEW_RELIC_LAMBDA_HANDLER: src/handlers/sqs-sns-bridge.sqsHandler
           NEW_RELIC_ACCOUNT_ID: !Sub ${NRAccountId}
           NEW_RELIC_TRUSTED_ACCOUNT_KEY: !Sub ${TrustedAccountId}
 
@@ -98,7 +98,7 @@ Resources:
       Layers:
         # This layer includes the New Relic Lambda Extension, a sidecar process that sends telemetry,
         # as well as the New Relic Agent for Node.js, and a handler wrapper that makes integration easy.
-        - !Sub arn:${AWS::Partition}:lambda:${AWS::Region}:451483290750:layer:NewRelicNodeJS12X:31
+        - !Sub arn:${AWS::Partition}:lambda:${AWS::Region}:451483290750:layer:NewRelicNodeJS12X:34
       Policies:
         # This policy allows the lambda to know the value of the New Relic licence key. We need this so
         # that we can send telemetry back to New Relic
@@ -131,7 +131,7 @@ Resources:
             Topic: !Ref SnsTopic
       Layers:
         # This layer includes the New Relic Lambda Extension, a sidecar process that sends telemetry,
-        - !Sub arn:${AWS::Partition}:lambda:${AWS::Region}:451483290750:layer:NewRelicLambdaExtension:6
+        - !Sub arn:${AWS::Partition}:lambda:${AWS::Region}:451483290750:layer:NewRelicLambdaExtension:7
       Policies:
         # This policy allows the lambda to know the value of the New Relic licence key. We need this so
         # that we can send telemetry back to New Relic

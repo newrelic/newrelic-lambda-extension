@@ -5,6 +5,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -50,9 +51,11 @@ func TestClientSend(t *testing.T) {
 }
 
 func TestClientSendRetry(t *testing.T) {
-	count := 0
+	var count int32 = 0
+
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if count == 0 {
+
+		if atomic.LoadInt32(&count) == 0 {
 			time.Sleep(300 * time.Millisecond)
 		} else {
 			assert.Equal(t, r.Method, http.MethodPost)
@@ -78,7 +81,7 @@ func TestClientSendRetry(t *testing.T) {
 			w.WriteHeader(200)
 			w.Write([]byte(""))
 		}
-		count += 1
+		atomic.AddInt32(&count, 1)
 	}))
 
 	defer srv.Close()
@@ -92,13 +95,13 @@ func TestClientSendRetry(t *testing.T) {
 
 	assert.NoError(t, err)
 	assert.Equal(t, 1, successCount)
-	assert.Equal(t, 2, count)
+	assert.Equal(t, int32(2), atomic.LoadInt32(&count))
 }
 
 func TestClientSendOutOfRetries(t *testing.T) {
-	count := 0
+	var count int32 = 0
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		count += 1
+		atomic.AddInt32(&count, 1)
 		time.Sleep(300 * time.Millisecond)
 	}))
 
@@ -113,5 +116,5 @@ func TestClientSendOutOfRetries(t *testing.T) {
 
 	assert.NoError(t, err)
 	assert.Equal(t, 0, successCount)
-	assert.Equal(t, retries, count)
+	assert.Equal(t, int32(retries), atomic.LoadInt32(&count))
 }

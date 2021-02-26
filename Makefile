@@ -17,7 +17,7 @@ publish: zip
 	aws lambda publish-layer-version --no-cli-pager --layer-name newrelic-lambda-extension --zip-file fileb://extensions.zip
 
 test:
-	go test ./...
+	go test -race ./...
 
 coverage:
 	./coverage.sh

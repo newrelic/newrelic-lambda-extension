@@ -7,7 +7,7 @@ trustedAccountId=$2
 region=$3
 echo "Deploying example in region ${region} for NR account ${accountId} with trustedAccountId ${trustedAccountId}"
 
-sam build --use-container --skip-pull-image
+sam build --use-container #--skip-pull-image
 
 bucket="newrelic-example-${region}-${accountId}"
 

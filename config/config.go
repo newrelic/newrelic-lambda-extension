@@ -17,11 +17,11 @@ var EmptyNRWrapper = "Undefined"
 
 type Configuration struct {
 	ExtensionEnabled   bool
-	LicenseKey         *string
-	LicenseKeySecretId *string
-	NRHandler          *string
-	TelemetryEndpoint  *string
-	LogEndpoint        *string
+	LicenseKey         string
+	LicenseKeySecretId string
+	NRHandler          string
+	TelemetryEndpoint  string
+	LogEndpoint        string
 	RipeMillis         uint32
 	RotMillis          uint32
 	LogLevel           string
@@ -41,29 +41,29 @@ func ConfigurationFromEnvironment() Configuration {
 	sendFunctionLogsStr, sendFunctionLogsOverride := os.LookupEnv("NEW_RELIC_EXTENSION_SEND_FUNCTION_LOGS")
 
 	extensionEnabled := true
-	if extensionEnabledOverride && "false" == strings.ToLower(enabledStr) {
+	if extensionEnabledOverride && strings.ToLower(enabledStr) == "false" {
 		extensionEnabled = false
 	}
 	ret := Configuration{ExtensionEnabled: extensionEnabled}
 
 	if lkOverride {
-		ret.LicenseKey = &licenseKey
+		ret.LicenseKey = licenseKey
 	} else if lkSecretOverride {
-		ret.LicenseKeySecretId = &licenseKeySecretId
+		ret.LicenseKeySecretId = licenseKeySecretId
 	}
 
 	if nrOverride {
-		ret.NRHandler = &nrHandler
+		ret.NRHandler = nrHandler
 	} else {
-		ret.NRHandler = &EmptyNRWrapper
+		ret.NRHandler = EmptyNRWrapper
 	}
 
 	if teOverride {
-		ret.TelemetryEndpoint = &telemetryEndpoint
+		ret.TelemetryEndpoint = telemetryEndpoint
 	}
 
 	if leOverride {
-		ret.LogEndpoint = &logEndpoint
+		ret.LogEndpoint = logEndpoint
 	}
 
 	if ripeMillisOverride {
@@ -72,6 +72,7 @@ func ConfigurationFromEnvironment() Configuration {
 			ret.RipeMillis = uint32(ripeMillis)
 		}
 	}
+
 	if ret.RipeMillis == 0 {
 		ret.RipeMillis = DefaultRipeMillis
 	}
@@ -82,6 +83,7 @@ func ConfigurationFromEnvironment() Configuration {
 			ret.RotMillis = uint32(rotMillis)
 		}
 	}
+
 	if ret.RotMillis == 0 {
 		ret.RotMillis = DefaultRotMillis
 	}

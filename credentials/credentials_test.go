@@ -16,7 +16,7 @@ func TestGetLicenseKeySecretId(t *testing.T) {
 	assert.Equal(t, defaultSecretId, secretId)
 
 	var testSecretId = "testSecretName"
-	var conf = &config.Configuration{LicenseKeySecretId: &testSecretId}
+	var conf = &config.Configuration{LicenseKeySecretId: testSecretId}
 	secretId = getLicenseKeySecretId(conf)
 	assert.Equal(t, testSecretId, secretId)
 }
@@ -33,19 +33,16 @@ func (mockSecretManager) GetSecretValue(*secretsmanager.GetSecretValueInput) (*s
 
 func TestGetLicenseKeyImpl(t *testing.T) {
 	lk, err := GetLicenseKeyImpl(mockSecretManager{}, &config.Configuration{})
-	if err != nil {
-		t.Error("Unexpected error", err)
-	}
-
-	assert.Equal(t, "foo", *lk)
+	assert.Nil(t, err)
+	assert.Equal(t, "foo", lk)
 }
 
 func TestGetNewRelicLicenseKeyConfigValue(t *testing.T) {
 	licenseKey := "test_value"
 	resultKey, err := GetNewRelicLicenseKey(&config.Configuration{
-		LicenseKey: &licenseKey,
+		LicenseKey: licenseKey,
 	})
 
 	assert.Nil(t, err)
-	assert.Equal(t, licenseKey, *resultKey)
+	assert.Equal(t, licenseKey, resultKey)
 }

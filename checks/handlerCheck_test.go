@@ -18,7 +18,7 @@ func TestRuntimeMethods(t *testing.T) {
 		handlerName: r.wrapperName,
 		conf:        &conf,
 	}
-	conf.NRHandler = &testHandler
+	conf.NRHandler = testHandler
 
 	t1 := r.getTrueHandler(h)
 	t2 := removePathMethodName(t1)
@@ -63,7 +63,7 @@ func TestHandlerCheck(t *testing.T) {
 
 	// Error
 	reg.Handler = testHandler
-	conf.NRHandler = &config.EmptyNRWrapper
+	conf.NRHandler = config.EmptyNRWrapper
 	err = checkHandler(&conf, &reg, r)
 	assert.EqualError(t, err, "Missing handler file path/to/app.handler (NEW_RELIC_LAMBDA_HANDLER=Undefined)")
 
@@ -79,7 +79,7 @@ func TestHandlerCheck(t *testing.T) {
 	os.Create(dirname + "/var/task/path/to/app.js")
 	defer os.RemoveAll(dirname + "/var")
 	reg.Handler = testHandler
-	conf.NRHandler = &config.EmptyNRWrapper
+	conf.NRHandler = config.EmptyNRWrapper
 	err = checkHandler(&conf, &reg, r)
 	assert.Nil(t, err)
 }

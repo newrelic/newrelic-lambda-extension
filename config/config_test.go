@@ -14,7 +14,7 @@ func TestConfigurationFromEnvironmentZero(t *testing.T) {
 		RipeMillis:       DefaultRipeMillis,
 		RotMillis:        DefaultRotMillis,
 		LogLevel:         DefaultLogLevel,
-		NRHandler:        &EmptyNRWrapper,
+		NRHandler:        EmptyNRWrapper,
 	}
 	assert.Equal(t, expected, conf)
 }
@@ -41,9 +41,9 @@ func TestConfigurationFromEnvironment(t *testing.T) {
 	conf = ConfigurationFromEnvironment()
 
 	assert.Equal(t, conf.ExtensionEnabled, false)
-	assert.Equal(t, "lk", *conf.LicenseKey)
-	assert.Nil(t, conf.LicenseKeySecretId)
-	assert.Equal(t, "endpoint", *conf.TelemetryEndpoint)
+	assert.Equal(t, "lk", conf.LicenseKey)
+	assert.Empty(t, conf.LicenseKeySecretId)
+	assert.Equal(t, "endpoint", conf.TelemetryEndpoint)
 }
 
 func TestConfigurationFromEnvironmentSecretId(t *testing.T) {
@@ -51,5 +51,5 @@ func TestConfigurationFromEnvironmentSecretId(t *testing.T) {
 	defer os.Unsetenv("NEW_RELIC_LICENSE_KEY_SECRET")
 
 	conf := ConfigurationFromEnvironment()
-	assert.Equal(t, "secretId", *conf.LicenseKeySecretId)
+	assert.Equal(t, "secretId", conf.LicenseKeySecretId)
 }

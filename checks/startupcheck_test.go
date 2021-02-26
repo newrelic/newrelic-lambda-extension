@@ -37,7 +37,7 @@ func TestRunCheck(t *testing.T) {
 	assert.Nil(t, result)
 }
 
-func TestRunCheck_err(t *testing.T) {
+func TestRunCheckErr(t *testing.T) {
 	conf := config.Configuration{}
 	resp := api.RegistrationResponse{}
 	r := runtimeConfig{}
@@ -55,4 +55,14 @@ func TestRunCheck_err(t *testing.T) {
 	assert.NotNil(t, result)
 
 	assert.Equal(t, "Startup check failed: Failure Test", string(logSender.sent[0].Content))
+}
+
+func TestRunChecks(t *testing.T) {
+	c := &config.Configuration{}
+	r := &api.RegistrationResponse{}
+	l := &TestLogSender{}
+
+	client = &mockClientError{}
+
+	RunChecks(c, r, l)
 }

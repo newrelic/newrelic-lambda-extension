@@ -2,8 +2,9 @@ package credentials
 
 import (
 	"encoding/json"
-	"github.com/newrelic/newrelic-lambda-extension/util"
 	"os"
+
+	"github.com/newrelic/newrelic-lambda-extension/util"
 
 	"github.com/newrelic/newrelic-lambda-extension/config"
 
@@ -23,26 +24,27 @@ var sess = session.Must(session.NewSessionWithOptions(session.Options{
 const defaultSecretId = "NEW_RELIC_LICENSE_KEY"
 
 func getLicenseKeySecretId(conf *config.Configuration) string {
-	if conf.LicenseKeySecretId != nil {
-		util.Logln("Fetching license key from secret id " + *conf.LicenseKeySecretId)
-		return *conf.LicenseKeySecretId
+	if conf.LicenseKeySecretId != "" {
+		util.Logln("Fetching license key from secret id " + conf.LicenseKeySecretId)
+		return conf.LicenseKeySecretId
 	}
+
 	return defaultSecretId
 }
 
-func decodeLicenseKey(rawJson *string) (*string, error) {
+func decodeLicenseKey(rawJson *string) (string, error) {
 	var secrets licenseKeySecret
 
 	err := json.Unmarshal([]byte(*rawJson), &secrets)
 	if err != nil {
-		return nil, err
+		return "", err
 	}
 
-	return &secrets.LicenseKey, nil
+	return secrets.LicenseKey, nil
 }
 
 // GetLicenseKeyImpl retrieves the license key from AWS Secrets Manager
-func GetLicenseKeyImpl(secrets secretsmanageriface.SecretsManagerAPI, conf *config.Configuration) (*string, error) {
+func GetLicenseKeyImpl(secrets secretsmanageriface.SecretsManagerAPI, conf *config.Configuration) (string, error) {
 	secretId := getLicenseKeySecretId(conf)
 	secretValueInput := secretsmanager.GetSecretValueInput{SecretId: &secretId}
 
@@ -50,10 +52,10 @@ func GetLicenseKeyImpl(secrets secretsmanageriface.SecretsManagerAPI, conf *conf
 	if err != nil {
 		envLicenseKey, found := os.LookupEnv(defaultSecretId)
 		if found {
-			return &envLicenseKey, nil
+			return envLicenseKey, nil
 		}
 
-		return nil, err
+		return "", err
 	}
 
 	return decodeLicenseKey(secretValueOutput.SecretString)
@@ -61,8 +63,8 @@ func GetLicenseKeyImpl(secrets secretsmanageriface.SecretsManagerAPI, conf *conf
 
 // GetNewRelicLicenseKey fetches the license key from AWS Secrets Manager, falling back
 // to the NEW_RELIC_LICENSE_KEY environment varaible if set.
-func GetNewRelicLicenseKey(conf *config.Configuration) (*string, error) {
-	if conf.LicenseKey != nil {
+func GetNewRelicLicenseKey(conf *config.Configuration) (string, error) {
+	if conf.LicenseKey != "" {
 		util.Logln("Using license key from environment variable")
 		return conf.LicenseKey, nil
 	}

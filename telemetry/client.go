@@ -31,7 +31,7 @@ type Client struct {
 }
 
 // New creates a telemetry client with sensible defaults
-func New(functionName string, licenseKey string, telemetryEndpointOverride *string, logEndpointOverride *string) *Client {
+func New(functionName string, licenseKey string, telemetryEndpointOverride string, logEndpointOverride string) *Client {
 	httpClient := &http.Client{
 		Timeout: time.Second * 2,
 	}
@@ -40,7 +40,7 @@ func New(functionName string, licenseKey string, telemetryEndpointOverride *stri
 }
 
 // NewWithHTTPClient is just like New, but the HTTP client can be overridden
-func NewWithHTTPClient(httpClient *http.Client, functionName string, licenseKey string, telemetryEndpointOverride *string, logEndpointOverride *string) *Client {
+func NewWithHTTPClient(httpClient *http.Client, functionName string, licenseKey string, telemetryEndpointOverride string, logEndpointOverride string) *Client {
 	telemetryEndpoint := getInfraEndpointURL(licenseKey, telemetryEndpointOverride)
 	logEndpoint := getLogEndpointURL(licenseKey, logEndpointOverride)
 	return &Client{
@@ -53,10 +53,11 @@ func NewWithHTTPClient(httpClient *http.Client, functionName string, licenseKey 
 }
 
 // getInfraEndpointURL returns the Vortex endpoint for the provided license key
-func getInfraEndpointURL(licenseKey string, telemetryEndpointOverride *string) string {
-	if telemetryEndpointOverride != nil {
-		return *telemetryEndpointOverride
+func getInfraEndpointURL(licenseKey string, telemetryEndpointOverride string) string {
+	if telemetryEndpointOverride != "" {
+		return telemetryEndpointOverride
 	}
+
 	if strings.HasPrefix(licenseKey, "eu") {
 		return InfraEndpointEU
 	}
@@ -65,10 +66,11 @@ func getInfraEndpointURL(licenseKey string, telemetryEndpointOverride *string) s
 }
 
 // getLogEndpointURL returns the Vortex endpoint for the provided license key
-func getLogEndpointURL(licenseKey string, logEndpointOverride *string) string {
-	if logEndpointOverride != nil {
-		return *logEndpointOverride
+func getLogEndpointURL(licenseKey string, logEndpointOverride string) string {
+	if logEndpointOverride != "" {
+		return logEndpointOverride
 	}
+
 	if strings.HasPrefix(licenseKey, "eu") {
 		return LogEndpointEU
 	}

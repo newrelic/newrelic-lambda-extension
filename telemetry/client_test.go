@@ -41,7 +41,7 @@ func TestClientSend(t *testing.T) {
 
 	defer srv.Close()
 
-	client := NewWithHTTPClient(srv.Client(), "", "a mock license key", &srv.URL, &srv.URL)
+	client := NewWithHTTPClient(srv.Client(), "", "a mock license key", srv.URL, srv.URL)
 
 	bytes := []byte("foobar")
 	err, successCount := client.SendTelemetry("arn:aws:lambda:us-east-1:1234:function:newrelic-example-go", [][]byte{bytes})
@@ -88,7 +88,7 @@ func TestClientSendRetry(t *testing.T) {
 
 	httpClient := srv.Client()
 	httpClient.Timeout = 200 * time.Millisecond
-	client := NewWithHTTPClient(httpClient, "", "a mock license key", &srv.URL, &srv.URL)
+	client := NewWithHTTPClient(httpClient, "", "a mock license key", srv.URL, srv.URL)
 
 	bytes := []byte("foobar")
 	err, successCount := client.SendTelemetry("arn:aws:lambda:us-east-1:1234:function:newrelic-example-go", [][]byte{bytes})
@@ -109,7 +109,7 @@ func TestClientSendOutOfRetries(t *testing.T) {
 
 	httpClient := srv.Client()
 	httpClient.Timeout = 200 * time.Millisecond
-	client := NewWithHTTPClient(httpClient, "", "a mock license key", &srv.URL, &srv.URL)
+	client := NewWithHTTPClient(httpClient, "", "a mock license key", srv.URL, srv.URL)
 
 	bytes := []byte("foobar")
 	err, successCount := client.SendTelemetry("arn:aws:lambda:us-east-1:1234:function:newrelic-example-go", [][]byte{bytes})

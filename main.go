@@ -81,7 +81,7 @@ func main() {
 	}
 
 	// Init the telemetry sending client
-	telemetryClient := telemetry.New(registrationResponse.FunctionName, *licenseKey, conf.TelemetryEndpoint, conf.LogEndpoint)
+	telemetryClient := telemetry.New(registrationResponse.FunctionName, licenseKey, conf.TelemetryEndpoint, conf.LogEndpoint)
 
 	telemetryChan, err := telemetry.InitTelemetryChannel()
 	if err != nil {

@@ -1,6 +1,6 @@
 AWSTemplateFormatVersion: '2010-09-09'
 Transform: AWS::Serverless-2016-10-31
-Description: And example of a simple instrumented Python Lambda
+Description: And example of a simple instrumented NodeJS Lambda
 
 Parameters:
   NRAccountId:
@@ -29,7 +29,7 @@ Resources:
       Layers:
         # This layer includes the New Relic Lambda Extension, a sidecar process that sends telemetry,
         # as well as the New Relic Agent for Node.js, and a handler wrapper that makes integration easy.
-        - !Sub arn:${AWS::Partition}:lambda:${AWS::Region}:451483290750:layer:NewRelicNodeJS12X:28
+        - !Sub arn:${AWS::Partition}:lambda:${AWS::Region}:451483290750:layer:NewRelicNodeJS12X:34
       Policies:
         # This policy allows the lambda to know the value of the New Relic licence key. We need this so
         # that we can send telemetry back to New Relic

@@ -5,3 +5,4 @@ extensions/
 /venv/
 response.out
 .aws-sam/
+coverage.txt

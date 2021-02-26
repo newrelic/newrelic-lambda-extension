@@ -1,6 +1,6 @@
 [![Community Project header](https://github.com/newrelic/opensource-website/raw/master/src/images/categories/Community_Project.png)](https://opensource.newrelic.com/oss-category/#community-project)
 
-# newrelic-lambda-extension [![Build Status](https://circleci.com/gh/newrelic/newrelic-lambda-extension.svg?style=svg)](https://circleci.com/gh/newrelic/newrelic-lambda-extension)
+# newrelic-lambda-extension [![Build Status](https://circleci.com/gh/newrelic/newrelic-lambda-extension.svg?style=svg)](https://circleci.com/gh/newrelic/newrelic-lambda-extension) [![Coverage](https://codecov.io/gh/newrelic/newrelic-lambda-extension/branch/main/graph/badge.svg?token=T73UEDVA5K)](https://codecov.io/gh/newrelic/newrelic-lambda-extension)
 
 An AWS Lambda extension to collect, enhance, and transport telemetry data from your AWS Lambda functions to New Relic without requiring an external transport such as CloudWatch Logs or Kinesis.
 
@@ -38,20 +38,19 @@ link above you should begin seeing telemetry data in New Relic.
 
 See below for details on supported New Relic agents.
 
-## Supported Agents
+## Supported Configurations
 
-1. Node Agent, version [v6.13.1](https://github.com/newrelic/node-newrelic/releases/tag/v6.13.1), via layer versions
- NewRelicNodeJS12X:20, NewRelicNodeJS10X:22, NewRelicNodeJS810:20 
-2. Python Agent, version [v5.18.0.148](https://github.com/newrelic/newrelic-python-agent/releases/tag/v5.18.0.148) via layer versions NewRelicPython38:18, NewRelicPython37:22, NewRelicPython36:21, NewRelicPython27:21
-3. Go Agent, version [v3.9.0](https://github.com/newrelic/go-agent/releases/tag/v3.9.0)
-4. Java
-   - `com.newrelic.opentracing:newrelic-java-lambda` [v2.1.2](https://github.com/newrelic/newrelic-lambda-tracer-java/releases/tag/v2.1.2)
-   - `com.newrelic.opentracing:java-aws-lambda` [v2.1.0](https://github.com/newrelic/java-aws-lambda/releases/tag/v2.1.0)
-5. Dotnet: [v1.1.0](https://github.com/newrelic/newrelic-dotnet-agent/releases/tag/AwsLambdaOpenTracer_v1.1.0)
+AWS's [Extension API supports](https://docs.aws.amazon.com/lambda/latest/dg/runtimes-extensions-api.html) only a subset 
+of all their runtimes. Notably absent as of this writing are Node JS before 10, Python before 3.7, Go (all versions), 
+Dotnet before 3.1, and the older "java8" runtime, though "java8.al2" is supported.
 
-Note that future agent layers (for Node and Python) will include the extension. To test with a different extension version, make sure that the layer for the version you want to run is **after** the agent, so that it overwrites the packaged extension. 
+For Go lambdas, we suggest using "provided" or "provided.al2". The Go example's deploy script contains compiler flags
+that produce a suitable self-hosting Go executable. See the [Custom runtime](https://docs.aws.amazon.com/lambda/latest/dg/runtimes-custom.html)
+docs for more details on this feature. 
 
-For other runtimes, be sure to include the latest `NewRelicLambdaExtension` layer.
+All of our layers include the extension, and the latest Agent version for the Layer's runtime. The latest 
+layer version ARNs for your runtime and region are available [here](https://layers.newrelic-external.com/). The 
+`NewRelicLambdaExtension` layer is suitable for Go, Java and Dotnet.
 
 ## Building
 

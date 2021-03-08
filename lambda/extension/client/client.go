@@ -40,6 +40,7 @@ func New(httpClient http.Client) *RegistrationClient {
 	if err != nil {
 		util.Fatal(err)
 	}
+
 	exeName := filepath.Base(exePath)
 
 	return &RegistrationClient{

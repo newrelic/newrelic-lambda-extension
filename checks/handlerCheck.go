@@ -22,10 +22,12 @@ func checkHandler(conf *config.Configuration, reg *api.RegistrationResponse, r r
 			handlerName: reg.Handler,
 			conf:        conf,
 		}
+
 		if !r.check(h) {
 			return fmt.Errorf("Missing handler file %s (NEW_RELIC_LAMBDA_HANDLER=%s)", h.handlerName, conf.NRHandler)
 		}
 	}
+
 	return nil
 }
 

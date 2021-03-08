@@ -2,6 +2,7 @@ package checks
 
 import (
 	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/newrelic/newrelic-lambda-extension/config"
@@ -19,20 +20,17 @@ func TestAgentVersion(t *testing.T) {
 	assert.Nil(t, err)
 
 	// Error
-	dirname, err := os.Getwd()
-
-	// We want to make sure our working directory doesn't end up being root
-	assert.NotEqual(t, dirname, "")
+	dirname, err := os.MkdirTemp("", "")
 	assert.Nil(t, err)
+	defer os.RemoveAll(dirname)
 
-	testFile := dirname + "/opt/python/lib/python3.8/site-packages/newrelic/"
+	testFile := filepath.Join(dirname, "opt", "python", "lib", "python3.8", "site-packages", "newrelic")
 	r = runtimeConfigs[Python]
 	r.AgentVersion = "v10.1.2"
 	r.layerAgentPaths = []string{testFile}
 
 	os.MkdirAll(testFile, os.ModePerm)
-	defer os.RemoveAll(dirname + "/opt")
-	f, _ := os.Create(testFile + r.agentVersionFile)
+	f, _ := os.Create(filepath.Join(testFile, r.agentVersionFile))
 	f.WriteString("10.1.0")
 
 	err = agentVersionCheck(&conf, &reg, r)

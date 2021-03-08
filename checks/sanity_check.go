@@ -3,10 +3,6 @@ package checks
 import (
 	"fmt"
 
-	"github.com/aws/aws-sdk-go/aws/session"
-	"github.com/aws/aws-sdk-go/service/secretsmanager"
-	"github.com/aws/aws-sdk-go/service/secretsmanager/secretsmanageriface"
-
 	"github.com/newrelic/newrelic-lambda-extension/config"
 	"github.com/newrelic/newrelic-lambda-extension/credentials"
 	"github.com/newrelic/newrelic-lambda-extension/lambda/extension/api"
@@ -22,15 +18,7 @@ var (
 		"NR_INFRA_ENDPOINT",
 		"NR_LOGGING_ENDPOINT",
 	}
-	sess = session.Must(session.NewSessionWithOptions(session.Options{
-		SharedConfigState: session.SharedConfigEnable,
-	}))
-	secrets secretsmanageriface.SecretsManagerAPI
 )
-
-func init() {
-	secrets = secretsmanager.New(sess)
-}
 
 // sanityCheck checks for configuration that is either misplaced or in conflict
 func sanityCheck(conf *config.Configuration, res *api.RegistrationResponse, _ runtimeConfig) error {
@@ -38,7 +26,7 @@ func sanityCheck(conf *config.Configuration, res *api.RegistrationResponse, _ ru
 		return fmt.Errorf("Environment varaible '%s' is used by aws-log-ingestion and has no effect here. Recommend unsetting this environment variable within this function.", util.AnyEnvVarsExistString(awsLogIngestionEnvVars))
 	}
 
-	licenseKey, _ := credentials.GetLicenseKeyImpl(secrets, conf)
+	licenseKey, _ := credentials.GetNewRelicLicenseKey(conf)
 	if licenseKey != "" && util.EnvVarExists("NEW_RELIC_LICENSE_KEY") {
 		return fmt.Errorf("There is both a AWS Secrets Manager secret and a NEW_RELIC_LICENSE_KEY environment variable set. Recommend removing the NEW_RELIC_LICENSE_KEY environment variable and using the AWS Secrets Manager secret.")
 	}

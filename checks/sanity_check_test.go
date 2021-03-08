@@ -8,6 +8,7 @@ import (
 	"github.com/aws/aws-sdk-go/service/secretsmanager"
 	"github.com/aws/aws-sdk-go/service/secretsmanager/secretsmanageriface"
 	"github.com/newrelic/newrelic-lambda-extension/config"
+	"github.com/newrelic/newrelic-lambda-extension/credentials"
 	"github.com/newrelic/newrelic-lambda-extension/lambda/extension/api"
 	"github.com/newrelic/newrelic-lambda-extension/util"
 	"github.com/stretchr/testify/assert"
@@ -35,7 +36,7 @@ func TestSanityCheck(t *testing.T) {
 	os.Unsetenv("DEBUG_LOGGING_ENABLED")
 
 	os.Setenv("NEW_RELIC_LICENSE_KEY", "foobar")
-	secrets = &mockSecretManager{}
+	credentials.OverrideSecretsManager(&mockSecretManager{})
 	assert.Error(t, sanityCheck(&config.Configuration{}, &api.RegistrationResponse{}, runtimeConfig{}))
 	os.Unsetenv("NEW_RELIC_LICENSE_KEY")
 }

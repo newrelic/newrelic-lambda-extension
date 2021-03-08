@@ -1,6 +1,8 @@
 package credentials
 
 import (
+	"fmt"
+	"os"
 	"testing"
 
 	"github.com/newrelic/newrelic-lambda-extension/config"
@@ -31,10 +33,31 @@ func (mockSecretManager) GetSecretValue(*secretsmanager.GetSecretValueInput) (*s
 	}, nil
 }
 
-func TestGetLicenseKeyImpl(t *testing.T) {
-	lk, err := GetLicenseKeyImpl(mockSecretManager{}, &config.Configuration{})
+type mockSecretManagerErr struct {
+	secretsmanageriface.SecretsManagerAPI
+}
+
+func (mockSecretManagerErr) GetSecretValue(*secretsmanager.GetSecretValueInput) (*secretsmanager.GetSecretValueOutput, error) {
+	return nil, fmt.Errorf("Something went wrong")
+}
+
+func TestGetNewRelicLicenseKey(t *testing.T) {
+	OverrideSecretsManager(mockSecretManager{})
+	lk, err := GetNewRelicLicenseKey(&config.Configuration{})
 	assert.Nil(t, err)
 	assert.Equal(t, "foo", lk)
+
+	os.Unsetenv("NEW_RELIC_LICENSE_KEY")
+	OverrideSecretsManager(mockSecretManagerErr{})
+	lk, err = GetNewRelicLicenseKey(&config.Configuration{})
+	assert.Error(t, err)
+	assert.Empty(t, lk)
+
+	os.Setenv("NEW_RELIC_LICENSE_KEY", "foobar")
+	defer os.Unsetenv("NEW_RELIC_LICENSE_KEY")
+	lk, err = GetNewRelicLicenseKey(&config.Configuration{})
+	assert.Nil(t, err)
+	assert.Equal(t, "foobar", lk)
 }
 
 func TestGetNewRelicLicenseKeyConfigValue(t *testing.T) {
@@ -45,4 +68,11 @@ func TestGetNewRelicLicenseKeyConfigValue(t *testing.T) {
 
 	assert.Nil(t, err)
 	assert.Equal(t, licenseKey, resultKey)
+}
+
+func TestDecodeLicenseKey(t *testing.T) {
+	invalidJson := "invalid json"
+	decoded, err := decodeLicenseKey(&invalidJson)
+	assert.Empty(t, decoded)
+	assert.Error(t, err)
 }

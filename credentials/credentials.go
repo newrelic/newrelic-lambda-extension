@@ -17,11 +17,18 @@ type licenseKeySecret struct {
 	LicenseKey string
 }
 
-var sess = session.Must(session.NewSessionWithOptions(session.Options{
-	SharedConfigState: session.SharedConfigEnable,
-}))
+var (
+	sess = session.Must(session.NewSessionWithOptions(session.Options{
+		SharedConfigState: session.SharedConfigEnable,
+	}))
+	secrets secretsmanageriface.SecretsManagerAPI
+)
 
 const defaultSecretId = "NEW_RELIC_LICENSE_KEY"
+
+func init() {
+	secrets = secretsmanager.New(sess)
+}
 
 func getLicenseKeySecretId(conf *config.Configuration) string {
 	if conf.LicenseKeySecretId != "" {
@@ -43,8 +50,14 @@ func decodeLicenseKey(rawJson *string) (string, error) {
 	return secrets.LicenseKey, nil
 }
 
-// GetLicenseKeyImpl retrieves the license key from AWS Secrets Manager
-func GetLicenseKeyImpl(secrets secretsmanageriface.SecretsManagerAPI, conf *config.Configuration) (string, error) {
+// GetNewRelicLicenseKey fetches the license key from AWS Secrets Manager, falling back
+// to the NEW_RELIC_LICENSE_KEY environment variable if set.
+func GetNewRelicLicenseKey(conf *config.Configuration) (string, error) {
+	if conf.LicenseKey != "" {
+		util.Logln("Using license key from environment variable")
+		return conf.LicenseKey, nil
+	}
+
 	secretId := getLicenseKeySecretId(conf)
 	secretValueInput := secretsmanager.GetSecretValueInput{SecretId: &secretId}
 
@@ -59,16 +72,9 @@ func GetLicenseKeyImpl(secrets secretsmanageriface.SecretsManagerAPI, conf *conf
 	}
 
 	return decodeLicenseKey(secretValueOutput.SecretString)
+
 }
 
-// GetNewRelicLicenseKey fetches the license key from AWS Secrets Manager, falling back
-// to the NEW_RELIC_LICENSE_KEY environment varaible if set.
-func GetNewRelicLicenseKey(conf *config.Configuration) (string, error) {
-	if conf.LicenseKey != "" {
-		util.Logln("Using license key from environment variable")
-		return conf.LicenseKey, nil
-	}
-
-	secrets := secretsmanager.New(sess)
-	return GetLicenseKeyImpl(secrets, conf)
+func OverrideSecretsManager(override secretsmanageriface.SecretsManagerAPI) {
+	secrets = override
 }

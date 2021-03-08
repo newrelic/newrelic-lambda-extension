@@ -75,6 +75,9 @@ func TestRegistrationClient_RegisterDefault(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, "test-ext-id", invocationClient.extensionId)
 	assert.NotNil(t, rr)
+	assert.NotEmpty(t, invocationClient.getInitErrorURL())
+	assert.NotEmpty(t, invocationClient.getExitErrorURL())
+	assert.NotEmpty(t, invocationClient.getLogRegistrationURL())
 }
 
 func TestInvocationClient_NextEvent(t *testing.T) {

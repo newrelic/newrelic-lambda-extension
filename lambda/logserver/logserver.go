@@ -3,13 +3,14 @@ package logserver
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/newrelic/newrelic-lambda-extension/lambda/extension/api"
-	"github.com/newrelic/newrelic-lambda-extension/util"
 	"io/ioutil"
 	"net"
 	"net/http"
 	"strconv"
 	"time"
+
+	"github.com/newrelic/newrelic-lambda-extension/lambda/extension/api"
+	"github.com/newrelic/newrelic-lambda-extension/util"
 )
 
 const (
@@ -106,6 +107,7 @@ func (ls *LogServer) handler(res http.ResponseWriter, req *http.Request) {
 
 	var functionLogs []LogLine
 	var lastRequestId string
+
 	for _, event := range logEvents {
 		switch event.Type {
 		case "platform.start":

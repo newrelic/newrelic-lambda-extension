@@ -48,6 +48,9 @@ func TestClientSend(t *testing.T) {
 
 	assert.NoError(t, err)
 	assert.Equal(t, 1, successCount)
+
+	client = New("", "mock license key", srv.URL, srv.URL)
+	assert.NotNil(t, client)
 }
 
 func TestClientSendRetry(t *testing.T) {
@@ -117,4 +120,16 @@ func TestClientSendOutOfRetries(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, 0, successCount)
 	assert.Equal(t, int32(retries), atomic.LoadInt32(&count))
+}
+
+func TestGetInfraEndpointURL(t *testing.T) {
+	assert.Equal(t, "barbaz", getInfraEndpointURL("foobar", "barbaz"))
+	assert.Equal(t, InfraEndpointUS, getInfraEndpointURL("us license key", ""))
+	assert.Equal(t, InfraEndpointEU, getInfraEndpointURL("eu license key", ""))
+}
+
+func TestGetLogEndpointURL(t *testing.T) {
+	assert.Equal(t, "barbaz", getLogEndpointURL("foobar", "barbaz"))
+	assert.Equal(t, LogEndpointUS, getLogEndpointURL("us mock license key", ""))
+	assert.Equal(t, LogEndpointEU, getLogEndpointURL("eu mock license key", ""))
 }

@@ -66,6 +66,7 @@ func (b *Batch) Harvest(now time.Time) []*Invocation {
 	if b.eldest.Before(ripeTime) {
 		return b.ripeHarvest(now)
 	}
+
 	return nil
 }
 

@@ -5,6 +5,8 @@ import (
 	"log"
 	"os"
 	"syscall"
+
+	"github.com/newrelic/newrelic-lambda-extension/util"
 )
 
 const telemetryNamedPipePath = "/tmp/newrelic-telemetry"
@@ -34,13 +36,14 @@ func pollForTelemetry() []byte {
 	if err != nil {
 		log.Panic("failed to open telemetry pipe", err)
 	}
-	//noinspection GoUnhandledErrorResult
-	defer telemetryPipe.Close()
+
+	defer util.Close(telemetryPipe)
 
 	// When the write side closes, we get an EOF.
 	bytes, err := ioutil.ReadAll(telemetryPipe)
 	if err != nil {
 		log.Panic("failed to read telemetry pipe", err)
 	}
+
 	return bytes
 }

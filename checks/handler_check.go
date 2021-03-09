@@ -22,10 +22,12 @@ func checkHandler(conf *config.Configuration, reg *api.RegistrationResponse, r r
 			handlerName: reg.Handler,
 			conf:        conf,
 		}
+
 		if !r.check(h) {
-			return fmt.Errorf("Missing handler file %s (NEW_RELIC_LAMBDA_HANDLER=%s)", h.handlerName, *conf.NRHandler)
+			return fmt.Errorf("Missing handler file %s (NEW_RELIC_LAMBDA_HANDLER=%s)", h.handlerName, conf.NRHandler)
 		}
 	}
+
 	return nil
 }
 
@@ -41,7 +43,8 @@ func (r runtimeConfig) getTrueHandler(h handlerConfigs) string {
 		util.Logln("Warning: handler not set to New Relic layer wrapper", r.wrapperName)
 		return h.handlerName
 	}
-	return *h.conf.NRHandler
+
+	return h.conf.NRHandler
 }
 
 func removePathMethodName(p string) string {

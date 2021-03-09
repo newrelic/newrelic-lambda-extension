@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
+	"path/filepath"
 
 	"github.com/newrelic/newrelic-lambda-extension/config"
 	"github.com/newrelic/newrelic-lambda-extension/lambda/extension/api"
@@ -22,28 +23,33 @@ func agentVersionCheck(conf *config.Configuration, reg *api.RegistrationResponse
 		return nil
 	}
 
+	v := LayerAgentVersion{}
+
 	for i := range r.layerAgentPaths {
-		f := fmt.Sprintf("%s/%s", r.layerAgentPaths[i], r.agentVersionFile)
-		if util.PathExists(f) {
-			b, err := ioutil.ReadFile(f)
+		f := filepath.Join(r.layerAgentPaths[i], r.agentVersionFile)
+		if !util.PathExists(f) {
+			continue
+		}
+
+		b, err := ioutil.ReadFile(f)
+		if err != nil {
+			return nil
+		}
+
+		if r.language == Python {
+			v.Version = string(b)
+		} else {
+			err = json.Unmarshal([]byte(b), &v)
 			if err != nil {
 				return nil
 			}
-			v := LayerAgentVersion{}
-			if r.language == Python {
-				v.Version = string(b)
-			} else {
-				err = json.Unmarshal([]byte(b), &v)
-				if err != nil {
-					return nil
-				}
-			}
-			// semver requires a prepended v on version string
-			if semver.Compare("v"+v.Version, r.AgentVersion) < 0 {
-				return fmt.Errorf("Agent version out of date: v%s, in order access up to date features please upgrade to the latest New Relic %s layer that includes agent version %s", v.Version, r.language, r.AgentVersion)
-			}
-			return nil
 		}
 	}
+
+	// semver requires a prepended v on version string
+	if v.Version != "" && semver.Compare("v"+v.Version, r.AgentVersion) < 0 {
+		return fmt.Errorf("Agent version out of date: v%s, in order access up to date features please upgrade to the latest New Relic %s layer that includes agent version %s", v.Version, r.language, r.AgentVersion)
+	}
+
 	return nil
 }

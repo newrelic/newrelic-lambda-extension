@@ -30,6 +30,7 @@ func RunChecks(conf *config.Configuration, reg *api.RegistrationResponse, logSen
 		errLog := fmt.Sprintf("There was an issue querying for the latest agent version: %v", err)
 		util.Logln(errLog)
 	}
+
 	for _, check := range checks {
 		runCheck(conf, reg, runtimeConfig, logSender, check)
 	}

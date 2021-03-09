@@ -2,6 +2,7 @@ package checks
 
 import (
 	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/newrelic/newrelic-lambda-extension/config"
@@ -18,7 +19,7 @@ func TestRuntimeMethods(t *testing.T) {
 		handlerName: r.wrapperName,
 		conf:        &conf,
 	}
-	conf.NRHandler = &testHandler
+	conf.NRHandler = testHandler
 
 	t1 := r.getTrueHandler(h)
 	t2 := removePathMethodName(t1)
@@ -63,23 +64,21 @@ func TestHandlerCheck(t *testing.T) {
 
 	// Error
 	reg.Handler = testHandler
-	conf.NRHandler = &config.EmptyNRWrapper
+	conf.NRHandler = config.EmptyNRWrapper
 	err = checkHandler(&conf, &reg, r)
 	assert.EqualError(t, err, "Missing handler file path/to/app.handler (NEW_RELIC_LAMBDA_HANDLER=Undefined)")
 
 	// Success
-	dirname, err := os.Getwd()
-
-	// Want to make sure our working directory isn't root
-	assert.NotEqual(t, dirname, "")
+	dirname, err := os.MkdirTemp("", "")
 	assert.Nil(t, err)
+	defer os.RemoveAll(dirname)
 
-	handlerPath = dirname + "/var/task"
-	os.MkdirAll(dirname+"/var/task/path/to/", os.ModePerm)
-	os.Create(dirname + "/var/task/path/to/app.js")
-	defer os.RemoveAll(dirname + "/var")
+	handlerPath = filepath.Join(dirname, "var", "task")
+	os.MkdirAll(filepath.Join(handlerPath, "path", "to"), os.ModePerm)
+	os.Create(filepath.Join(handlerPath, "path", "to", "app.js"))
+
 	reg.Handler = testHandler
-	conf.NRHandler = &config.EmptyNRWrapper
+	conf.NRHandler = config.EmptyNRWrapper
 	err = checkHandler(&conf, &reg, r)
 	assert.Nil(t, err)
 }

@@ -40,6 +40,7 @@ func New(httpClient http.Client) *RegistrationClient {
 	if err != nil {
 		util.Fatal(err)
 	}
+
 	exeName := filepath.Base(exePath)
 
 	return &RegistrationClient{
@@ -129,6 +130,7 @@ func (ic *InvocationClient) LogRegister(subscriptionRequest *api.LogSubscription
 	if err != nil {
 		return fmt.Errorf("error occurred while marshaling subscription request %s", err)
 	}
+
 	util.Debugln("Log registration with request ", string(subscriptionRequestJson))
 
 	req, err := http.NewRequest("PUT", ic.getLogRegistrationURL(), bytes.NewBuffer(subscriptionRequestJson))

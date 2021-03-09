@@ -1,9 +1,10 @@
 package telemetry
 
 import (
-	"github.com/newrelic/newrelic-lambda-extension/util"
 	"math"
 	"time"
+
+	"github.com/newrelic/newrelic-lambda-extension/util"
 )
 
 // The Unix epoch instant; used as a nil time for eldest and lastHarvest
@@ -65,6 +66,7 @@ func (b *Batch) Harvest(now time.Time) []*Invocation {
 	if b.eldest.Before(ripeTime) {
 		return b.ripeHarvest(now)
 	}
+
 	return nil
 }
 

@@ -21,6 +21,7 @@ var exeName = filepath.Base(exePath)
 func TestNew(t *testing.T) {
 	_ = os.Setenv(api.LambdaHostPortEnvVar, "127.0.0.1:8123")
 	defer os.Unsetenv(api.LambdaHostPortEnvVar)
+
 	client := New(http.Client{})
 
 	assert.Equal(t, exeName, client.extensionName)
@@ -29,19 +30,27 @@ func TestNew(t *testing.T) {
 func TestRegistrationClient_GetRegisterURL(t *testing.T) {
 	_ = os.Setenv(api.LambdaHostPortEnvVar, "127.0.0.1:8123")
 	defer os.Unsetenv(api.LambdaHostPortEnvVar)
+
 	client := New(http.Client{})
+
 	assert.Equal(t, "http://127.0.0.1:8123/2020-01-01/extension/register", client.getRegisterURL())
 }
 
 func TestRegistrationClient_RegisterDefault(t *testing.T) {
+	rc := RegistrationClient{}
+	ic, res, err := rc.RegisterDefault()
+	assert.Nil(t, ic)
+	assert.Nil(t, res)
+	assert.Error(t, err)
+
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		assert.Equal(t, r.Method, http.MethodPost)
-
 		assert.NotEmpty(t, r.Header.Get(api.ExtensionNameHeader))
 
 		reqBytes, err := ioutil.ReadAll(r.Body)
 		assert.NoError(t, err)
 		defer util.Close(r.Body)
+
 		assert.NotEmpty(t, reqBytes)
 
 		var reqData api.RegistrationRequest
@@ -59,12 +68,16 @@ func TestRegistrationClient_RegisterDefault(t *testing.T) {
 	url := srv.URL[7:]
 	_ = os.Setenv(api.LambdaHostPortEnvVar, url)
 	defer os.Unsetenv(api.LambdaHostPortEnvVar)
+
 	client := New(*srv.Client())
 	invocationClient, rr, err := client.RegisterDefault()
 
 	assert.NoError(t, err)
 	assert.Equal(t, "test-ext-id", invocationClient.extensionId)
 	assert.NotNil(t, rr)
+	assert.NotEmpty(t, invocationClient.getInitErrorURL())
+	assert.NotEmpty(t, invocationClient.getExitErrorURL())
+	assert.NotEmpty(t, invocationClient.getLogRegistrationURL())
 }
 
 func TestInvocationClient_NextEvent(t *testing.T) {

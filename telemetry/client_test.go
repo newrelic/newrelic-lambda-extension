@@ -41,13 +41,16 @@ func TestClientSend(t *testing.T) {
 
 	defer srv.Close()
 
-	client := NewWithHTTPClient(srv.Client(), "", "a mock license key", &srv.URL, &srv.URL)
+	client := NewWithHTTPClient(srv.Client(), "", "a mock license key", srv.URL, srv.URL)
 
 	bytes := []byte("foobar")
 	err, successCount := client.SendTelemetry("arn:aws:lambda:us-east-1:1234:function:newrelic-example-go", [][]byte{bytes})
 
 	assert.NoError(t, err)
 	assert.Equal(t, 1, successCount)
+
+	client = New("", "mock license key", srv.URL, srv.URL)
+	assert.NotNil(t, client)
 }
 
 func TestClientSendRetry(t *testing.T) {
@@ -88,7 +91,7 @@ func TestClientSendRetry(t *testing.T) {
 
 	httpClient := srv.Client()
 	httpClient.Timeout = 200 * time.Millisecond
-	client := NewWithHTTPClient(httpClient, "", "a mock license key", &srv.URL, &srv.URL)
+	client := NewWithHTTPClient(httpClient, "", "a mock license key", srv.URL, srv.URL)
 
 	bytes := []byte("foobar")
 	err, successCount := client.SendTelemetry("arn:aws:lambda:us-east-1:1234:function:newrelic-example-go", [][]byte{bytes})
@@ -109,7 +112,7 @@ func TestClientSendOutOfRetries(t *testing.T) {
 
 	httpClient := srv.Client()
 	httpClient.Timeout = 200 * time.Millisecond
-	client := NewWithHTTPClient(httpClient, "", "a mock license key", &srv.URL, &srv.URL)
+	client := NewWithHTTPClient(httpClient, "", "a mock license key", srv.URL, srv.URL)
 
 	bytes := []byte("foobar")
 	err, successCount := client.SendTelemetry("arn:aws:lambda:us-east-1:1234:function:newrelic-example-go", [][]byte{bytes})
@@ -117,4 +120,16 @@ func TestClientSendOutOfRetries(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, 0, successCount)
 	assert.Equal(t, int32(retries), atomic.LoadInt32(&count))
+}
+
+func TestGetInfraEndpointURL(t *testing.T) {
+	assert.Equal(t, "barbaz", getInfraEndpointURL("foobar", "barbaz"))
+	assert.Equal(t, InfraEndpointUS, getInfraEndpointURL("us license key", ""))
+	assert.Equal(t, InfraEndpointEU, getInfraEndpointURL("eu license key", ""))
+}
+
+func TestGetLogEndpointURL(t *testing.T) {
+	assert.Equal(t, "barbaz", getLogEndpointURL("foobar", "barbaz"))
+	assert.Equal(t, LogEndpointUS, getLogEndpointURL("us mock license key", ""))
+	assert.Equal(t, LogEndpointEU, getLogEndpointURL("eu mock license key", ""))
 }

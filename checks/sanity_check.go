@@ -26,8 +26,7 @@ func sanityCheck(conf *config.Configuration, res *api.RegistrationResponse, _ ru
 		return fmt.Errorf("Environment varaible '%s' is used by aws-log-ingestion and has no effect here. Recommend unsetting this environment variable within this function.", util.AnyEnvVarsExistString(awsLogIngestionEnvVars))
 	}
 
-	licenseKey, _ := credentials.GetNewRelicLicenseKey(conf)
-	if licenseKey != "" && util.EnvVarExists("NEW_RELIC_LICENSE_KEY") {
+	if credentials.IsSecretConfigured(conf) && util.EnvVarExists("NEW_RELIC_LICENSE_KEY") {
 		return fmt.Errorf("There is both a AWS Secrets Manager secret and a NEW_RELIC_LICENSE_KEY environment variable set. Recommend removing the NEW_RELIC_LICENSE_KEY environment variable and using the AWS Secrets Manager secret.")
 	}
 

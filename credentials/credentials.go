@@ -50,6 +50,20 @@ func decodeLicenseKey(rawJson *string) (string, error) {
 	return secrets.LicenseKey, nil
 }
 
+// IsSecretConfigured returns true if the Secrets Maanger secret is configured, false
+// otherwise
+func IsSecretConfigured(conf *config.Configuration) bool {
+	secretId := getLicenseKeySecretId(conf)
+	secretValueInput := secretsmanager.GetSecretValueInput{SecretId: &secretId}
+
+	_, err := secrets.GetSecretValue(&secretValueInput)
+	if err != nil {
+		return false
+	}
+
+	return true
+}
+
 // GetNewRelicLicenseKey fetches the license key from AWS Secrets Manager, falling back
 // to the NEW_RELIC_LICENSE_KEY environment variable if set.
 func GetNewRelicLicenseKey(conf *config.Configuration) (string, error) {
@@ -72,9 +86,9 @@ func GetNewRelicLicenseKey(conf *config.Configuration) (string, error) {
 	}
 
 	return decodeLicenseKey(secretValueOutput.SecretString)
-
 }
 
+// OverrideSecretsManager overrides the default Secrets Manager implementation
 func OverrideSecretsManager(override secretsmanageriface.SecretsManagerAPI) {
 	secrets = override
 }

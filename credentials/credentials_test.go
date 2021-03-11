@@ -41,6 +41,14 @@ func (mockSecretManagerErr) GetSecretValue(*secretsmanager.GetSecretValueInput) 
 	return nil, fmt.Errorf("Something went wrong")
 }
 
+func TestIsSecretConfigured(t *testing.T) {
+	OverrideSecretsManager(mockSecretManager{})
+	assert.True(t, IsSecretConfigured(&config.Configuration{}))
+
+	OverrideSecretsManager(mockSecretManagerErr{})
+	assert.False(t, IsSecretConfigured(&config.Configuration{}))
+}
+
 func TestGetNewRelicLicenseKey(t *testing.T) {
 	OverrideSecretsManager(mockSecretManager{})
 	lk, err := GetNewRelicLicenseKey(&config.Configuration{})

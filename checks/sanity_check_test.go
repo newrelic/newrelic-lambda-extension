@@ -1,6 +1,7 @@
 package checks
 
 import (
+	"fmt"
 	"os"
 	"testing"
 
@@ -24,6 +25,14 @@ func (mockSecretManager) GetSecretValue(*secretsmanager.GetSecretValueInput) (*s
 	}, nil
 }
 
+type mockSecretManagerErr struct {
+	secretsmanageriface.SecretsManagerAPI
+}
+
+func (mockSecretManagerErr) GetSecretValue(*secretsmanager.GetSecretValueInput) (*secretsmanager.GetSecretValueOutput, error) {
+	return nil, fmt.Errorf("Something went wrong")
+}
+
 func TestSanityCheck(t *testing.T) {
 	if util.AnyEnvVarsExist(awsLogIngestionEnvVars) {
 		assert.Error(t, sanityCheck(&config.Configuration{}, &api.RegistrationResponse{}, runtimeConfig{}))
@@ -35,8 +44,15 @@ func TestSanityCheck(t *testing.T) {
 	assert.Error(t, sanityCheck(&config.Configuration{}, &api.RegistrationResponse{}, runtimeConfig{}))
 	os.Unsetenv("DEBUG_LOGGING_ENABLED")
 
+	os.Unsetenv("NEW_RELIC_LICENSE_KEY")
+	credentials.OverrideSecretsManager(&mockSecretManager{})
+	assert.Nil(t, sanityCheck(&config.Configuration{}, &api.RegistrationResponse{}, runtimeConfig{}))
+
 	os.Setenv("NEW_RELIC_LICENSE_KEY", "foobar")
+	defer os.Unsetenv("NEW_RELIC_LICENSE_KEY")
 	credentials.OverrideSecretsManager(&mockSecretManager{})
 	assert.Error(t, sanityCheck(&config.Configuration{}, &api.RegistrationResponse{}, runtimeConfig{}))
-	os.Unsetenv("NEW_RELIC_LICENSE_KEY")
+
+	credentials.OverrideSecretsManager(&mockSecretManagerErr{})
+	assert.Nil(t, sanityCheck(&config.Configuration{}, &api.RegistrationResponse{}, runtimeConfig{}))
 }

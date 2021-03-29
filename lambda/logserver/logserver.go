@@ -15,7 +15,7 @@ import (
 
 const (
 	platformLogBufferSize = 100
-	defaultHost           = "sandbox"
+	defaultIP             = "0.0.0.0"
 )
 
 type LogLine struct {
@@ -148,7 +148,7 @@ func (ls *LogServer) handler(res http.ResponseWriter, req *http.Request) {
 }
 
 func Start() (*LogServer, error) {
-	return startInternal(defaultHost)
+	return startInternal(defaultIP)
 }
 
 func startInternal(host string) (*LogServer, error) {

@@ -43,6 +43,19 @@ This will package and deploy the CloudFormation stack for this example function.
 At this point, you can invoke the function. As provided, the example function doesn't pay attention to its invocation
 event. If everything has gone well, each invocation gets reported to New Relic, and its telemetry appears in NR One.
 
+### Invoking the application
+
+This example is driven from the browser. The CloudFormation stack you've deployed has an Output value named 
+`PythonSqsSenderApi`. This is the URL you should visit with your web browser to get started. 
+
+On that page, enter one or more words into the form field, and hit submit. The words will be processed by the 
+application, and spans will be generated for the various processing steps.
+
+New Relic batches telemetry, and in the Lambda environment, we can only send a batch during a subsequent invocation. 
+So, you'll likely need to submit the form a second time around ten seconds after your first submission to get all the 
+telemetry from the first submission sent to New Relic. Otherwise, you may temporarily see partial traces, or notice 
+missing spans.
+
 ## Code Structure
 
 Now is also a good time to look at the structure of the example code.

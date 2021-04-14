@@ -15,7 +15,7 @@ import (
 
 const (
 	platformLogBufferSize = 100
-	defaultHost           = "sandbox"
+	defaultHost           = "sandbox.localdomain"
 )
 
 type LogLine struct {

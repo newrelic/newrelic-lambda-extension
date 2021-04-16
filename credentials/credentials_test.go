@@ -84,3 +84,10 @@ func TestDecodeLicenseKey(t *testing.T) {
 	assert.Empty(t, decoded)
 	assert.Error(t, err)
 }
+
+func TestDecodeLicenseKeyValidButWrong(t *testing.T) {
+	badJson := "{\"some\": \"garbage\"}"
+	decoded, err := decodeLicenseKey(&badJson)
+	assert.Empty(t, decoded)
+	assert.Error(t, err)
+}

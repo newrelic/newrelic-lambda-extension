@@ -2,6 +2,7 @@ package credentials
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 
 	"github.com/newrelic/newrelic-lambda-extension/util"
@@ -45,6 +46,9 @@ func decodeLicenseKey(rawJson *string) (string, error) {
 	err := json.Unmarshal([]byte(*rawJson), &secrets)
 	if err != nil {
 		return "", err
+	}
+	if secrets.LicenseKey == "" {
+		return "", fmt.Errorf("malformed license key secret; missing \"LicenseKey\" attribute")
 	}
 
 	return secrets.LicenseKey, nil

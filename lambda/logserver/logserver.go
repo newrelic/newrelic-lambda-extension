@@ -41,9 +41,10 @@ func (ls *LogServer) Close() error {
 	// Pause briefly to allow final platform logs to arrive
 	time.Sleep(200 * time.Millisecond)
 
+	ret := ls.server.Close()
 	close(ls.platformLogChan)
 	close(ls.functionLogChan)
-	return ls.server.Close()
+	return ret
 }
 
 func (ls *LogServer) PollPlatformChannel() []LogLine {

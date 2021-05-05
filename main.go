@@ -235,7 +235,7 @@ func pollLogServer(logServer *logserver.LogServer, batch *telemetry.Batch) {
 	for _, platformLog := range logServer.PollPlatformChannel() {
 		inv := batch.AddTelemetry(platformLog.RequestID, platformLog.Content)
 		if inv == nil {
-			util.Debugf("Failed to add platform log for request %v", platformLog.RequestID)
+			util.Debugf("Skipping platform log for request %v", platformLog.RequestID)
 		}
 	}
 }

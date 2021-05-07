@@ -48,7 +48,7 @@ tell CloudFormation where to find lambda function code, what layers to use, and
 what IAM policies to add to the Lambda function's execution role. We also set
 environment variables that are available to the handler function. 
 
-### App.java
+### App.java and Stream.java
 
 Lambda functions written in Java are Java classes. The runtime loads them
 just like any Java class, and then invokes the handler function for each 
@@ -62,13 +62,13 @@ and sending them to the New Relic collector.
 If you're familiar with the logging ecosystem in Java, the idea behind 
 OpenTracing and OpenTelemetry is a similar one: standardize the API that 
 libraries use, and let applications choose the concrete implementation 
-responsible for managing the data itself.
+responsible for managing the data itself. 
 
-For all that to work, two things happen here. First, we register the New Relic
-`LambdaTracer` as the concrete `Tracer` implementation in the static initializer.
-Second, we need to wrap your request handler's business logic so that the trace
-begins and ends correctly, and errors are handled appropriately. That's the call
-to `LambdaTracing.instrument` on the first line of our request handler.
+We have two examples, implementing the AWS RequestHandler and the AWS RequestStreamHandler.
+Both examples are instrumented with the published New Relic Lambda Layer that wraps your handler
+function, and initializes the New Relic agent, allowing us to collect telemetry. 
 
-There are a couple examples here of how you might use the OpenTracing API in
-your own code. 
+Additionally, there are a couple examples in App.java demonstrating how you might use the OpenTracing API in
+your own code to create custom span data.
+
+

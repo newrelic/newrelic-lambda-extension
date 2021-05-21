@@ -119,7 +119,7 @@ func main() {
 	}()
 
 	// Call next, and process telemetry, until we're shut down
-	mainLoop(ctx, invocationClient, &batch, telemetryChan, logServer, telemetryClient)
+	mainLoop(ctx, cancel, invocationClient, &batch, telemetryChan, logServer, telemetryClient)
 
 	util.Debugln("Waiting for background tasks to complete")
 	backgroundTasks.Wait()
@@ -144,17 +144,20 @@ func functionLogShipLoop(ctx context.Context, logServer *logserver.LogServer, te
 }
 
 // mainLoop repeatedly calls the /next api, and processes telemetry and platform logs. The timing is rather complicated.
-func mainLoop(ctx context.Context, invocationClient *client.InvocationClient, batch *telemetry.Batch, telemetryChan chan []byte, logServer *logserver.LogServer, telemetryClient *telemetry.Client) {
+func mainLoop(ctx context.Context, cancel context.CancelFunc, invocationClient *client.InvocationClient, batch *telemetry.Batch, telemetryChan chan []byte, logServer *logserver.LogServer, telemetryClient *telemetry.Client) {
 	counter := 0
 	var invokedFunctionARN string
 	var lastRequestId string
 	var lastEventStart time.Time
 	probablyTimeout := false
+
 	for {
 		// Our call to next blocks. It is likely that the container is frozen immediately after we call NextEvent.
 		event, err := invocationClient.NextEvent(ctx)
+
 		// We've thawed.
 		eventStart := time.Now()
+
 		if err != nil {
 			errErr := invocationClient.ExitError(ctx, "NextEventError.Main", err)
 			if errErr != nil {
@@ -171,6 +174,9 @@ func mainLoop(ctx context.Context, invocationClient *client.InvocationClient, ba
 			// If we have indeed timed out, there's a chance we got telemetry out anyway. If we haven't
 			// timed out, this will catch us up to the current state of telemetry, allowing us to resume.
 			select {
+			case <-ctx.Done():
+				// We're already done
+				return
 			case telemetryBytes := <-telemetryChan:
 				// We received telemetry
 				batch.AddTelemetry(lastRequestId, telemetryBytes)
@@ -197,6 +203,7 @@ func mainLoop(ctx context.Context, invocationClient *client.InvocationClient, ba
 				batch.AddTelemetry(lastRequestId, []byte(errorMessage))
 			}
 
+			cancel()
 			break
 		}
 
@@ -216,6 +223,9 @@ func mainLoop(ctx context.Context, invocationClient *client.InvocationClient, ba
 		timeout := time.NewTimer(timeoutInstant.Sub(time.Now()) - timeoutWatchBegins)
 
 		select {
+		case <-ctx.Done():
+			// We're alreadydone
+			return
 		case telemetryBytes := <-telemetryChan:
 			// We received telemetry
 			util.Debugf("Agent telemetry bytes: %s", base64.URLEncoding.EncodeToString(telemetryBytes))
@@ -235,9 +245,12 @@ func mainLoop(ctx context.Context, invocationClient *client.InvocationClient, ba
 			// Function is timing out
 			util.Debugln("Timeout suspected")
 			probablyTimeout = true
+			cancel()
 		}
+
 		lastEventStart = eventStart
 	}
+
 	util.Logf("New Relic Extension shutting down after %v events\n", counter)
 
 	err := logServer.Close()

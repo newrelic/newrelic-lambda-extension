@@ -1,6 +1,7 @@
 package checks
 
 import (
+	"context"
 	"fmt"
 	"time"
 
@@ -10,21 +11,21 @@ import (
 	"github.com/newrelic/newrelic-lambda-extension/util"
 )
 
-type checkFn func(*config.Configuration, *api.RegistrationResponse, runtimeConfig) error
+type checkFn func(context.Context, *config.Configuration, *api.RegistrationResponse, runtimeConfig) error
 
 type LogSender interface {
-	SendFunctionLogs(lines []logserver.LogLine) error
+	SendFunctionLogs(ctx context.Context, lines []logserver.LogLine) error
 }
 
 /// Register checks here
 var checks = []checkFn{
 	agentVersionCheck,
-	checkHandler,
+	handlerCheck,
 	sanityCheck,
 	vendorCheck,
 }
 
-func RunChecks(conf *config.Configuration, reg *api.RegistrationResponse, logSender LogSender) {
+func RunChecks(ctx context.Context, conf *config.Configuration, reg *api.RegistrationResponse, logSender LogSender) {
 	runtimeConfig, err := checkAndReturnRuntime()
 	if err != nil {
 		errLog := fmt.Sprintf("There was an issue querying for the latest agent version: %v", err)
@@ -32,19 +33,18 @@ func RunChecks(conf *config.Configuration, reg *api.RegistrationResponse, logSen
 	}
 
 	for _, check := range checks {
-		runCheck(conf, reg, runtimeConfig, logSender, check)
+		runCheck(ctx, conf, reg, runtimeConfig, logSender, check)
 	}
 }
 
-func runCheck(conf *config.Configuration, reg *api.RegistrationResponse, r runtimeConfig, logSender LogSender, check checkFn) error {
-	err := check(conf, reg, r)
-
+func runCheck(ctx context.Context, conf *config.Configuration, reg *api.RegistrationResponse, r runtimeConfig, logSender LogSender, check checkFn) error {
+	err := check(ctx, conf, reg, r)
 	if err != nil {
 		errLog := fmt.Sprintf("Startup check failed: %v", err)
 		util.Logln(errLog)
 
 		//Send a log line to NR as well
-		logSender.SendFunctionLogs([]logserver.LogLine{
+		logSender.SendFunctionLogs(ctx, []logserver.LogLine{
 			{
 				Time:      time.Now(),
 				RequestID: "0",

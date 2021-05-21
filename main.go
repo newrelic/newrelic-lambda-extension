@@ -1,10 +1,14 @@
 package main
 
 import (
+	"context"
 	"encoding/base64"
 	"fmt"
 	"net/http"
+	"os"
+	"os/signal"
 	"sync"
+	"syscall"
 	"time"
 
 	"github.com/newrelic/newrelic-lambda-extension/checks"
@@ -21,6 +25,17 @@ import (
 func main() {
 	extensionStartup := time.Now()
 
+	ctx, cancel := context.WithCancel(context.Background())
+
+	// exit cleanly on SIGTERM or SIGINT
+	sigs := make(chan os.Signal, 1)
+	signal.Notify(sigs, syscall.SIGTERM, syscall.SIGINT)
+	go func() {
+		s := <-sigs
+		cancel()
+		util.Logf("Received %v Exiting", s)
+	}()
+
 	// Parse various env vars for our config
 	conf := config.ConfigurationFromEnvironment()
 
@@ -28,27 +43,29 @@ func main() {
 
 	// Extensions must register
 	registrationClient := client.New(http.Client{})
+
 	regReq := api.RegistrationRequest{
 		Events: []api.LifecycleEvent{api.Invoke, api.Shutdown},
 	}
 
-	invocationClient, registrationResponse, err := registrationClient.Register(regReq)
+	invocationClient, registrationResponse, err := registrationClient.Register(ctx, regReq)
 	if err != nil {
 		util.Fatal(err)
 	}
 
+	// If extension disabled, go into no op mode
 	if !conf.ExtensionEnabled {
 		util.Logln("Extension telemetry processing disabled")
-		noopLoop(invocationClient)
+		noopLoop(ctx, invocationClient)
 		return
 	}
 
 	// Attempt to find the license key for telemetry sending
-	licenseKey, err := credentials.GetNewRelicLicenseKey(&conf)
+	licenseKey, err := credentials.GetNewRelicLicenseKey(ctx, &conf)
 	if err != nil {
-		util.Logln("Failed to retrieve license key", err)
+		util.Logln("Failed to retrieve New Relic license key", err)
 		// We fail open; telemetry will go to CloudWatch instead
-		noopLoop(invocationClient)
+		noopLoop(ctx, invocationClient)
 		return
 	}
 
@@ -59,21 +76,22 @@ func main() {
 	logServer, err := logserver.Start()
 	if err != nil {
 		util.Logln("Failed to start logs HTTP server", err)
-		err = invocationClient.InitError("logServer.start", err)
+		err = invocationClient.InitError(ctx, "logServer.start", err)
 		if err != nil {
 			util.Fatal(err)
 		}
 		return
 	}
+
 	eventTypes := []api.LogEventType{api.Platform}
 	if conf.SendFunctionLogs {
 		eventTypes = append(eventTypes, api.Function)
 	}
 	subscriptionRequest := api.DefaultLogSubscription(eventTypes, logServer.Port())
-	err = invocationClient.LogRegister(&subscriptionRequest)
+	err = invocationClient.LogRegister(ctx, &subscriptionRequest)
 	if err != nil {
 		util.Logln("Failed to register with Logs API", err)
-		err = invocationClient.InitError("logServer.register", err)
+		err = invocationClient.InitError(ctx, "logServer.register", err)
 		if err != nil {
 			util.Fatal(err)
 		}
@@ -82,14 +100,14 @@ func main() {
 
 	// Init the telemetry sending client
 	telemetryClient := telemetry.New(registrationResponse.FunctionName, licenseKey, conf.TelemetryEndpoint, conf.LogEndpoint)
-
 	telemetryChan, err := telemetry.InitTelemetryChannel()
 	if err != nil {
 		util.Fatal("telemetry pipe init failed: ", err)
 	}
 
+	// Run startup checks
 	go func() {
-		checks.RunChecks(&conf, registrationResponse, telemetryClient)
+		checks.RunChecks(ctx, &conf, registrationResponse, telemetryClient)
 	}()
 
 	// Send function logs as they arrive. When disabled, function logs aren't delivered to the extension.
@@ -97,11 +115,11 @@ func main() {
 	go func() {
 		backgroundTasks.Add(1)
 		defer backgroundTasks.Done()
-		functionLogShipLoop(logServer, telemetryClient)
+		functionLogShipLoop(ctx, logServer, telemetryClient)
 	}()
 
 	// Call next, and process telemetry, until we're shut down
-	mainLoop(invocationClient, &batch, telemetryChan, logServer, telemetryClient)
+	mainLoop(ctx, invocationClient, &batch, telemetryChan, logServer, telemetryClient)
 
 	util.Debugln("Waiting for background tasks to complete")
 	backgroundTasks.Wait()
@@ -112,13 +130,13 @@ func main() {
 }
 
 // functionLogShipLoop ships function logs to New Relic as they arrive.
-func functionLogShipLoop(logServer *logserver.LogServer, telemetryClient *telemetry.Client) {
+func functionLogShipLoop(ctx context.Context, logServer *logserver.LogServer, telemetryClient *telemetry.Client) {
 	for {
 		functionLogs, more := logServer.AwaitFunctionLogs()
 		if !more {
 			return
 		}
-		err := telemetryClient.SendFunctionLogs(functionLogs)
+		err := telemetryClient.SendFunctionLogs(ctx, functionLogs)
 		if err != nil {
 			util.Logf("Failed to send %d function logs", len(functionLogs))
 		}
@@ -126,7 +144,7 @@ func functionLogShipLoop(logServer *logserver.LogServer, telemetryClient *teleme
 }
 
 // mainLoop repeatedly calls the /next api, and processes telemetry and platform logs. The timing is rather complicated.
-func mainLoop(invocationClient *client.InvocationClient, batch *telemetry.Batch, telemetryChan chan []byte, logServer *logserver.LogServer, telemetryClient *telemetry.Client) {
+func mainLoop(ctx context.Context, invocationClient *client.InvocationClient, batch *telemetry.Batch, telemetryChan chan []byte, logServer *logserver.LogServer, telemetryClient *telemetry.Client) {
 	counter := 0
 	var invokedFunctionARN string
 	var lastRequestId string
@@ -134,11 +152,11 @@ func mainLoop(invocationClient *client.InvocationClient, batch *telemetry.Batch,
 	probablyTimeout := false
 	for {
 		// Our call to next blocks. It is likely that the container is frozen immediately after we call NextEvent.
-		event, err := invocationClient.NextEvent()
+		event, err := invocationClient.NextEvent(ctx)
 		// We've thawed.
 		eventStart := time.Now()
 		if err != nil {
-			errErr := invocationClient.ExitError("NextEventError.Main", err)
+			errErr := invocationClient.ExitError(ctx, "NextEventError.Main", err)
 			if errErr != nil {
 				util.Logln(errErr)
 			}
@@ -184,6 +202,7 @@ func mainLoop(invocationClient *client.InvocationClient, batch *telemetry.Batch,
 
 		invokedFunctionARN = event.InvokedFunctionARN
 		lastRequestId = event.RequestID
+
 		// Create an invocation record to hold telemetry
 		batch.AddInvocation(lastRequestId, eventStart)
 
@@ -191,9 +210,11 @@ func mainLoop(invocationClient *client.InvocationClient, batch *telemetry.Batch,
 		// timeoutInstant is when the invocation will time out
 		timeoutInstant := time.Unix(0, event.DeadlineMs*int64(time.Millisecond))
 
-		// Set the timeout timer for a smidge before the actual timeout; we can recover from early.
+		// Set the timeout timer for a smidge before the actual timeout;
+		// we can recover from early.
 		timeoutWatchBegins := time.Millisecond * 100
 		timeout := time.NewTimer(timeoutInstant.Sub(time.Now()) - timeoutWatchBegins)
+
 		select {
 		case telemetryBytes := <-telemetryChan:
 			// We received telemetry
@@ -208,9 +229,8 @@ func mainLoop(invocationClient *client.InvocationClient, batch *telemetry.Batch,
 			}
 
 			pollLogServer(logServer, batch)
-
 			harvested := batch.Harvest(time.Now())
-			shipHarvest(harvested, telemetryClient, invokedFunctionARN)
+			shipHarvest(ctx, harvested, telemetryClient, invokedFunctionARN)
 		case <-timeout.C:
 			// Function is timing out
 			util.Debugln("Timeout suspected")
@@ -227,7 +247,7 @@ func mainLoop(invocationClient *client.InvocationClient, batch *telemetry.Batch,
 
 	pollLogServer(logServer, batch)
 	finalHarvest := batch.Close()
-	shipHarvest(finalHarvest, telemetryClient, invokedFunctionARN)
+	shipHarvest(ctx, finalHarvest, telemetryClient, invokedFunctionARN)
 }
 
 // pollLogServer polls for platform logs, and annotates telemetry
@@ -240,25 +260,25 @@ func pollLogServer(logServer *logserver.LogServer, batch *telemetry.Batch) {
 	}
 }
 
-func shipHarvest(harvested []*telemetry.Invocation, telemetryClient *telemetry.Client, invokedFunctionARN string) {
+func shipHarvest(ctx context.Context, harvested []*telemetry.Invocation, telemetryClient *telemetry.Client, invokedFunctionARN string) {
 	if len(harvested) > 0 {
 		telemetrySlice := make([][]byte, 0, 2*len(harvested))
 		for _, inv := range harvested {
 			telemetrySlice = append(telemetrySlice, inv.Telemetry...)
 		}
 
-		err, _ := telemetryClient.SendTelemetry(invokedFunctionARN, telemetrySlice)
+		err, _ := telemetryClient.SendTelemetry(ctx, invokedFunctionARN, telemetrySlice)
 		if err != nil {
 			util.Logf("Failed to send harvested telemetry for %d invocations %s", len(harvested), err)
 		}
 	}
 }
 
-func noopLoop(invocationClient *client.InvocationClient) {
+func noopLoop(ctx context.Context, invocationClient *client.InvocationClient) {
 	for {
-		event, err := invocationClient.NextEvent()
+		event, err := invocationClient.NextEvent(ctx)
 		if err != nil {
-			errErr := invocationClient.ExitError("NextEventError.Noop", err)
+			errErr := invocationClient.ExitError(ctx, "NextEventError.Noop", err)
 			if errErr != nil {
 				util.Logln(errErr)
 			}

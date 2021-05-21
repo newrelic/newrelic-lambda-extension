@@ -1,6 +1,7 @@
 package client
 
 import (
+	"context"
 	"encoding/json"
 	"io/ioutil"
 	"net/http"
@@ -38,7 +39,8 @@ func TestRegistrationClient_GetRegisterURL(t *testing.T) {
 
 func TestRegistrationClient_RegisterDefault(t *testing.T) {
 	rc := RegistrationClient{}
-	ic, res, err := rc.RegisterDefault()
+	ctx := context.Background()
+	ic, res, err := rc.RegisterDefault(ctx)
 	assert.Nil(t, ic)
 	assert.Nil(t, res)
 	assert.Error(t, err)
@@ -70,7 +72,7 @@ func TestRegistrationClient_RegisterDefault(t *testing.T) {
 	defer os.Unsetenv(api.LambdaHostPortEnvVar)
 
 	client := New(*srv.Client())
-	invocationClient, rr, err := client.RegisterDefault()
+	invocationClient, rr, err := client.RegisterDefault(ctx)
 
 	assert.NoError(t, err)
 	assert.Equal(t, "test-ext-id", invocationClient.extensionId)
@@ -107,7 +109,8 @@ func TestInvocationClient_NextEvent(t *testing.T) {
 		httpClient:  *srv.Client(),
 		extensionId: "test-ext-id",
 	}
-	invocationEvent, err := client.NextEvent()
+	ctx := context.Background()
+	invocationEvent, err := client.NextEvent(ctx)
 
 	assert.NoError(t, err)
 	assert.NotNil(t, invocationEvent)

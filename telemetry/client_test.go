@@ -1,6 +1,7 @@
 package telemetry
 
 import (
+	"context"
 	"encoding/json"
 	"io/ioutil"
 	"net/http"
@@ -43,8 +44,9 @@ func TestClientSend(t *testing.T) {
 
 	client := NewWithHTTPClient(srv.Client(), "", "a mock license key", srv.URL, srv.URL)
 
+	ctx := context.Background()
 	bytes := []byte("foobar")
-	err, successCount := client.SendTelemetry("arn:aws:lambda:us-east-1:1234:function:newrelic-example-go", [][]byte{bytes})
+	err, successCount := client.SendTelemetry(ctx, "arn:aws:lambda:us-east-1:1234:function:newrelic-example-go", [][]byte{bytes})
 
 	assert.NoError(t, err)
 	assert.Equal(t, 1, successCount)
@@ -93,8 +95,9 @@ func TestClientSendRetry(t *testing.T) {
 	httpClient.Timeout = 200 * time.Millisecond
 	client := NewWithHTTPClient(httpClient, "", "a mock license key", srv.URL, srv.URL)
 
+	ctx := context.Background()
 	bytes := []byte("foobar")
-	err, successCount := client.SendTelemetry("arn:aws:lambda:us-east-1:1234:function:newrelic-example-go", [][]byte{bytes})
+	err, successCount := client.SendTelemetry(ctx, "arn:aws:lambda:us-east-1:1234:function:newrelic-example-go", [][]byte{bytes})
 
 	assert.NoError(t, err)
 	assert.Equal(t, 1, successCount)
@@ -114,12 +117,28 @@ func TestClientSendOutOfRetries(t *testing.T) {
 	httpClient.Timeout = 200 * time.Millisecond
 	client := NewWithHTTPClient(httpClient, "", "a mock license key", srv.URL, srv.URL)
 
+	ctx := context.Background()
 	bytes := []byte("foobar")
-	err, successCount := client.SendTelemetry("arn:aws:lambda:us-east-1:1234:function:newrelic-example-go", [][]byte{bytes})
+	err, successCount := client.SendTelemetry(ctx, "arn:aws:lambda:us-east-1:1234:function:newrelic-example-go", [][]byte{bytes})
 
 	assert.NoError(t, err)
 	assert.Equal(t, 0, successCount)
 	assert.Equal(t, int32(retries), atomic.LoadInt32(&count))
+}
+
+func TestClientUnreachableEndpoint(t *testing.T) {
+	httpClient := &http.Client{
+		Timeout: time.Millisecond * 1,
+	}
+
+	client := NewWithHTTPClient(httpClient, "", "a mock license key", "http://10.123.123.123:12345", "http://10.123.123.123:12345")
+
+	ctx := context.Background()
+	bytes := []byte("foobar")
+	err, successCount := client.SendTelemetry(ctx, "arn:aws:lambda:us-east-1:1234:function:newrelic-example-go", [][]byte{bytes})
+
+	assert.Nil(t, err)
+	assert.Equal(t, 0, successCount)
 }
 
 func TestGetInfraEndpointURL(t *testing.T) {

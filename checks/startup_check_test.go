@@ -1,6 +1,7 @@
 package checks
 
 import (
+	"context"
 	"fmt"
 	"testing"
 
@@ -14,7 +15,7 @@ type TestLogSender struct {
 	sent []logserver.LogLine
 }
 
-func (c *TestLogSender) SendFunctionLogs(lines []logserver.LogLine) error {
+func (c *TestLogSender) SendFunctionLogs(ctx context.Context, lines []logserver.LogLine) error {
 	c.sent = append(c.sent, lines...)
 	return nil
 }
@@ -24,14 +25,15 @@ func TestRunCheck(t *testing.T) {
 	resp := api.RegistrationResponse{}
 	r := runtimeConfig{}
 	client := TestLogSender{}
+	ctx := context.Background()
 
 	tested := false
-	testCheck := func(conf *config.Configuration, resp *api.RegistrationResponse, r runtimeConfig) error {
+	testCheck := func(ctx context.Context, conf *config.Configuration, resp *api.RegistrationResponse, r runtimeConfig) error {
 		tested = true
 		return nil
 	}
 
-	result := runCheck(&conf, &resp, r, &client, testCheck)
+	result := runCheck(ctx, &conf, &resp, r, &client, testCheck)
 
 	assert.Equal(t, true, tested)
 	assert.Nil(t, result)
@@ -42,14 +44,15 @@ func TestRunCheckErr(t *testing.T) {
 	resp := api.RegistrationResponse{}
 	r := runtimeConfig{}
 	logSender := TestLogSender{}
+	ctx := context.Background()
 
 	tested := false
-	testCheck := func(conf *config.Configuration, resp *api.RegistrationResponse, r runtimeConfig) error {
+	testCheck := func(ctx context.Context, conf *config.Configuration, resp *api.RegistrationResponse, r runtimeConfig) error {
 		tested = true
 		return fmt.Errorf("Failure Test")
 	}
 
-	result := runCheck(&conf, &resp, r, &logSender, testCheck)
+	result := runCheck(ctx, &conf, &resp, r, &logSender, testCheck)
 
 	assert.Equal(t, true, tested)
 	assert.NotNil(t, result)
@@ -64,5 +67,6 @@ func TestRunChecks(t *testing.T) {
 
 	client = &mockClientError{}
 
-	RunChecks(c, r, l)
+	ctx := context.Background()
+	RunChecks(ctx, c, r, l)
 }

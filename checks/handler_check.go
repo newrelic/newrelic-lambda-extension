@@ -1,6 +1,7 @@
 package checks
 
 import (
+	"context"
 	"fmt"
 	"strings"
 
@@ -16,7 +17,7 @@ type handlerConfigs struct {
 
 var handlerPath = "/var/task"
 
-func checkHandler(conf *config.Configuration, reg *api.RegistrationResponse, r runtimeConfig) error {
+func handlerCheck(ctx context.Context, conf *config.Configuration, reg *api.RegistrationResponse, r runtimeConfig) error {
 	if r.language != "" {
 		h := handlerConfigs{
 			handlerName: reg.Handler,

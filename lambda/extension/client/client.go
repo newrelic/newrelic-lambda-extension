@@ -6,6 +6,7 @@ package client
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -57,20 +58,20 @@ func (rc *RegistrationClient) getRegisterURL() string {
 }
 
 // RegisterDefault registers for Invoke and Shutdown events, with no configuration parameters.
-func (rc *RegistrationClient) RegisterDefault() (*InvocationClient, *api.RegistrationResponse, error) {
+func (rc *RegistrationClient) RegisterDefault(ctx context.Context) (*InvocationClient, *api.RegistrationResponse, error) {
 	defaultEvents := []api.LifecycleEvent{api.Invoke, api.Shutdown}
 	defaultRequest := api.RegistrationRequest{Events: defaultEvents}
-	return rc.Register(defaultRequest)
+	return rc.Register(ctx, defaultRequest)
 }
 
 // Register registers, with custom registration parameters.
-func (rc *RegistrationClient) Register(registrationRequest api.RegistrationRequest) (*InvocationClient, *api.RegistrationResponse, error) {
+func (rc *RegistrationClient) Register(ctx context.Context, registrationRequest api.RegistrationRequest) (*InvocationClient, *api.RegistrationResponse, error) {
 	registrationRequestJson, err := json.Marshal(registrationRequest)
 	if err != nil {
 		return nil, nil, fmt.Errorf("error occurred while marshaling registration request %s", err)
 	}
 
-	req, err := http.NewRequest("POST", rc.getRegisterURL(), bytes.NewBuffer(registrationRequestJson))
+	req, err := http.NewRequestWithContext(ctx, "POST", rc.getRegisterURL(), bytes.NewBuffer(registrationRequestJson))
 	if err != nil {
 		return nil, nil, fmt.Errorf("error occurred while creating registration request %s", err)
 	}
@@ -110,22 +111,23 @@ func (ic *InvocationClient) getNextEventURL() string {
 	return fmt.Sprintf("http://%s/%s/extension/event/next", ic.baseUrl, ic.version)
 }
 
-// getInitErrorURL returns the Lambda Extension next event URL
+// getInitErrorURL returns the Lambda Extension initialization error URL
 func (ic *InvocationClient) getInitErrorURL() string {
 	return fmt.Sprintf("http://%s/%s/extension/init/error", ic.baseUrl, ic.version)
 }
 
-// getExitErrorURL returns the Lambda Extension next event URL
+// getExitErrorURL returns the Lambda exit error URL
 func (ic *InvocationClient) getExitErrorURL() string {
 	return fmt.Sprintf("http://%s/%s/extension/exit/error", ic.baseUrl, ic.version)
 }
 
+// getLogRegistrationURL returns the Lambda Log Registration URL
 func (ic *InvocationClient) getLogRegistrationURL() string {
 	return fmt.Sprintf("http://%s/%s/logs", ic.baseUrl, api.LogsApiVersion)
 }
 
 // LogRegister registers for log events
-func (ic *InvocationClient) LogRegister(subscriptionRequest *api.LogSubscription) error {
+func (ic *InvocationClient) LogRegister(ctx context.Context, subscriptionRequest *api.LogSubscription) error {
 	subscriptionRequestJson, err := json.Marshal(subscriptionRequest)
 	if err != nil {
 		return fmt.Errorf("error occurred while marshaling subscription request %s", err)
@@ -133,7 +135,7 @@ func (ic *InvocationClient) LogRegister(subscriptionRequest *api.LogSubscription
 
 	util.Debugln("Log registration with request ", string(subscriptionRequestJson))
 
-	req, err := http.NewRequest("PUT", ic.getLogRegistrationURL(), bytes.NewBuffer(subscriptionRequestJson))
+	req, err := http.NewRequestWithContext(ctx, "PUT", ic.getLogRegistrationURL(), bytes.NewBuffer(subscriptionRequestJson))
 	if err != nil {
 		return fmt.Errorf("error occurred while creating subscription request %s", err)
 	}
@@ -158,8 +160,8 @@ func (ic *InvocationClient) LogRegister(subscriptionRequest *api.LogSubscription
 }
 
 // NextEvent awaits the next event.
-func (ic *InvocationClient) NextEvent() (*api.InvocationEvent, error) {
-	req, err := http.NewRequest("GET", ic.getNextEventURL(), nil)
+func (ic *InvocationClient) NextEvent(ctx context.Context) (*api.InvocationEvent, error) {
+	req, err := http.NewRequestWithContext(ctx, "GET", ic.getNextEventURL(), nil)
 	if err != nil {
 		return nil, fmt.Errorf("error occurred when creating next request %s", err)
 	}
@@ -187,9 +189,10 @@ func (ic *InvocationClient) NextEvent() (*api.InvocationEvent, error) {
 	return &event, nil
 }
 
-func (ic *InvocationClient) InitError(errorEnum string, initError error) error {
+// InitError sends an initialization error to the lambda platform
+func (ic *InvocationClient) InitError(ctx context.Context, errorEnum string, initError error) error {
 	errorBuf := bytes.NewBufferString(initError.Error())
-	req, err := http.NewRequest("POST", ic.getInitErrorURL(), errorBuf)
+	req, err := http.NewRequestWithContext(ctx, "POST", ic.getInitErrorURL(), errorBuf)
 	if err != nil {
 		return fmt.Errorf("error occurred when creating init error request %s", err)
 	}
@@ -207,9 +210,10 @@ func (ic *InvocationClient) InitError(errorEnum string, initError error) error {
 	return nil
 }
 
-func (ic *InvocationClient) ExitError(errorEnum string, exitError error) error {
+// ExitError sends an exit error to the lambda platform
+func (ic *InvocationClient) ExitError(ctx context.Context, errorEnum string, exitError error) error {
 	errorBuf := bytes.NewBufferString(exitError.Error())
-	req, err := http.NewRequest("POST", ic.getExitErrorURL(), errorBuf)
+	req, err := http.NewRequestWithContext(ctx, "POST", ic.getExitErrorURL(), errorBuf)
 	if err != nil {
 		return fmt.Errorf("error occurred when creating exit error request %s", err)
 	}

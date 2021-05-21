@@ -1,6 +1,7 @@
 package checks
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 	"testing"
@@ -14,9 +15,10 @@ func TestAgentVersion(t *testing.T) {
 	conf := config.Configuration{}
 	reg := api.RegistrationResponse{}
 	r := runtimeConfig{}
+	ctx := context.Background()
 
 	// No version set
-	err := agentVersionCheck(&conf, &reg, r)
+	err := agentVersionCheck(ctx, &conf, &reg, r)
 	assert.Nil(t, err)
 
 	// Error
@@ -33,11 +35,11 @@ func TestAgentVersion(t *testing.T) {
 	f, _ := os.Create(filepath.Join(testFile, r.agentVersionFile))
 	f.WriteString("10.1.0")
 
-	err = agentVersionCheck(&conf, &reg, r)
+	err = agentVersionCheck(ctx, &conf, &reg, r)
 	assert.EqualError(t, err, "Agent version out of date: v10.1.0, in order access up to date features please upgrade to the latest New Relic python layer that includes agent version v10.1.2")
 
 	// Success
 	r.AgentVersion = "10.1.0"
-	err = agentVersionCheck(&conf, &reg, r)
+	err = agentVersionCheck(ctx, &conf, &reg, r)
 	assert.Nil(t, err)
 }

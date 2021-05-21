@@ -1,6 +1,7 @@
 package checks
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 	"testing"
@@ -57,15 +58,16 @@ func TestHandlerCheck(t *testing.T) {
 	conf := config.Configuration{}
 	reg := api.RegistrationResponse{}
 	r := runtimeConfigs[Node]
+	ctx := context.Background()
 
 	// No Runtime
-	err := checkHandler(&conf, &reg, runtimeConfig{})
+	err := handlerCheck(ctx, &conf, &reg, runtimeConfig{})
 	assert.Nil(t, err)
 
 	// Error
 	reg.Handler = testHandler
 	conf.NRHandler = config.EmptyNRWrapper
-	err = checkHandler(&conf, &reg, r)
+	err = handlerCheck(ctx, &conf, &reg, r)
 	assert.EqualError(t, err, "Missing handler file path/to/app.handler (NEW_RELIC_LAMBDA_HANDLER=Undefined)")
 
 	// Success
@@ -79,6 +81,6 @@ func TestHandlerCheck(t *testing.T) {
 
 	reg.Handler = testHandler
 	conf.NRHandler = config.EmptyNRWrapper
-	err = checkHandler(&conf, &reg, r)
+	err = handlerCheck(ctx, &conf, &reg, r)
 	assert.Nil(t, err)
 }

@@ -2,6 +2,7 @@ package telemetry
 
 import (
 	"bytes"
+	"context"
 	"io/ioutil"
 	"net/http"
 	"net/url"
@@ -78,7 +79,7 @@ func getLogEndpointURL(licenseKey string, logEndpointOverride string) string {
 	return LogEndpointUS
 }
 
-func (c *Client) SendTelemetry(invokedFunctionARN string, telemetry [][]byte) (error, int) {
+func (c *Client) SendTelemetry(ctx context.Context, invokedFunctionARN string, telemetry [][]byte) (error, int) {
 	start := time.Now()
 	logEvents := make([]LogsEvent, 0, len(telemetry))
 	for _, payload := range telemetry {
@@ -92,7 +93,7 @@ func (c *Client) SendTelemetry(invokedFunctionARN string, telemetry [][]byte) (e
 	}
 
 	var builder requestBuilder = func(buffer *bytes.Buffer) (*http.Request, error) {
-		return BuildVortexRequest(c.telemetryEndpoint, buffer, util.Name, c.licenseKey)
+		return BuildVortexRequest(ctx, c.telemetryEndpoint, buffer, util.Name, c.licenseKey)
 	}
 
 	transmitStart := time.Now()
@@ -179,7 +180,7 @@ func (c *Client) sendPayloads(compressedPayloads []*bytes.Buffer, builder reques
 	return successCount, sentBytes, nil
 }
 
-func (c *Client) SendFunctionLogs(lines []logserver.LogLine) error {
+func (c *Client) SendFunctionLogs(ctx context.Context, lines []logserver.LogLine) error {
 	start := time.Now()
 
 	common := map[string]interface{}{
@@ -204,7 +205,7 @@ func (c *Client) SendFunctionLogs(lines []logserver.LogLine) error {
 	compressedPayloads := []*bytes.Buffer{compressedPayload}
 
 	var builder requestBuilder = func(buffer *bytes.Buffer) (*http.Request, error) {
-		req, err := BuildVortexRequest(c.logEndpoint, buffer, util.Name, c.licenseKey)
+		req, err := BuildVortexRequest(ctx, c.logEndpoint, buffer, util.Name, c.licenseKey)
 		if err != nil {
 			return nil, err
 		}

@@ -1,6 +1,7 @@
 package credentials
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -56,11 +57,11 @@ func decodeLicenseKey(rawJson *string) (string, error) {
 
 // IsSecretConfigured returns true if the Secrets Maanger secret is configured, false
 // otherwise
-func IsSecretConfigured(conf *config.Configuration) bool {
+func IsSecretConfigured(ctx context.Context, conf *config.Configuration) bool {
 	secretId := getLicenseKeySecretId(conf)
 	secretValueInput := secretsmanager.GetSecretValueInput{SecretId: &secretId}
 
-	_, err := secrets.GetSecretValue(&secretValueInput)
+	_, err := secrets.GetSecretValueWithContext(ctx, &secretValueInput)
 	if err != nil {
 		return false
 	}
@@ -70,7 +71,7 @@ func IsSecretConfigured(conf *config.Configuration) bool {
 
 // GetNewRelicLicenseKey fetches the license key from AWS Secrets Manager, falling back
 // to the NEW_RELIC_LICENSE_KEY environment variable if set.
-func GetNewRelicLicenseKey(conf *config.Configuration) (string, error) {
+func GetNewRelicLicenseKey(ctx context.Context, conf *config.Configuration) (string, error) {
 	if conf.LicenseKey != "" {
 		util.Logln("Using license key from environment variable")
 		return conf.LicenseKey, nil
@@ -79,7 +80,7 @@ func GetNewRelicLicenseKey(conf *config.Configuration) (string, error) {
 	secretId := getLicenseKeySecretId(conf)
 	secretValueInput := secretsmanager.GetSecretValueInput{SecretId: &secretId}
 
-	secretValueOutput, err := secrets.GetSecretValue(&secretValueInput)
+	secretValueOutput, err := secrets.GetSecretValueWithContext(ctx, &secretValueInput)
 	if err != nil {
 		envLicenseKey, found := os.LookupEnv(defaultSecretId)
 		if found {

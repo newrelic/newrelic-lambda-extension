@@ -22,10 +22,13 @@ import (
 	"github.com/newrelic/newrelic-lambda-extension/telemetry"
 )
 
+var eventCounter int64
+
 func main() {
 	extensionStartup := time.Now()
 
 	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 
 	// exit cleanly on SIGTERM or SIGINT
 	sigs := make(chan os.Signal, 1)
@@ -39,6 +42,7 @@ func main() {
 	// Parse various env vars for our config
 	conf := config.ConfigurationFromEnvironment()
 
+	// Optionally enable debug logging, disabled by default
 	util.ConfigLogger(conf.LogLevel == config.DebugLogLevel)
 
 	// Extensions must register
@@ -80,8 +84,18 @@ func main() {
 		if err != nil {
 			util.Fatal(err)
 		}
+		// We fail open; telemetry will go to CloudWatch instead
+		noopLoop(ctx, invocationClient)
 		return
 	}
+
+	defer func() {
+		util.Logf("New Relic Extension shutting down after %v events\n", eventCounter)
+		err := logServer.Close()
+		if err != nil {
+			util.Logln("Error shutting down Log API server", err)
+		}
+	}()
 
 	eventTypes := []api.LogEventType{api.Platform}
 	if conf.SendFunctionLogs {
@@ -95,6 +109,8 @@ func main() {
 		if err != nil {
 			util.Fatal(err)
 		}
+		// We fail open; telemetry will go to CloudWatch instead
+		noopLoop(ctx, invocationClient)
 		return
 	}
 
@@ -112,14 +128,15 @@ func main() {
 
 	// Send function logs as they arrive. When disabled, function logs aren't delivered to the extension.
 	var backgroundTasks sync.WaitGroup
+
 	go func() {
 		backgroundTasks.Add(1)
 		defer backgroundTasks.Done()
-		functionLogShipLoop(ctx, logServer, telemetryClient)
+		logShipLoop(ctx, logServer, telemetryClient)
 	}()
 
 	// Call next, and process telemetry, until we're shut down
-	mainLoop(ctx, cancel, invocationClient, &batch, telemetryChan, logServer, telemetryClient)
+	mainLoop(ctx, invocationClient, &batch, telemetryChan, logServer, telemetryClient)
 
 	util.Debugln("Waiting for background tasks to complete")
 	backgroundTasks.Wait()
@@ -129,13 +146,14 @@ func main() {
 	util.Logf("Extension shutdown after %vms", ranFor.Milliseconds())
 }
 
-// functionLogShipLoop ships function logs to New Relic as they arrive.
-func functionLogShipLoop(ctx context.Context, logServer *logserver.LogServer, telemetryClient *telemetry.Client) {
+// logShipLoop ships function logs to New Relic as they arrive.
+func logShipLoop(ctx context.Context, logServer *logserver.LogServer, telemetryClient *telemetry.Client) {
 	for {
 		functionLogs, more := logServer.AwaitFunctionLogs()
 		if !more {
 			return
 		}
+
 		err := telemetryClient.SendFunctionLogs(ctx, functionLogs)
 		if err != nil {
 			util.Logf("Failed to send %d function logs", len(functionLogs))
@@ -144,123 +162,116 @@ func functionLogShipLoop(ctx context.Context, logServer *logserver.LogServer, te
 }
 
 // mainLoop repeatedly calls the /next api, and processes telemetry and platform logs. The timing is rather complicated.
-func mainLoop(ctx context.Context, cancel context.CancelFunc, invocationClient *client.InvocationClient, batch *telemetry.Batch, telemetryChan chan []byte, logServer *logserver.LogServer, telemetryClient *telemetry.Client) {
-	counter := 0
-	var invokedFunctionARN string
-	var lastRequestId string
-	var lastEventStart time.Time
+func mainLoop(ctx context.Context, invocationClient *client.InvocationClient, batch *telemetry.Batch, telemetryChan chan []byte, logServer *logserver.LogServer, telemetryClient *telemetry.Client) {
+	var (
+		invokedFunctionARN string
+		lastEventStart     time.Time
+		lastRequestId      string
+	)
+
 	probablyTimeout := false
 
 	for {
-		// Our call to next blocks. It is likely that the container is frozen immediately after we call NextEvent.
-		event, err := invocationClient.NextEvent(ctx)
-
-		// We've thawed.
-		eventStart := time.Now()
-
-		if err != nil {
-			errErr := invocationClient.ExitError(ctx, "NextEventError.Main", err)
-			if errErr != nil {
-				util.Logln(errErr)
-			}
-			util.Fatal(err)
-		}
-
-		counter++
-
-		if probablyTimeout {
-			// We suspect a timeout. Either way, we've gotten to the next event, so telemetry will
-			// have arrived for the last request if it's going to. Non-blocking poll for telemetry.
-			// If we have indeed timed out, there's a chance we got telemetry out anyway. If we haven't
-			// timed out, this will catch us up to the current state of telemetry, allowing us to resume.
-			select {
-			case <-ctx.Done():
-				// We're already done
-				return
-			case telemetryBytes := <-telemetryChan:
-				// We received telemetry
-				batch.AddTelemetry(lastRequestId, telemetryBytes)
-				util.Logf("We suspected a timeout for request %s but got telemetry anyway", lastRequestId)
-			default:
-			}
-		}
-
-		if event.EventType == api.Shutdown {
-			if event.ShutdownReason == api.Timeout && lastRequestId != "" {
-				// Synthesize the timeout error message that the platform produces, and LLC parses
-				timestamp := eventStart.UTC()
-				timeoutSecs := eventStart.Sub(lastEventStart).Seconds()
-				timeoutMessage := fmt.Sprintf(
-					"%s %s Task timed out after %.2f seconds",
-					timestamp.Format(time.RFC3339),
-					lastRequestId,
-					timeoutSecs,
-				)
-				batch.AddTelemetry(lastRequestId, []byte(timeoutMessage))
-			} else if event.ShutdownReason == api.Failure && lastRequestId != "" {
-				// Synthesize a generic platform error. Probably an OOM, though it could be any runtime crash.
-				errorMessage := fmt.Sprintf("RequestId: %s A platform error caused a shutdown", lastRequestId)
-				batch.AddTelemetry(lastRequestId, []byte(errorMessage))
-			}
-
-			cancel()
-			break
-		}
-
-		invokedFunctionARN = event.InvokedFunctionARN
-		lastRequestId = event.RequestID
-
-		// Create an invocation record to hold telemetry
-		batch.AddInvocation(lastRequestId, eventStart)
-
-		// Await agent telemetry. This may time out, so we race the timeout against the telemetry channel
-		// timeoutInstant is when the invocation will time out
-		timeoutInstant := time.Unix(0, event.DeadlineMs*int64(time.Millisecond))
-
-		// Set the timeout timer for a smidge before the actual timeout;
-		// we can recover from early.
-		timeoutWatchBegins := time.Millisecond * 100
-		timeout := time.NewTimer(timeoutInstant.Sub(time.Now()) - timeoutWatchBegins)
-
 		select {
 		case <-ctx.Done():
-			// We're alreadydone
+			// We're already done
+			util.Logln(ctx.Err())
 			return
-		case telemetryBytes := <-telemetryChan:
-			// We received telemetry
-			util.Debugf("Agent telemetry bytes: %s", base64.URLEncoding.EncodeToString(telemetryBytes))
-			inv := batch.AddTelemetry(lastRequestId, telemetryBytes)
-			if inv == nil {
-				util.Logf("Failed to add telemetry for request %v", lastRequestId)
-			}
-			// Tear down the timer
-			if !timeout.Stop() {
-				<-timeout.C
+		default:
+			// Our call to next blocks. It is likely that the container is frozen immediately after we call NextEvent.
+			event, err := invocationClient.NextEvent(ctx)
+
+			// We've thawed.
+			eventStart := time.Now()
+
+			if err != nil {
+				errErr := invocationClient.ExitError(ctx, "NextEventError.Main", err)
+				if errErr != nil {
+					util.Logln(errErr)
+				}
+				util.Fatal(err)
 			}
 
-			pollLogServer(logServer, batch)
-			harvested := batch.Harvest(time.Now())
-			shipHarvest(ctx, harvested, telemetryClient, invokedFunctionARN)
-		case <-timeout.C:
-			// Function is timing out
-			util.Debugln("Timeout suspected")
-			probablyTimeout = true
-			cancel()
+			eventCounter++
+
+			if probablyTimeout {
+				// We suspect a timeout. Either way, we've gotten to the next event, so telemetry will
+				// have arrived for the last request if it's going to. Non-blocking poll for telemetry.
+				// If we have indeed timed out, there's a chance we got telemetry out anyway. If we haven't
+				// timed out, this will catch us up to the current state of telemetry, allowing us to resume.
+				select {
+				case telemetryBytes := <-telemetryChan:
+					// We received telemetry
+					batch.AddTelemetry(lastRequestId, telemetryBytes)
+					util.Logf("We suspected a timeout for request %s but got telemetry anyway", lastRequestId)
+				default:
+				}
+			}
+
+			if event.EventType == api.Shutdown {
+				if event.ShutdownReason == api.Timeout && lastRequestId != "" {
+					// Synthesize the timeout error message that the platform produces, and LLC parses
+					timestamp := eventStart.UTC()
+					timeoutSecs := eventStart.Sub(lastEventStart).Seconds()
+					timeoutMessage := fmt.Sprintf(
+						"%s %s Task timed out after %.2f seconds",
+						timestamp.Format(time.RFC3339),
+						lastRequestId,
+						timeoutSecs,
+					)
+					batch.AddTelemetry(lastRequestId, []byte(timeoutMessage))
+				} else if event.ShutdownReason == api.Failure && lastRequestId != "" {
+					// Synthesize a generic platform error. Probably an OOM, though it could be any runtime crash.
+					errorMessage := fmt.Sprintf("RequestId: %s A platform error caused a shutdown", lastRequestId)
+					batch.AddTelemetry(lastRequestId, []byte(errorMessage))
+				}
+
+				pollLogServer(logServer, batch)
+				finalHarvest := batch.Close()
+				shipHarvest(ctx, finalHarvest, telemetryClient, invokedFunctionARN)
+				break
+			}
+
+			invokedFunctionARN = event.InvokedFunctionARN
+			lastRequestId = event.RequestID
+
+			// Create an invocation record to hold telemetry
+			batch.AddInvocation(lastRequestId, eventStart)
+
+			// Await agent telemetry. This may time out
+			// timeoutInstant is when the invocation will time out
+			timeoutInstant := time.Unix(0, event.DeadlineMs*int64(time.Millisecond))
+
+			// Set the timeout timer for a smidge before the actual timeout;
+			// we can recover from early.
+			timeoutWatchBegins := time.Millisecond * 100
+			timeout := timeoutInstant.Sub(time.Now()) - timeoutWatchBegins
+
+			invCtx, cancel := context.WithTimeout(ctx, timeout)
+			defer cancel()
+
+			select {
+			case <-invCtx.Done():
+				// We are about to timeout
+				util.Debugln("Timeout suspected: ", invCtx.Err())
+				probablyTimeout = true
+				break
+			case telemetryBytes := <-telemetryChan:
+				// We received telemetry
+				util.Debugf("Agent telemetry bytes: %s", base64.URLEncoding.EncodeToString(telemetryBytes))
+				inv := batch.AddTelemetry(lastRequestId, telemetryBytes)
+				if inv == nil {
+					util.Logf("Failed to add telemetry for request %v", lastRequestId)
+				}
+
+				pollLogServer(logServer, batch)
+				harvested := batch.Harvest(time.Now())
+				shipHarvest(ctx, harvested, telemetryClient, invokedFunctionARN)
+			}
+
+			lastEventStart = eventStart
 		}
-
-		lastEventStart = eventStart
 	}
-
-	util.Logf("New Relic Extension shutting down after %v events\n", counter)
-
-	err := logServer.Close()
-	if err != nil {
-		util.Logln("Error shutting down Log API server", err)
-	}
-
-	pollLogServer(logServer, batch)
-	finalHarvest := batch.Close()
-	shipHarvest(ctx, finalHarvest, telemetryClient, invokedFunctionARN)
 }
 
 // pollLogServer polls for platform logs, and annotates telemetry

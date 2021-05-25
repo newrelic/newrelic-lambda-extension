@@ -5,6 +5,7 @@ go 1.14
 require (
 	github.com/aws/aws-lambda-go v1.19.1 // indirect
 	github.com/aws/aws-sdk-go v1.34.21
+	github.com/foxcpp/go-mockdns v0.0.0-20201212160233-ede2f9158d15 // indirect
 	github.com/golang/protobuf v1.4.2 // indirect
 	github.com/google/uuid v1.1.2
 	github.com/newrelic/go-agent/v3 v3.9.0

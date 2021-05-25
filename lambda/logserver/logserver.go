@@ -6,6 +6,7 @@ import (
 	"io/ioutil"
 	"net"
 	"net/http"
+	"os"
 	"strconv"
 	"time"
 
@@ -49,6 +50,7 @@ func (ls *LogServer) Close() error {
 
 func (ls *LogServer) PollPlatformChannel() []LogLine {
 	var ret []LogLine
+
 	for {
 		select {
 		case report, more := <-ls.platformLogChan:
@@ -64,8 +66,12 @@ func (ls *LogServer) PollPlatformChannel() []LogLine {
 }
 
 func (ls *LogServer) AwaitFunctionLogs() ([]LogLine, bool) {
-	ll, more := <-ls.functionLogChan
-	return ll, more
+	select {
+	case ll, more := <-ls.functionLogChan:
+		return ll, more
+	default:
+		return nil, false
+	}
 }
 
 func formatReport(metrics map[string]interface{}) string {
@@ -95,6 +101,8 @@ func formatReport(metrics map[string]interface{}) string {
 }
 
 func (ls *LogServer) handler(res http.ResponseWriter, req *http.Request) {
+	defer util.Close(req.Body)
+
 	bodyBytes, err := ioutil.ReadAll(req.Body)
 	if err != nil {
 		util.Logf("Error processing log request: %v", err)
@@ -106,8 +114,10 @@ func (ls *LogServer) handler(res http.ResponseWriter, req *http.Request) {
 		util.Logf("Error parsing log payload: %v", err)
 	}
 
-	var functionLogs []LogLine
-	var lastRequestId string
+	var (
+		functionLogs  []LogLine
+		lastRequestId string
+	)
 
 	for _, event := range logEvents {
 		switch event.Type {
@@ -138,9 +148,10 @@ func (ls *LogServer) handler(res http.ResponseWriter, req *http.Request) {
 				Content:   []byte(record),
 			})
 		default:
-			//util.Logln("Ignored log event of type ", event.Type, string(bodyBytes))
+			util.Debugln("Ignored log event of type ", event.Type, string(bodyBytes))
 		}
 	}
+
 	if len(functionLogs) > 0 {
 		ls.functionLogChan <- functionLogs
 	}
@@ -149,7 +160,12 @@ func (ls *LogServer) handler(res http.ResponseWriter, req *http.Request) {
 }
 
 func Start() (*LogServer, error) {
-	return startInternal(defaultHost)
+	// This should only be used for testing purposes
+	host, hostOverride := os.LookupEnv("NEW_RELIC_LOG_SERVER_HOST_OVERRIDE")
+	if !hostOverride {
+		host = defaultHost
+	}
+	return startInternal(host)
 }
 
 func startInternal(host string) (*LogServer, error) {

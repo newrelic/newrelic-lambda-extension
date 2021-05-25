@@ -39,6 +39,16 @@ func main() {
 		util.Logf("Received %v Exiting", s)
 	}()
 
+	// Allow extension to be interrupted with CTRL-C
+	c := make(chan os.Signal, 1)
+	signal.Notify(c, os.Interrupt)
+	go func() {
+		for _ = range c {
+			cancel()
+			util.Fatal("Exiting...")
+		}
+	}()
+
 	// Parse various env vars for our config
 	conf := config.ConfigurationFromEnvironment()
 
@@ -54,7 +64,7 @@ func main() {
 
 	invocationClient, registrationResponse, err := registrationClient.Register(ctx, regReq)
 	if err != nil {
-		util.Fatal(err)
+		util.Panic(err)
 	}
 
 	// If extension disabled, go into no op mode
@@ -82,10 +92,8 @@ func main() {
 		util.Logln("Failed to start logs HTTP server", err)
 		err = invocationClient.InitError(ctx, "logServer.start", err)
 		if err != nil {
-			util.Fatal(err)
+			util.Panic(err)
 		}
-		// We fail open; telemetry will go to CloudWatch instead
-		noopLoop(ctx, invocationClient)
 		return
 	}
 
@@ -107,7 +115,7 @@ func main() {
 		util.Logln("Failed to register with Logs API", err)
 		err = invocationClient.InitError(ctx, "logServer.register", err)
 		if err != nil {
-			util.Fatal(err)
+			util.Panic(err)
 		}
 		// We fail open; telemetry will go to CloudWatch instead
 		noopLoop(ctx, invocationClient)
@@ -118,7 +126,7 @@ func main() {
 	telemetryClient := telemetry.New(registrationResponse.FunctionName, licenseKey, conf.TelemetryEndpoint, conf.LogEndpoint)
 	telemetryChan, err := telemetry.InitTelemetryChannel()
 	if err != nil {
-		util.Fatal("telemetry pipe init failed: ", err)
+		util.Panic("telemetry pipe init failed: ", err)
 	}
 
 	// Run startup checks
@@ -189,7 +197,7 @@ func mainLoop(ctx context.Context, invocationClient *client.InvocationClient, ba
 				if errErr != nil {
 					util.Logln(errErr)
 				}
-				util.Fatal(err)
+				util.Panic(err)
 			}
 
 			eventCounter++
@@ -229,7 +237,7 @@ func mainLoop(ctx context.Context, invocationClient *client.InvocationClient, ba
 				pollLogServer(logServer, batch)
 				finalHarvest := batch.Close()
 				shipHarvest(ctx, finalHarvest, telemetryClient, invokedFunctionARN)
-				break
+				return
 			}
 
 			invokedFunctionARN = event.InvokedFunctionARN
@@ -246,6 +254,7 @@ func mainLoop(ctx context.Context, invocationClient *client.InvocationClient, ba
 			// we can recover from early.
 			timeoutWatchBegins := time.Millisecond * 100
 			timeout := timeoutInstant.Sub(time.Now()) - timeoutWatchBegins
+			util.Debugf("Timeout in %v", timeout)
 
 			invCtx, cancel := context.WithTimeout(ctx, timeout)
 			defer cancel()
@@ -299,6 +308,8 @@ func shipHarvest(ctx context.Context, harvested []*telemetry.Invocation, telemet
 }
 
 func noopLoop(ctx context.Context, invocationClient *client.InvocationClient) {
+	util.Logln("Starting no-op mode")
+
 	for {
 		event, err := invocationClient.NextEvent(ctx)
 		if err != nil {
@@ -306,7 +317,7 @@ func noopLoop(ctx context.Context, invocationClient *client.InvocationClient) {
 			if errErr != nil {
 				util.Logln(errErr)
 			}
-			util.Fatal(err)
+			util.Panic(err)
 		}
 
 		if event.EventType == api.Shutdown {

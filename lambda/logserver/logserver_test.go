@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"log"
 	"net/http"
 	"testing"
 	"time"
@@ -13,15 +12,9 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func Test_Logserver(t *testing.T) {
+func TestLogServer(t *testing.T) {
 	logs, err := startInternal("localhost")
-	if err != nil {
-		log.Println("Failed to start logs HTTP server", err)
-		if err != nil {
-			log.Fatal(err)
-		}
-		return
-	}
+	assert.NoError(t, err)
 
 	testEvents := []api.LogEvent{
 		{
@@ -49,8 +42,8 @@ func Test_Logserver(t *testing.T) {
 
 	client := http.Client{}
 	res, err := client.Do(req)
-	assert.NoError(t, err)
 
+	assert.NoError(t, err)
 	assert.Equal(t, 200, res.StatusCode)
 	assert.Equal(t, http.NoBody, res.Body)
 

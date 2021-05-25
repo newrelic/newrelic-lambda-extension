@@ -85,10 +85,15 @@ func (rc *RegistrationClient) Register(ctx context.Context, registrationRequest 
 
 	defer util.Close(res.Body)
 
+	if res.StatusCode != http.StatusOK {
+		return nil, nil, fmt.Errorf("error occurred while making registration request: %s", res.Status)
+	}
+
 	bodyBytes, err := ioutil.ReadAll(res.Body)
 	if err != nil {
 		return nil, nil, err
 	}
+
 	util.Debugf("Registration response: %s", bodyBytes)
 
 	var registrationResponse api.RegistrationResponse
@@ -174,6 +179,10 @@ func (ic *InvocationClient) NextEvent(ctx context.Context) (*api.InvocationEvent
 	}
 
 	defer util.Close(res.Body)
+
+	if res.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("error occurred when calling extension/event/next: %s", res.Status)
+	}
 
 	body, err := ioutil.ReadAll(res.Body)
 	if err != nil {

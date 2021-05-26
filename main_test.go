@@ -36,8 +36,6 @@ func TestMainRegisterFail(t *testing.T) {
 
 func TestMain(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		util.Logln(r.URL.Path)
-
 		defer util.Close(r.Body)
 
 		if r.URL.Path == "/2020-01-01/extension/register" {

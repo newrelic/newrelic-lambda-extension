@@ -66,12 +66,8 @@ func (ls *LogServer) PollPlatformChannel() []LogLine {
 }
 
 func (ls *LogServer) AwaitFunctionLogs() ([]LogLine, bool) {
-	select {
-	case ll, more := <-ls.functionLogChan:
-		return ll, more
-	default:
-		return nil, false
-	}
+	ll, more := <-ls.functionLogChan
+	return ll, more
 }
 
 func formatReport(metrics map[string]interface{}) string {

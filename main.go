@@ -97,14 +97,6 @@ func main() {
 		return
 	}
 
-	defer func() {
-		util.Logf("New Relic Extension shutting down after %v events\n", eventCounter)
-		err := logServer.Close()
-		if err != nil {
-			util.Logln("Error shutting down Log API server", err)
-		}
-	}()
-
 	eventTypes := []api.LogEventType{api.Platform}
 	if conf.SendFunctionLogs {
 		eventTypes = append(eventTypes, api.Function)
@@ -145,6 +137,13 @@ func main() {
 
 	// Call next, and process telemetry, until we're shut down
 	mainLoop(ctx, invocationClient, &batch, telemetryChan, logServer, telemetryClient)
+
+	util.Logf("New Relic Extension shutting down after %v events\n", eventCounter)
+
+	err = logServer.Close()
+	if err != nil {
+		util.Logln("Error shutting down Log API server", err)
+	}
 
 	util.Debugln("Waiting for background tasks to complete")
 	backgroundTasks.Wait()

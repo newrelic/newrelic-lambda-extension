@@ -154,6 +154,10 @@ func (ic *InvocationClient) LogRegister(ctx context.Context, subscriptionRequest
 
 	defer util.Close(res.Body)
 
+	if res.StatusCode != http.StatusOK {
+		return fmt.Errorf("error occurred while making log subscription request: %s", res.Status)
+	}
+
 	responseBody, err := ioutil.ReadAll(res.Body)
 	if err != nil {
 		return err
@@ -201,6 +205,7 @@ func (ic *InvocationClient) NextEvent(ctx context.Context) (*api.InvocationEvent
 // InitError sends an initialization error to the lambda platform
 func (ic *InvocationClient) InitError(ctx context.Context, errorEnum string, initError error) error {
 	errorBuf := bytes.NewBufferString(initError.Error())
+
 	req, err := http.NewRequestWithContext(ctx, "POST", ic.getInitErrorURL(), errorBuf)
 	if err != nil {
 		return fmt.Errorf("error occurred when creating init error request %s", err)

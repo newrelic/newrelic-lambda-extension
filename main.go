@@ -22,8 +22,6 @@ import (
 	"github.com/newrelic/newrelic-lambda-extension/telemetry"
 )
 
-var eventCounter int64
-
 func main() {
 	extensionStartup := time.Now()
 
@@ -89,12 +87,11 @@ func main() {
 	// Start the Logs API server, and register it
 	logServer, err := logserver.Start()
 	if err != nil {
-		util.Logln("Failed to start logs HTTP server", err)
-		err = invocationClient.InitError(ctx, "logServer.start", err)
-		if err != nil {
-			util.Panic(err)
+		err2 := invocationClient.InitError(ctx, "logServer.start", err)
+		if err2 != nil {
+			util.Logln(err2)
 		}
-		return
+		util.Panic("Failed to start logs HTTP server", err)
 	}
 
 	eventTypes := []api.LogEventType{api.Platform}
@@ -104,20 +101,21 @@ func main() {
 	subscriptionRequest := api.DefaultLogSubscription(eventTypes, logServer.Port())
 	err = invocationClient.LogRegister(ctx, &subscriptionRequest)
 	if err != nil {
-		util.Logln("Failed to register with Logs API", err)
-		err = invocationClient.InitError(ctx, "logServer.register", err)
-		if err != nil {
-			util.Panic(err)
+		err2 := invocationClient.InitError(ctx, "logServer.register", err)
+		if err2 != nil {
+			util.Logln(err2)
 		}
-		// We fail open; telemetry will go to CloudWatch instead
-		noopLoop(ctx, invocationClient)
-		return
+		util.Panic("Failed to register with Logs API", err)
 	}
 
 	// Init the telemetry sending client
 	telemetryClient := telemetry.New(registrationResponse.FunctionName, licenseKey, conf.TelemetryEndpoint, conf.LogEndpoint)
 	telemetryChan, err := telemetry.InitTelemetryChannel()
 	if err != nil {
+		err2 := invocationClient.InitError(ctx, "telemetryClient.init", err)
+		if err2 != nil {
+			util.Logln(err2)
+		}
 		util.Panic("telemetry pipe init failed: ", err)
 	}
 
@@ -127,16 +125,16 @@ func main() {
 	}()
 
 	// Send function logs as they arrive. When disabled, function logs aren't delivered to the extension.
-	var backgroundTasks sync.WaitGroup
+	backgroundTasks := &sync.WaitGroup{}
+	backgroundTasks.Add(1)
 
 	go func() {
-		backgroundTasks.Add(1)
 		defer backgroundTasks.Done()
 		logShipLoop(ctx, logServer, telemetryClient)
 	}()
 
 	// Call next, and process telemetry, until we're shut down
-	mainLoop(ctx, invocationClient, &batch, telemetryChan, logServer, telemetryClient)
+	eventCounter := mainLoop(ctx, invocationClient, &batch, telemetryChan, logServer, telemetryClient)
 
 	util.Logf("New Relic Extension shutting down after %v events\n", eventCounter)
 
@@ -169,13 +167,14 @@ func logShipLoop(ctx context.Context, logServer *logserver.LogServer, telemetryC
 }
 
 // mainLoop repeatedly calls the /next api, and processes telemetry and platform logs. The timing is rather complicated.
-func mainLoop(ctx context.Context, invocationClient *client.InvocationClient, batch *telemetry.Batch, telemetryChan chan []byte, logServer *logserver.LogServer, telemetryClient *telemetry.Client) {
+func mainLoop(ctx context.Context, invocationClient *client.InvocationClient, batch *telemetry.Batch, telemetryChan chan []byte, logServer *logserver.LogServer, telemetryClient *telemetry.Client) int {
 	var (
 		invokedFunctionARN string
 		lastEventStart     time.Time
 		lastRequestId      string
 	)
 
+	eventCounter := 0
 	probablyTimeout := false
 
 	for {
@@ -183,7 +182,7 @@ func mainLoop(ctx context.Context, invocationClient *client.InvocationClient, ba
 		case <-ctx.Done():
 			// We're already done
 			util.Logln(ctx.Err())
-			return
+			return eventCounter
 		default:
 			// Our call to next blocks. It is likely that the container is frozen immediately after we call NextEvent.
 			event, err := invocationClient.NextEvent(ctx)
@@ -236,7 +235,7 @@ func mainLoop(ctx context.Context, invocationClient *client.InvocationClient, ba
 				pollLogServer(logServer, batch)
 				finalHarvest := batch.Close()
 				shipHarvest(ctx, finalHarvest, telemetryClient, invokedFunctionARN)
-				return
+				return eventCounter
 			}
 
 			invokedFunctionARN = event.InvokedFunctionARN
@@ -307,7 +306,7 @@ func shipHarvest(ctx context.Context, harvested []*telemetry.Invocation, telemet
 }
 
 func noopLoop(ctx context.Context, invocationClient *client.InvocationClient) {
-	util.Logln("Starting no-op mode")
+	util.Logln("Starting no-op mode, no teleemtry will be sent")
 
 	for {
 		event, err := invocationClient.NextEvent(ctx)

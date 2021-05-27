@@ -20,9 +20,9 @@ type Batch struct {
 }
 
 // NewBatch constructs a new batch.
-func NewBatch(ripeMillis int64, rotMillis int64) Batch {
+func NewBatch(ripeMillis int64, rotMillis int64) *Batch {
 	initialSize := uint32(math.Min(float64(ripeMillis)/100, 100))
-	return Batch{
+	return &Batch{
 		lastHarvest:     epochStart,
 		eldest:          epochStart,
 		invocations:     make(map[string]*Invocation, initialSize),

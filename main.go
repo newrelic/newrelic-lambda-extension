@@ -134,7 +134,7 @@ func main() {
 	}()
 
 	// Call next, and process telemetry, until we're shut down
-	eventCounter := mainLoop(ctx, invocationClient, &batch, telemetryChan, logServer, telemetryClient)
+	eventCounter, invokedFunctionARN := mainLoop(ctx, invocationClient, batch, telemetryChan, logServer, telemetryClient)
 
 	util.Logf("New Relic Extension shutting down after %v events\n", eventCounter)
 
@@ -142,6 +142,10 @@ func main() {
 	if err != nil {
 		util.Logln("Error shutting down Log API server", err)
 	}
+
+	pollLogServer(logServer, batch)
+	finalHarvest := batch.Close()
+	shipHarvest(ctx, finalHarvest, telemetryClient, invokedFunctionARN)
 
 	util.Debugln("Waiting for background tasks to complete")
 	backgroundTasks.Wait()
@@ -167,7 +171,7 @@ func logShipLoop(ctx context.Context, logServer *logserver.LogServer, telemetryC
 }
 
 // mainLoop repeatedly calls the /next api, and processes telemetry and platform logs. The timing is rather complicated.
-func mainLoop(ctx context.Context, invocationClient *client.InvocationClient, batch *telemetry.Batch, telemetryChan chan []byte, logServer *logserver.LogServer, telemetryClient *telemetry.Client) int {
+func mainLoop(ctx context.Context, invocationClient *client.InvocationClient, batch *telemetry.Batch, telemetryChan chan []byte, logServer *logserver.LogServer, telemetryClient *telemetry.Client) (int, string) {
 	var (
 		invokedFunctionARN string
 		lastEventStart     time.Time
@@ -182,7 +186,7 @@ func mainLoop(ctx context.Context, invocationClient *client.InvocationClient, ba
 		case <-ctx.Done():
 			// We're already done
 			util.Logln(ctx.Err())
-			return eventCounter
+			return eventCounter, ""
 		default:
 			// Our call to next blocks. It is likely that the container is frozen immediately after we call NextEvent.
 			event, err := invocationClient.NextEvent(ctx)
@@ -199,6 +203,9 @@ func mainLoop(ctx context.Context, invocationClient *client.InvocationClient, ba
 			}
 
 			eventCounter++
+
+			invokedFunctionARN = event.InvokedFunctionARN
+			lastRequestId = event.RequestID
 
 			if probablyTimeout {
 				// We suspect a timeout. Either way, we've gotten to the next event, so telemetry will
@@ -232,14 +239,8 @@ func mainLoop(ctx context.Context, invocationClient *client.InvocationClient, ba
 					batch.AddTelemetry(lastRequestId, []byte(errorMessage))
 				}
 
-				pollLogServer(logServer, batch)
-				finalHarvest := batch.Close()
-				shipHarvest(ctx, finalHarvest, telemetryClient, invokedFunctionARN)
-				return eventCounter
+				return eventCounter, invokedFunctionARN
 			}
-
-			invokedFunctionARN = event.InvokedFunctionARN
-			lastRequestId = event.RequestID
 
 			// Create an invocation record to hold telemetry
 			batch.AddInvocation(lastRequestId, eventStart)

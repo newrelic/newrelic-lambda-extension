@@ -170,23 +170,23 @@ func startInternal(host string) (*LogServer, error) {
 		return nil, err
 	}
 
-	server := http.Server{}
+	server := &http.Server{}
 
-	logServer := LogServer{
+	logServer := &LogServer{
 		listenString:    listener.Addr().String(),
-		server:          &server,
+		server:          server,
 		platformLogChan: make(chan LogLine, platformLogBufferSize),
 		functionLogChan: make(chan []LogLine),
 	}
 
-	http.HandleFunc("/", func(res http.ResponseWriter, req *http.Request) {
-		logServer.handler(res, req)
-	})
+	mux := http.NewServeMux()
+	mux.HandleFunc("/", logServer.handler)
+	server.Handler = mux
 
 	go func() {
 		util.Logln("Starting log server.")
 		util.Logf("Log server terminating: %v\n", server.Serve(listener))
 	}()
 
-	return &logServer, nil
+	return logServer, nil
 }

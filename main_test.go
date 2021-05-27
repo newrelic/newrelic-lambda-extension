@@ -90,6 +90,10 @@ func TestMainLogServerInitFail(t *testing.T) {
 	_ = os.Setenv("NEW_RELIC_LICENSE_KEY", "foobar")
 	defer os.Unsetenv("NEW_RELIC_LICENSE_KEY")
 
+	// Shouldn't be able to bind to this locally
+	_ = os.Setenv("NEW_RELIC_LOG_SERVER_HOST_OVERRIDE", "sandbox.localdomain")
+	defer os.Unsetenv("NEW_RELIC_LOG_SERVER_HOST_OVERRIDE")
+
 	_ = os.Setenv("NEW_RELIC_EXTENSION_LOG_LEVEL", "DEBUG")
 	defer os.Unsetenv("NEW_RELIC_EXTENSION_LOG_LEVEL")
 
@@ -101,7 +105,7 @@ func TestMainLogServerInitFail(t *testing.T) {
 	assert.Equal(t, 0, logRegisterRequestCount)
 }
 
-func MainLogServerRegisterFail(t *testing.T) {
+func TestMainLogServerRegisterFail(t *testing.T) {
 	var (
 		registerRequestCount    int
 		initErrorRequestCount   int
@@ -156,9 +160,6 @@ func MainLogServerRegisterFail(t *testing.T) {
 
 	_ = os.Setenv("NEW_RELIC_LICENSE_KEY", "foobar")
 	defer os.Unsetenv("NEW_RELIC_LICENSE_KEY")
-
-	_ = os.Setenv("NEW_RELIC_EXTENSION_LOG_LEVEL", "DEBUG")
-	defer os.Unsetenv("NEW_RELIC_EXTENSION_LOG_LEVEL")
 
 	_ = os.Setenv("NEW_RELIC_LOG_SERVER_HOST_OVERRIDE", "localhost")
 	defer os.Unsetenv("NEW_RELIC_LOG_SERVER_HOST_OVERRIDE")

@@ -3,6 +3,7 @@ package client
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
@@ -159,6 +160,108 @@ func TestInvocationClient_LogRegisterError(t *testing.T) {
 
 	ctx := context.Background()
 	err := client.LogRegister(ctx, subscriptionRequest)
+
+	assert.Error(t, err)
+}
+
+func TestInvocationClient_InitError(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, r.Method, http.MethodPost)
+
+		assert.NotEmpty(t, r.Header.Get(api.ExtensionIdHeader))
+		defer util.Close(r.Body)
+
+		w.WriteHeader(202)
+		_, _ = w.Write(nil)
+	}))
+	defer srv.Close()
+
+	url := srv.URL[7:]
+
+	client := InvocationClient{
+		version:     api.Version,
+		baseUrl:     url,
+		httpClient:  *srv.Client(),
+		extensionId: "test-ext-id",
+	}
+
+	ctx := context.Background()
+	err := client.InitError(ctx, "foo.bar", errors.New("something went wrong"))
+
+	assert.NoError(t, err)
+}
+
+func TestInvocationClient_InitErrorError(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		defer util.Close(r.Body)
+
+		w.WriteHeader(400)
+		_, _ = w.Write(nil)
+	}))
+	defer srv.Close()
+
+	url := srv.URL[7:]
+
+	client := InvocationClient{
+		version:     api.Version,
+		baseUrl:     url,
+		httpClient:  *srv.Client(),
+		extensionId: "test-ext-id",
+	}
+
+	ctx := context.Background()
+	err := client.InitError(ctx, "foo.bar", errors.New("something went wrong"))
+
+	assert.Error(t, err)
+}
+
+func TestInvocationClient_ExitError(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, r.Method, http.MethodPost)
+
+		assert.NotEmpty(t, r.Header.Get(api.ExtensionIdHeader))
+		defer util.Close(r.Body)
+
+		w.WriteHeader(202)
+		_, _ = w.Write(nil)
+	}))
+	defer srv.Close()
+
+	url := srv.URL[7:]
+
+	client := InvocationClient{
+		version:     api.Version,
+		baseUrl:     url,
+		httpClient:  *srv.Client(),
+		extensionId: "test-ext-id",
+	}
+
+	ctx := context.Background()
+	err := client.ExitError(ctx, "foo.bar", errors.New("something went wrong"))
+
+	assert.NoError(t, err)
+}
+
+func TestInvocationClient_ExitErrorError(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		defer util.Close(r.Body)
+
+		w.WriteHeader(400)
+		_, _ = w.Write(nil)
+	}))
+	defer srv.Close()
+
+	url := srv.URL[7:]
+
+	client := InvocationClient{
+		version:     api.Version,
+		baseUrl:     url,
+		httpClient:  *srv.Client(),
+		extensionId: "test-ext-id",
+	}
+
+	ctx := context.Background()
+	err := client.ExitError(ctx, "foo.bar", errors.New("something went wrong"))
 
 	assert.Error(t, err)
 }

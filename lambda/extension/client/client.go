@@ -154,7 +154,7 @@ func (ic *InvocationClient) LogRegister(ctx context.Context, subscriptionRequest
 
 	defer util.Close(res.Body)
 
-	if res.StatusCode != http.StatusOK {
+	if res.StatusCode != http.StatusOK && res.StatusCode != http.StatusAccepted {
 		return fmt.Errorf("error occurred while making log subscription request: %s", res.Status)
 	}
 
@@ -221,6 +221,10 @@ func (ic *InvocationClient) InitError(ctx context.Context, errorEnum string, ini
 
 	defer util.Close(res.Body)
 
+	if res.StatusCode != http.StatusAccepted {
+		return fmt.Errorf("error occurred while making init error request: %s", res.Status)
+	}
+
 	return nil
 }
 
@@ -241,6 +245,10 @@ func (ic *InvocationClient) ExitError(ctx context.Context, errorEnum string, exi
 	}
 
 	defer util.Close(res.Body)
+
+	if res.StatusCode != http.StatusAccepted {
+		return fmt.Errorf("error occurred while making exit error request: %s", res.Status)
+	}
 
 	return nil
 }

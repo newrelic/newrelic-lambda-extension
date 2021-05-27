@@ -99,7 +99,7 @@ func main() {
 		eventTypes = append(eventTypes, api.Function)
 	}
 	subscriptionRequest := api.DefaultLogSubscription(eventTypes, logServer.Port())
-	err = invocationClient.LogRegister(ctx, &subscriptionRequest)
+	err = invocationClient.LogRegister(ctx, subscriptionRequest)
 	if err != nil {
 		err2 := invocationClient.InitError(ctx, "logServer.register", err)
 		if err2 != nil {

@@ -68,15 +68,15 @@ type LogSubscription struct {
 	Types       []LogEventType `json:"types"`
 }
 
-func NewLogSubscription(bufferingCfg BufferingCfg, destinationCfg DestinationCfg, types []LogEventType) LogSubscription {
-	return LogSubscription{
+func NewLogSubscription(bufferingCfg BufferingCfg, destinationCfg DestinationCfg, types []LogEventType) *LogSubscription {
+	return &LogSubscription{
 		Buffering:   bufferingCfg,
 		Destination: destinationCfg,
 		Types:       types,
 	}
 }
 
-func DefaultLogSubscription(types []LogEventType, port uint16) LogSubscription {
+func DefaultLogSubscription(types []LogEventType, port uint16) *LogSubscription {
 	endpoint := formatLogsEndpoint(port)
 
 	return NewLogSubscription(

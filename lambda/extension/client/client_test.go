@@ -82,6 +82,87 @@ func TestRegistrationClient_RegisterDefault(t *testing.T) {
 	assert.NotEmpty(t, invocationClient.getLogRegistrationURL())
 }
 
+func TestRegistrationClient_RegisterError(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		defer util.Close(r.Body)
+
+		w.Header().Add(api.ExtensionIdHeader, "test-ext-id")
+		w.WriteHeader(500)
+		_, _ = w.Write(nil)
+	}))
+	defer srv.Close()
+
+	url := srv.URL[7:]
+
+	_ = os.Setenv(api.LambdaHostPortEnvVar, url)
+	defer os.Unsetenv(api.LambdaHostPortEnvVar)
+
+	client := New(*srv.Client())
+	ctx := context.Background()
+	ic, rr, err := client.RegisterDefault(ctx)
+
+	assert.Nil(t, ic)
+	assert.Nil(t, rr)
+	assert.Error(t, err)
+}
+
+func TestInvocationClient_LogRegister(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, r.Method, http.MethodPut)
+
+		assert.NotEmpty(t, r.Header.Get(api.ExtensionIdHeader))
+		defer util.Close(r.Body)
+
+		w.WriteHeader(200)
+		_, _ = w.Write(nil)
+	}))
+	defer srv.Close()
+
+	url := srv.URL[7:]
+
+	client := InvocationClient{
+		version:     api.Version,
+		baseUrl:     url,
+		httpClient:  *srv.Client(),
+		extensionId: "test-ext-id",
+	}
+
+	eventTypes := []api.LogEventType{api.Platform}
+	subscriptionRequest := api.DefaultLogSubscription(eventTypes, 12345)
+
+	ctx := context.Background()
+	err := client.LogRegister(ctx, subscriptionRequest)
+
+	assert.NoError(t, err)
+}
+
+func TestInvocationClient_LogRegisterError(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		defer util.Close(r.Body)
+
+		w.WriteHeader(500)
+		_, _ = w.Write(nil)
+	}))
+	defer srv.Close()
+
+	url := srv.URL[7:]
+
+	client := InvocationClient{
+		version:     api.Version,
+		baseUrl:     url,
+		httpClient:  *srv.Client(),
+		extensionId: "test-ext-id",
+	}
+
+	eventTypes := []api.LogEventType{api.Platform}
+	subscriptionRequest := api.DefaultLogSubscription(eventTypes, 12345)
+
+	ctx := context.Background()
+	err := client.LogRegister(ctx, subscriptionRequest)
+
+	assert.Error(t, err)
+}
+
 func TestInvocationClient_NextEvent(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		assert.Equal(t, r.Method, http.MethodGet)
@@ -114,4 +195,29 @@ func TestInvocationClient_NextEvent(t *testing.T) {
 
 	assert.NoError(t, err)
 	assert.NotNil(t, invocationEvent)
+}
+
+func TestInvocationClient_NextEventError(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		defer util.Close(r.Body)
+
+		w.WriteHeader(500)
+		_, _ = w.Write(nil)
+	}))
+	defer srv.Close()
+
+	url := srv.URL[7:]
+
+	client := InvocationClient{
+		version:     api.Version,
+		baseUrl:     url,
+		httpClient:  *srv.Client(),
+		extensionId: "test-ext-id",
+	}
+
+	ctx := context.Background()
+	event, err := client.NextEvent(ctx)
+
+	assert.Error(t, err)
+	assert.Nil(t, event)
 }

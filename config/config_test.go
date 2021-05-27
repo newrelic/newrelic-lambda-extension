@@ -72,3 +72,11 @@ func TestConfigurationFromEnvironmentSecretId(t *testing.T) {
 	conf := ConfigurationFromEnvironment()
 	assert.Equal(t, "secretId", conf.LicenseKeySecretId)
 }
+
+func TestConfigurationFromEnvironmentLogServerHost(t *testing.T) {
+	os.Setenv("NEW_RELIC_LOG_SERVER_HOST", "foobar")
+	defer os.Unsetenv("NEW_RELIC_LOG_SERVER_HOST")
+
+	conf := ConfigurationFromEnvironment()
+	assert.Equal(t, "foobar", conf.LogServerHost)
+}

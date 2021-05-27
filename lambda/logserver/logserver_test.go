@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/newrelic/newrelic-lambda-extension/config"
 	"github.com/newrelic/newrelic-lambda-extension/lambda/extension/api"
 	"github.com/stretchr/testify/assert"
 )
@@ -52,5 +53,11 @@ func TestLogServer(t *testing.T) {
 	assert.Equal(t, 1, len(logLines))
 	assert.Equal(t, "REPORT RequestId: testRequestId\tDuration: 25.30 ms\tBilled Duration: 100 ms\tMemory Size: 128 MB\tMax Memory Used: 74 MB\tInit Duration: 202.00 ms", string(logLines[0].Content))
 
+	assert.Nil(t, logs.Close())
+}
+
+func TestLogServerStart(t *testing.T) {
+	logs, err := Start(&config.Configuration{LogServerHost: "localhost"})
+	assert.NoError(t, err)
 	assert.Nil(t, logs.Close())
 }

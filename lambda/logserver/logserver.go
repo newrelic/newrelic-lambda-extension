@@ -143,7 +143,7 @@ func (ls *LogServer) handler(res http.ResponseWriter, req *http.Request) {
 				Content:   []byte(record),
 			})
 		default:
-			util.Debugln("Ignored log event of type ", event.Type, string(bodyBytes))
+			//util.Debugln("Ignored log event of type ", event.Type, string(bodyBytes))
 		}
 	}
 

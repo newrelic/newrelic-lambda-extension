@@ -6,17 +6,16 @@ import (
 	"io/ioutil"
 	"net"
 	"net/http"
-	"os"
 	"strconv"
 	"time"
 
+	"github.com/newrelic/newrelic-lambda-extension/config"
 	"github.com/newrelic/newrelic-lambda-extension/lambda/extension/api"
 	"github.com/newrelic/newrelic-lambda-extension/util"
 )
 
 const (
 	platformLogBufferSize = 100
-	defaultHost           = "sandbox.localdomain"
 )
 
 type LogLine struct {
@@ -155,13 +154,8 @@ func (ls *LogServer) handler(res http.ResponseWriter, req *http.Request) {
 	_, _ = res.Write(nil)
 }
 
-func Start() (*LogServer, error) {
-	// This should only be used for testing purposes
-	host, hostOverride := os.LookupEnv("NEW_RELIC_LOG_SERVER_HOST_OVERRIDE")
-	if !hostOverride {
-		host = defaultHost
-	}
-	return startInternal(host)
+func Start(conf *config.Configuration) (*LogServer, error) {
+	return startInternal(conf.LogServerHost)
 }
 
 func startInternal(host string) (*LogServer, error) {

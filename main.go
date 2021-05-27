@@ -73,7 +73,7 @@ func main() {
 	}
 
 	// Attempt to find the license key for telemetry sending
-	licenseKey, err := credentials.GetNewRelicLicenseKey(ctx, &conf)
+	licenseKey, err := credentials.GetNewRelicLicenseKey(ctx, conf)
 	if err != nil {
 		util.Logln("Failed to retrieve New Relic license key", err)
 		// We fail open; telemetry will go to CloudWatch instead
@@ -85,7 +85,7 @@ func main() {
 	batch := telemetry.NewBatch(int64(conf.RipeMillis), int64(conf.RotMillis))
 
 	// Start the Logs API server, and register it
-	logServer, err := logserver.Start()
+	logServer, err := logserver.Start(conf)
 	if err != nil {
 		err2 := invocationClient.InitError(ctx, "logServer.start", err)
 		if err2 != nil {
@@ -121,7 +121,7 @@ func main() {
 
 	// Run startup checks
 	go func() {
-		checks.RunChecks(ctx, &conf, registrationResponse, telemetryClient)
+		checks.RunChecks(ctx, conf, registrationResponse, telemetryClient)
 	}()
 
 	// Send function logs as they arrive. When disabled, function logs aren't delivered to the extension.
@@ -253,7 +253,6 @@ func mainLoop(ctx context.Context, invocationClient *client.InvocationClient, ba
 			// we can recover from early.
 			timeoutWatchBegins := time.Millisecond * 100
 			timeout := timeoutInstant.Sub(time.Now()) - timeoutWatchBegins
-			util.Debugf("Timeout in %v", timeout)
 
 			invCtx, cancel := context.WithTimeout(ctx, timeout)
 			defer cancel()

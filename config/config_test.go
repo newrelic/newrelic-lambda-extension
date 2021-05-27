@@ -9,12 +9,13 @@ import (
 
 func TestConfigurationFromEnvironmentZero(t *testing.T) {
 	conf := ConfigurationFromEnvironment()
-	expected := Configuration{
+	expected := &Configuration{
 		ExtensionEnabled: true,
 		RipeMillis:       DefaultRipeMillis,
 		RotMillis:        DefaultRotMillis,
 		LogLevel:         DefaultLogLevel,
 		NRHandler:        EmptyNRWrapper,
+		LogServerHost:    defaultLogServerHost,
 	}
 	assert.Equal(t, expected, conf)
 }

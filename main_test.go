@@ -19,10 +19,9 @@ func TestMainRegisterFail(t *testing.T) {
 
 		if r.URL.Path == "/2020-01-01/extension/register" {
 			w.Header().Add(api.ExtensionIdHeader, "test-ext-id")
-			w.WriteHeader(500)
-			_, _ = w.Write([]byte(""))
+			w.WriteHeader(400)
+			_, _ = w.Write(nil)
 		}
-
 	}))
 	defer srv.Close()
 
@@ -91,8 +90,8 @@ func TestMainLogServerInitFail(t *testing.T) {
 	defer os.Unsetenv("NEW_RELIC_LICENSE_KEY")
 
 	// Shouldn't be able to bind to this locally
-	_ = os.Setenv("NEW_RELIC_LOG_SERVER_HOST_OVERRIDE", "sandbox.localdomain")
-	defer os.Unsetenv("NEW_RELIC_LOG_SERVER_HOST_OVERRIDE")
+	_ = os.Setenv("NEW_RELIC_LOG_SERVER_HOST", "sandbox.localdomain")
+	defer os.Unsetenv("NEW_RELIC_LOG_SERVER_HOST")
 
 	_ = os.Setenv("NEW_RELIC_EXTENSION_LOG_LEVEL", "DEBUG")
 	defer os.Unsetenv("NEW_RELIC_EXTENSION_LOG_LEVEL")
@@ -161,8 +160,8 @@ func TestMainLogServerRegisterFail(t *testing.T) {
 	_ = os.Setenv("NEW_RELIC_LICENSE_KEY", "foobar")
 	defer os.Unsetenv("NEW_RELIC_LICENSE_KEY")
 
-	_ = os.Setenv("NEW_RELIC_LOG_SERVER_HOST_OVERRIDE", "localhost")
-	defer os.Unsetenv("NEW_RELIC_LOG_SERVER_HOST_OVERRIDE")
+	_ = os.Setenv("NEW_RELIC_LOG_SERVER_HOST", "localhost")
+	defer os.Unsetenv("NEW_RELIC_LOG_SERVER_HOST")
 
 	_ = os.Setenv("NEW_RELIC_EXTENSION_LOG_LEVEL", "DEBUG")
 	defer os.Unsetenv("NEW_RELIC_EXTENSION_LOG_LEVEL")
@@ -249,8 +248,8 @@ func TestMainShutdown(t *testing.T) {
 	_ = os.Setenv("NEW_RELIC_LICENSE_KEY", "foobar")
 	defer os.Unsetenv("NEW_RELIC_LICENSE_KEY")
 
-	_ = os.Setenv("NEW_RELIC_LOG_SERVER_HOST_OVERRIDE", "localhost")
-	defer os.Unsetenv("NEW_RELIC_LOG_SERVER_HOST_OVERRIDE")
+	_ = os.Setenv("NEW_RELIC_LOG_SERVER_HOST", "localhost")
+	defer os.Unsetenv("NEW_RELIC_LOG_SERVER_HOST")
 
 	_ = os.Setenv("NEW_RELIC_EXTENSION_LOG_LEVEL", "DEBUG")
 	defer os.Unsetenv("NEW_RELIC_EXTENSION_LOG_LEVEL")

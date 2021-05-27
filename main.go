@@ -22,10 +22,16 @@ import (
 	"github.com/newrelic/newrelic-lambda-extension/telemetry"
 )
 
+var rootCtx context.Context
+
+func init() {
+	rootCtx = context.Background()
+}
+
 func main() {
 	extensionStartup := time.Now()
 
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(rootCtx)
 	defer cancel()
 
 	// exit cleanly on SIGTERM or SIGINT
@@ -195,9 +201,9 @@ func mainLoop(ctx context.Context, invocationClient *client.InvocationClient, ba
 			eventStart := time.Now()
 
 			if err != nil {
-				errErr := invocationClient.ExitError(ctx, "NextEventError.Main", err)
-				if errErr != nil {
-					util.Logln(errErr)
+				err2 := invocationClient.ExitError(ctx, "NextEventError.Main", err)
+				if err2 != nil {
+					util.Logln(err2)
 				}
 				util.Panic(err)
 			}

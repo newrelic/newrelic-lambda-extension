@@ -85,6 +85,10 @@ func (rc *RegistrationClient) Register(ctx context.Context, registrationRequest 
 
 	defer util.Close(res.Body)
 
+	if res.StatusCode == http.StatusInternalServerError {
+		util.Panic("error occurred while making registration request: ", res.Status)
+	}
+
 	if res.StatusCode != http.StatusOK {
 		return nil, nil, fmt.Errorf("error occurred while making registration request: %s", res.Status)
 	}
@@ -154,6 +158,10 @@ func (ic *InvocationClient) LogRegister(ctx context.Context, subscriptionRequest
 
 	defer util.Close(res.Body)
 
+	if res.StatusCode == http.StatusInternalServerError {
+		util.Panic("error occurred while making log subscription request: ", res.Status)
+	}
+
 	if res.StatusCode != http.StatusOK && res.StatusCode != http.StatusAccepted {
 		return fmt.Errorf("error occurred while making log subscription request: %s", res.Status)
 	}
@@ -183,6 +191,10 @@ func (ic *InvocationClient) NextEvent(ctx context.Context) (*api.InvocationEvent
 	}
 
 	defer util.Close(res.Body)
+
+	if res.StatusCode == http.StatusInternalServerError {
+		util.Panic("error occurred when calling extension/event/next: ", res.Status)
+	}
 
 	if res.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("error occurred when calling extension/event/next: %s", res.Status)
@@ -221,6 +233,10 @@ func (ic *InvocationClient) InitError(ctx context.Context, errorEnum string, ini
 
 	defer util.Close(res.Body)
 
+	if res.StatusCode == http.StatusInternalServerError {
+		util.Panic("error occurred while making init error request: ", res.Status)
+	}
+
 	if res.StatusCode != http.StatusAccepted {
 		return fmt.Errorf("error occurred while making init error request: %s", res.Status)
 	}
@@ -245,6 +261,10 @@ func (ic *InvocationClient) ExitError(ctx context.Context, errorEnum string, exi
 	}
 
 	defer util.Close(res.Body)
+
+	if res.StatusCode == http.StatusInternalServerError {
+		util.Panic("error occurred while making exit error request: ", res.Status)
+	}
 
 	if res.StatusCode != http.StatusAccepted {
 		return fmt.Errorf("error occurred while making exit error request: %s", res.Status)

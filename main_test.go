@@ -149,7 +149,7 @@ func TestMainLogServerRegisterFail(t *testing.T) {
 		if r.URL.Path == "/2020-08-15/logs" {
 			logRegisterRequestCount++
 
-			w.WriteHeader(500)
+			w.WriteHeader(400)
 			_, _ = w.Write(nil)
 		}
 	}))
@@ -523,7 +523,7 @@ func TestMainTimeout(t *testing.T) {
 	_ = os.Setenv("NEW_RELIC_EXTENSION_LOG_LEVEL", "DEBUG")
 	defer os.Unsetenv("NEW_RELIC_EXTENSION_LOG_LEVEL")
 
-	assert.Panics(t, main)
+	assert.NotPanics(t, main)
 
 	assert.Equal(t, 1, registerRequestCount)
 	assert.Equal(t, 0, initErrorRequestCount)

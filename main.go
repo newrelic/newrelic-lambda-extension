@@ -201,17 +201,16 @@ func mainLoop(ctx context.Context, invocationClient *client.InvocationClient, ba
 			eventStart := time.Now()
 
 			if err != nil {
-				err2 := invocationClient.ExitError(ctx, "NextEventError.Main", err)
-				if err2 != nil {
-					util.Logln(err2)
+
+				util.Logln(err)
+				err = invocationClient.ExitError(ctx, "NextEventError.Main", err)
+				if err != nil {
+					util.Logln(err)
 				}
-				util.Panic(err)
+				continue
 			}
 
 			eventCounter++
-
-			invokedFunctionARN = event.InvokedFunctionARN
-			lastRequestId = event.RequestID
 
 			if probablyTimeout {
 				// We suspect a timeout. Either way, we've gotten to the next event, so telemetry will
@@ -225,7 +224,11 @@ func mainLoop(ctx context.Context, invocationClient *client.InvocationClient, ba
 					util.Logf("We suspected a timeout for request %s but got telemetry anyway", lastRequestId)
 				default:
 				}
+
 			}
+
+			invokedFunctionARN = event.InvokedFunctionARN
+			lastRequestId = event.RequestID
 
 			if event.EventType == api.Shutdown {
 				if event.ShutdownReason == api.Timeout && lastRequestId != "" {
@@ -268,7 +271,7 @@ func mainLoop(ctx context.Context, invocationClient *client.InvocationClient, ba
 				// We are about to timeout
 				util.Debugln("Timeout suspected: ", invCtx.Err())
 				probablyTimeout = true
-				break
+				continue
 			case telemetryBytes := <-telemetryChan:
 				// We received telemetry
 				util.Debugf("Agent telemetry bytes: %s", base64.URLEncoding.EncodeToString(telemetryBytes))
@@ -312,20 +315,26 @@ func shipHarvest(ctx context.Context, harvested []*telemetry.Invocation, telemet
 }
 
 func noopLoop(ctx context.Context, invocationClient *client.InvocationClient) {
-	util.Logln("Starting no-op mode, no teleemtry will be sent")
+	util.Logln("Starting no-op mode, no telemetry will be sent")
 
 	for {
-		event, err := invocationClient.NextEvent(ctx)
-		if err != nil {
-			errErr := invocationClient.ExitError(ctx, "NextEventError.Noop", err)
-			if errErr != nil {
-				util.Logln(errErr)
-			}
-			util.Panic(err)
-		}
-
-		if event.EventType == api.Shutdown {
+		select {
+		case <-ctx.Done():
 			return
+		default:
+			event, err := invocationClient.NextEvent(ctx)
+			if err != nil {
+				util.Logln(err)
+				errErr := invocationClient.ExitError(ctx, "NextEventError.Noop", err)
+				if errErr != nil {
+					util.Logln(errErr)
+				}
+				continue
+			}
+
+			if event.EventType == api.Shutdown {
+				return
+			}
 		}
 	}
 }

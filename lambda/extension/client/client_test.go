@@ -88,7 +88,7 @@ func TestRegistrationClient_RegisterError(t *testing.T) {
 		defer util.Close(r.Body)
 
 		w.Header().Add(api.ExtensionIdHeader, "test-ext-id")
-		w.WriteHeader(500)
+		w.WriteHeader(400)
 		_, _ = w.Write(nil)
 	}))
 	defer srv.Close()
@@ -105,6 +105,29 @@ func TestRegistrationClient_RegisterError(t *testing.T) {
 	assert.Nil(t, ic)
 	assert.Nil(t, rr)
 	assert.Error(t, err)
+}
+
+func TestRegistrationClient_RegisterPanic(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		defer util.Close(r.Body)
+
+		w.Header().Add(api.ExtensionIdHeader, "test-ext-id")
+		w.WriteHeader(500)
+		_, _ = w.Write(nil)
+	}))
+	defer srv.Close()
+
+	url := srv.URL[7:]
+
+	_ = os.Setenv(api.LambdaHostPortEnvVar, url)
+	defer os.Unsetenv(api.LambdaHostPortEnvVar)
+
+	client := New(*srv.Client())
+	ctx := context.Background()
+
+	assert.Panics(t, func() {
+		client.RegisterDefault(ctx)
+	})
 }
 
 func TestInvocationClient_LogRegister(t *testing.T) {
@@ -141,7 +164,7 @@ func TestInvocationClient_LogRegisterError(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		defer util.Close(r.Body)
 
-		w.WriteHeader(500)
+		w.WriteHeader(400)
 		_, _ = w.Write(nil)
 	}))
 	defer srv.Close()
@@ -162,6 +185,33 @@ func TestInvocationClient_LogRegisterError(t *testing.T) {
 	err := client.LogRegister(ctx, subscriptionRequest)
 
 	assert.Error(t, err)
+}
+
+func TestInvocationClient_LogRegisterEPanic(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		defer util.Close(r.Body)
+
+		w.WriteHeader(500)
+		_, _ = w.Write(nil)
+	}))
+	defer srv.Close()
+
+	url := srv.URL[7:]
+
+	client := InvocationClient{
+		version:     api.Version,
+		baseUrl:     url,
+		httpClient:  *srv.Client(),
+		extensionId: "test-ext-id",
+	}
+
+	eventTypes := []api.LogEventType{api.Platform}
+	subscriptionRequest := api.DefaultLogSubscription(eventTypes, 12345)
+
+	ctx := context.Background()
+	assert.Panics(t, func() {
+		client.LogRegister(ctx, subscriptionRequest)
+	})
 }
 
 func TestInvocationClient_InitError(t *testing.T) {
@@ -215,6 +265,30 @@ func TestInvocationClient_InitErrorError(t *testing.T) {
 	assert.Error(t, err)
 }
 
+func TestInvocationClient_InitErrorPanic(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		defer util.Close(r.Body)
+
+		w.WriteHeader(500)
+		_, _ = w.Write(nil)
+	}))
+	defer srv.Close()
+
+	url := srv.URL[7:]
+
+	client := InvocationClient{
+		version:     api.Version,
+		baseUrl:     url,
+		httpClient:  *srv.Client(),
+		extensionId: "test-ext-id",
+	}
+
+	ctx := context.Background()
+	assert.Panics(t, func() {
+		client.InitError(ctx, "foo.bar", errors.New("something went wrong"))
+	})
+}
+
 func TestInvocationClient_ExitError(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		assert.Equal(t, r.Method, http.MethodPost)
@@ -266,6 +340,30 @@ func TestInvocationClient_ExitErrorError(t *testing.T) {
 	assert.Error(t, err)
 }
 
+func TestInvocationClient_ExitErrorPanic(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		defer util.Close(r.Body)
+
+		w.WriteHeader(500)
+		_, _ = w.Write(nil)
+	}))
+	defer srv.Close()
+
+	url := srv.URL[7:]
+
+	client := InvocationClient{
+		version:     api.Version,
+		baseUrl:     url,
+		httpClient:  *srv.Client(),
+		extensionId: "test-ext-id",
+	}
+
+	ctx := context.Background()
+	assert.Panics(t, func() {
+		client.ExitError(ctx, "foo.bar", errors.New("something went wrong"))
+	})
+}
+
 func TestInvocationClient_NextEvent(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		assert.Equal(t, r.Method, http.MethodGet)
@@ -304,7 +402,7 @@ func TestInvocationClient_NextEventError(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		defer util.Close(r.Body)
 
-		w.WriteHeader(500)
+		w.WriteHeader(400)
 		_, _ = w.Write(nil)
 	}))
 	defer srv.Close()
@@ -323,4 +421,28 @@ func TestInvocationClient_NextEventError(t *testing.T) {
 
 	assert.Error(t, err)
 	assert.Nil(t, event)
+}
+
+func TestInvocationClient_NextEventPanic(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		defer util.Close(r.Body)
+
+		w.WriteHeader(500)
+		_, _ = w.Write(nil)
+	}))
+	defer srv.Close()
+
+	url := srv.URL[7:]
+
+	client := InvocationClient{
+		version:     api.Version,
+		baseUrl:     url,
+		httpClient:  *srv.Client(),
+		extensionId: "test-ext-id",
+	}
+
+	ctx := context.Background()
+	assert.Panics(t, func() {
+		client.NextEvent(ctx)
+	})
 }

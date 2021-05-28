@@ -2,6 +2,7 @@ package telemetry
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -133,8 +134,8 @@ func CompressedPayloadsForLogEvents(logsEvents []LogsEvent, functionName string,
 }
 
 // BuildVortexRequest builds a Vortex HTTP request
-func BuildVortexRequest(url string, compressed *bytes.Buffer, userAgent string, licenseKey string) (*http.Request, error) {
-	req, err := http.NewRequest("POST", url, compressed)
+func BuildVortexRequest(ctx context.Context, url string, compressed *bytes.Buffer, userAgent string, licenseKey string) (*http.Request, error) {
+	req, err := http.NewRequestWithContext(ctx, "POST", url, compressed)
 	if err != nil {
 		return nil, fmt.Errorf("error creating request: %v", err)
 	}

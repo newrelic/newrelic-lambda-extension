@@ -63,3 +63,7 @@ func Logln(v ...interface{}) {
 func Fatal(v ...interface{}) {
 	log.Fatal(v...)
 }
+
+func Panic(v ...interface{}) {
+	log.Panic(v...)
+}

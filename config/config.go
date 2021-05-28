@@ -7,10 +7,11 @@ import (
 )
 
 const (
-	DefaultRipeMillis = 7_000
-	DefaultRotMillis  = 12_000
-	DefaultLogLevel   = "INFO"
-	DebugLogLevel     = "DEBUG"
+	DefaultRipeMillis    = 7_000
+	DefaultRotMillis     = 12_000
+	DefaultLogLevel      = "INFO"
+	DebugLogLevel        = "DEBUG"
+	defaultLogServerHost = "sandbox.localdomain"
 )
 
 var EmptyNRWrapper = "Undefined"
@@ -26,9 +27,10 @@ type Configuration struct {
 	RotMillis          uint32
 	LogLevel           string
 	SendFunctionLogs   bool
+	LogServerHost      string
 }
 
-func ConfigurationFromEnvironment() Configuration {
+func ConfigurationFromEnvironment() *Configuration {
 	enabledStr, extensionEnabledOverride := os.LookupEnv("NEW_RELIC_LAMBDA_EXTENSION_ENABLED")
 	licenseKey, lkOverride := os.LookupEnv("NEW_RELIC_LICENSE_KEY")
 	licenseKeySecretId, lkSecretOverride := os.LookupEnv("NEW_RELIC_LICENSE_KEY_SECRET")
@@ -39,12 +41,13 @@ func ConfigurationFromEnvironment() Configuration {
 	rotMillisStr, rotMillisOverride := os.LookupEnv("NEW_RELIC_HARVEST_ROT_MILLIS")
 	logLevelStr, logLevelOverride := os.LookupEnv("NEW_RELIC_EXTENSION_LOG_LEVEL")
 	sendFunctionLogsStr, sendFunctionLogsOverride := os.LookupEnv("NEW_RELIC_EXTENSION_SEND_FUNCTION_LOGS")
+	logServerHostStr, logServerHostOverride := os.LookupEnv("NEW_RELIC_LOG_SERVER_HOST")
 
 	extensionEnabled := true
 	if extensionEnabledOverride && strings.ToLower(enabledStr) == "false" {
 		extensionEnabled = false
 	}
-	ret := Configuration{ExtensionEnabled: extensionEnabled}
+	ret := &Configuration{ExtensionEnabled: extensionEnabled}
 
 	if lkOverride {
 		ret.LicenseKey = licenseKey
@@ -92,6 +95,12 @@ func ConfigurationFromEnvironment() Configuration {
 		ret.LogLevel = DebugLogLevel
 	} else {
 		ret.LogLevel = DefaultLogLevel
+	}
+
+	if logServerHostOverride {
+		ret.LogServerHost = logServerHostStr
+	} else {
+		ret.LogServerHost = defaultLogServerHost
 	}
 
 	if sendFunctionLogsOverride && sendFunctionLogsStr == "true" {

@@ -1,6 +1,7 @@
 package checks
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -18,7 +19,7 @@ type LayerAgentVersion struct {
 
 // We are only returning an error message when an out of date agent version is detected.
 // All other errors will result in a nil return value.
-func agentVersionCheck(conf *config.Configuration, reg *api.RegistrationResponse, r runtimeConfig) error {
+func agentVersionCheck(ctx context.Context, conf *config.Configuration, reg *api.RegistrationResponse, r runtimeConfig) error {
 	if r.AgentVersion == "" {
 		return nil
 	}

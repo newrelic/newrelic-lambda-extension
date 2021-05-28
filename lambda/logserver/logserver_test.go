@@ -4,24 +4,18 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"log"
 	"net/http"
 	"testing"
 	"time"
 
+	"github.com/newrelic/newrelic-lambda-extension/config"
 	"github.com/newrelic/newrelic-lambda-extension/lambda/extension/api"
 	"github.com/stretchr/testify/assert"
 )
 
-func Test_Logserver(t *testing.T) {
+func TestLogServer(t *testing.T) {
 	logs, err := startInternal("localhost")
-	if err != nil {
-		log.Println("Failed to start logs HTTP server", err)
-		if err != nil {
-			log.Fatal(err)
-		}
-		return
-	}
+	assert.NoError(t, err)
 
 	testEvents := []api.LogEvent{
 		{
@@ -49,8 +43,8 @@ func Test_Logserver(t *testing.T) {
 
 	client := http.Client{}
 	res, err := client.Do(req)
-	assert.NoError(t, err)
 
+	assert.NoError(t, err)
 	assert.Equal(t, 200, res.StatusCode)
 	assert.Equal(t, http.NoBody, res.Body)
 
@@ -59,5 +53,11 @@ func Test_Logserver(t *testing.T) {
 	assert.Equal(t, 1, len(logLines))
 	assert.Equal(t, "REPORT RequestId: testRequestId\tDuration: 25.30 ms\tBilled Duration: 100 ms\tMemory Size: 128 MB\tMax Memory Used: 74 MB\tInit Duration: 202.00 ms", string(logLines[0].Content))
 
+	assert.Nil(t, logs.Close())
+}
+
+func TestLogServerStart(t *testing.T) {
+	logs, err := Start(&config.Configuration{LogServerHost: "localhost"})
+	assert.NoError(t, err)
 	assert.Nil(t, logs.Close())
 }

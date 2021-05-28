@@ -1,6 +1,7 @@
 package checks
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/newrelic/newrelic-lambda-extension/config"
@@ -21,12 +22,12 @@ var (
 )
 
 // sanityCheck checks for configuration that is either misplaced or in conflict
-func sanityCheck(conf *config.Configuration, res *api.RegistrationResponse, _ runtimeConfig) error {
+func sanityCheck(ctx context.Context, conf *config.Configuration, res *api.RegistrationResponse, _ runtimeConfig) error {
 	if util.AnyEnvVarsExist(awsLogIngestionEnvVars) {
 		return fmt.Errorf("Environment varaible '%s' is used by aws-log-ingestion and has no effect here. Recommend unsetting this environment variable within this function.", util.AnyEnvVarsExistString(awsLogIngestionEnvVars))
 	}
 
-	if credentials.IsSecretConfigured(conf) && util.EnvVarExists("NEW_RELIC_LICENSE_KEY") {
+	if credentials.IsSecretConfigured(ctx, conf) && util.EnvVarExists("NEW_RELIC_LICENSE_KEY") {
 		return fmt.Errorf("There is both a AWS Secrets Manager secret and a NEW_RELIC_LICENSE_KEY environment variable set. Recommend removing the NEW_RELIC_LICENSE_KEY environment variable and using the AWS Secrets Manager secret.")
 	}
 

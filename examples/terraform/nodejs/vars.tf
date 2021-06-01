@@ -21,5 +21,5 @@ variable "lambda_zip_filename" {
 variable "newrelic_account_id" {}
 
 variable "newrelic_nodejs_layer" {
-  default = "arn:aws:lambda:us-east-1:451483290750:layer:NewRelicNodeJS12X:30"
+  default = "arn:aws:lambda:us-east-1:451483290750:layer:NewRelicNodeJS12X:44"
 }

@@ -25,7 +25,7 @@ Resources:
           # NEW_RELIC_EXTENSION_LOG_LEVEL: DEBUG
       Layers:
         # This layer includes the New Relic Lambda Extension, a sidecar process that sends telemetry.
-        - !Sub arn:${AWS::Partition}:lambda:${AWS::Region}:451483290750:layer:NewRelicLambdaExtension:11
+        - !Sub arn:${AWS::Partition}:lambda:${AWS::Region}:451483290750:layer:NewRelicLambdaExtension:12
       Policies:
         # This policy allows the lambda to know the value of the New Relic licence key. We need this so
         # that we can send telemetry back to New Relic

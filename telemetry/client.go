@@ -177,6 +177,7 @@ func (c *Client) sendPayloads(compressedPayloads []*bytes.Buffer, builder reques
 			successCount += 1
 		}
 	}
+
 	return successCount, sentBytes, nil
 }
 

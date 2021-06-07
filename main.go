@@ -191,7 +191,6 @@ func mainLoop(ctx context.Context, invocationClient *client.InvocationClient, ba
 		select {
 		case <-ctx.Done():
 			// We're already done
-			util.Logln(ctx.Err())
 			return eventCounter, ""
 		default:
 			// Our call to next blocks. It is likely that the container is frozen immediately after we call NextEvent.
@@ -201,7 +200,6 @@ func mainLoop(ctx context.Context, invocationClient *client.InvocationClient, ba
 			eventStart := time.Now()
 
 			if err != nil {
-
 				util.Logln(err)
 				err = invocationClient.ExitError(ctx, "NextEventError.Main", err)
 				if err != nil {
@@ -224,7 +222,6 @@ func mainLoop(ctx context.Context, invocationClient *client.InvocationClient, ba
 					util.Logf("We suspected a timeout for request %s but got telemetry anyway", lastRequestId)
 				default:
 				}
-
 			}
 
 			invokedFunctionARN = event.InvokedFunctionARN
@@ -260,16 +257,19 @@ func mainLoop(ctx context.Context, invocationClient *client.InvocationClient, ba
 
 			// Set the timeout timer for a smidge before the actual timeout;
 			// we can recover from early.
-			timeoutWatchBegins := time.Millisecond * 100
-			timeout := timeoutInstant.Sub(time.Now()) - timeoutWatchBegins
+			timeoutWatchBegins := 100 * time.Millisecond
+			hardTimeout := timeoutInstant.Sub(time.Now())
+			softTimeout := hardTimeout - timeoutWatchBegins
 
-			invCtx, cancel := context.WithTimeout(ctx, timeout)
-			defer cancel()
+			hardCtx, hardCancel := context.WithTimeout(ctx, hardTimeout)
+			defer hardCancel()
+
+			softCtx, softCancel := context.WithTimeout(hardCtx, softTimeout)
+			defer softCancel()
 
 			select {
-			case <-invCtx.Done():
+			case <-softCtx.Done():
 				// We are about to timeout
-				util.Debugln("Timeout suspected: ", invCtx.Err())
 				probablyTimeout = true
 				continue
 			case telemetryBytes := <-telemetryChan:
@@ -282,7 +282,7 @@ func mainLoop(ctx context.Context, invocationClient *client.InvocationClient, ba
 
 				pollLogServer(logServer, batch)
 				harvested := batch.Harvest(time.Now())
-				shipHarvest(ctx, harvested, telemetryClient, invokedFunctionARN)
+				shipHarvest(hardCtx, harvested, telemetryClient, invokedFunctionARN)
 			}
 
 			lastEventStart = eventStart

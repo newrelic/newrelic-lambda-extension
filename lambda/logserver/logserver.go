@@ -7,6 +7,7 @@ import (
 	"net"
 	"net/http"
 	"strconv"
+	"sync"
 	"time"
 
 	"github.com/newrelic/newrelic-lambda-extension/config"
@@ -29,6 +30,8 @@ type LogServer struct {
 	server          *http.Server
 	platformLogChan chan LogLine
 	functionLogChan chan []LogLine
+	lastRequestId   string
+	lastRequestIdLock *sync.Mutex
 }
 
 func (ls *LogServer) Port() uint16 {
@@ -109,15 +112,14 @@ func (ls *LogServer) handler(res http.ResponseWriter, req *http.Request) {
 		util.Logf("Error parsing log payload: %v", err)
 	}
 
-	var (
-		functionLogs  []LogLine
-		lastRequestId string
-	)
+	var functionLogs []LogLine
 
 	for _, event := range logEvents {
 		switch event.Type {
 		case "platform.start":
-			lastRequestId = event.Record.(map[string]interface{})["requestId"].(string)
+			ls.lastRequestIdLock.Lock()
+			ls.lastRequestId = event.Record.(map[string]interface{})["requestId"].(string)
+			ls.lastRequestIdLock.Unlock()
 		case "platform.report":
 			record := event.Record.(map[string]interface{})
 			metrics := record["metrics"].(map[string]interface{})
@@ -137,11 +139,13 @@ func (ls *LogServer) handler(res http.ResponseWriter, req *http.Request) {
 			util.Logf("Platform dropped logs: %v", event.Record)
 		case "function":
 			record := event.Record.(string)
+			ls.lastRequestIdLock.Lock()
 			functionLogs = append(functionLogs, LogLine{
 				Time:      event.Time,
-				RequestID: lastRequestId,
+				RequestID: ls.lastRequestId,
 				Content:   []byte(record),
 			})
+			ls.lastRequestIdLock.Unlock()
 		default:
 			//util.Debugln("Ignored log event of type ", event.Type, string(bodyBytes))
 		}
@@ -171,6 +175,7 @@ func startInternal(host string) (*LogServer, error) {
 		server:          server,
 		platformLogChan: make(chan LogLine, platformLogBufferSize),
 		functionLogChan: make(chan []LogLine),
+		lastRequestIdLock: &sync.Mutex{},
 	}
 
 	mux := http.NewServeMux()

@@ -14,6 +14,7 @@ know that all the telemetry plumbing is connected correctly.
 - The [AWS CLI v2](https://docs.aws.amazon.com/cli/latest/userguide/install-cliv2.html)
 - [Go](https://golang.org/doc/install)
 - [newrelic-lambda](https://github.com/newrelic/newrelic-lambda-cli#installation) CLI tool
+- [aws-lambda-go >= 1.18.0](https://github.com/aws/aws-lambda-go/releases/tag/v1.18.0)
 
 Make sure you've run the `newrelic-lambda install` command in your
 AWS Region, and included the `--enable-license-key-secret` flag.

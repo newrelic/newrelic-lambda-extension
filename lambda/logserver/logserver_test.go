@@ -53,34 +53,6 @@ func TestLogServer(t *testing.T) {
 	assert.Equal(t, 1, len(logLines))
 	assert.Equal(t, "REPORT RequestId: testRequestId\tDuration: 25.30 ms\tBilled Duration: 100 ms\tMemory Size: 128 MB\tMax Memory Used: 74 MB\tInit Duration: 202.00 ms", string(logLines[0].Content))
 
-	testPlatformStartString := []api.LogEvent{
-		{
-			Time:   time.Now(),
-			Type:   "platform.start",
-			Record: "RequestId: abcdef-4321-abcdef-9876",
-		},
-	}
-	testPlatformStartBytes, err := json.Marshal(testPlatformStartString)
-	assert.NoError(t, err)
-
-	req, err = http.NewRequest("POST", realEndpoint, bytes.NewBuffer(testPlatformStartBytes))
-	assert.NoError(t, err)
-
-	client = http.Client{}
-	res, err = client.Do(req)
-
-	assert.NoError(t, err)
-	assert.Equal(t, 200, res.StatusCode)
-	assert.Equal(t, http.NoBody, res.Body)
-	fmt.Println("platform start response")
-	fmt.Println(res)
-	logLines = logs.PollPlatformChannel()
-	fmt.Println("log lines")
-	fmt.Println(logLines)
-
-	assert.Equal(t, 1, len(logLines))
-	assert.Equal(t, "START RequestId: abcdef-4321-abcdef-9876", string(logLines[0].Content))
-
 	assert.Nil(t, logs.Close())
 }
 
@@ -90,15 +62,15 @@ func TestFunctionLogs(t *testing.T) {
 
 	testEvents := []api.LogEvent{
 		{
-			Time: time.Now().Add(-100 * time.Millisecond),
+			Time: time.Now().Add(-100*time.Millisecond),
 			Type: "platform.start",
 			Record: map[string]interface{}{
 				"requestId": "testRequestId",
 			},
 		},
 		{
-			Time:   time.Now().Add(-50 * time.Millisecond),
-			Type:   "function",
+			Time: time.Now().Add(-50*time.Millisecond),
+			Type: "function",
 			Record: "log line 1",
 		},
 	}
@@ -127,8 +99,8 @@ func TestFunctionLogs(t *testing.T) {
 
 	testEvents2 := []api.LogEvent{
 		{
-			Time:   time.Now().Add(500 * time.Millisecond),
-			Type:   "function",
+			Time: time.Now().Add(500*time.Millisecond),
+			Type: "function",
 			Record: "log line 2",
 		},
 	}

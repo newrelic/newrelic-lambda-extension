@@ -34,23 +34,6 @@ func TestLogServer(t *testing.T) {
 		},
 	}
 
-	fmt.Println("testEvents")
-	fmt.Println(testEvents)
-
-	platformStart := api.LogEvent{
-		Time:   time.Now().Add(-100 * time.Millisecond),
-		Type:   "platform.start",
-		Record: "RequestId: abcdef01-a2b3-4321-cd89-0123456789ab",
-	}
-	fmt.Println("platformStart")
-	fmt.Println(platformStart)
-
-	testEvents = append(testEvents, platformStart)
-
-	fmt.Println("============ testEvents after append ===========")
-	fmt.Println(testEvents)
-	fmt.Println("============ / testEvents after append ===========")
-
 	testEventBytes, err := json.Marshal(testEvents)
 	assert.NoError(t, err)
 
@@ -67,15 +50,8 @@ func TestLogServer(t *testing.T) {
 
 	logLines := logs.PollPlatformChannel()
 
-	fmt.Println("log server response")
-	fmt.Println(res)
-	fmt.Println("log lines")
-	fmt.Println(logLines)
-
-	assert.Equal(t, 2, len(logLines))
+	assert.Equal(t, 1, len(logLines))
 	assert.Equal(t, "REPORT RequestId: testRequestId\tDuration: 25.30 ms\tBilled Duration: 100 ms\tMemory Size: 128 MB\tMax Memory Used: 74 MB\tInit Duration: 202.00 ms", string(logLines[0].Content))
-
-	assert.Equal(t, "START RequestId: abcdef01-a2b3-4321-cd89-0123456789ab", string(logLines[1].Content))
 
 	assert.Nil(t, logs.Close())
 }
@@ -147,6 +123,38 @@ func TestFunctionLogs(t *testing.T) {
 	assert.Equal(t, 1, len(logLines2))
 	assert.Equal(t, "log line 2", string(logLines2[0].Content))
 	assert.Equal(t, "testRequestId", logLines2[0].RequestID)
+
+	testEvents3 := []api.LogEvent{
+		{
+			Time:   time.Now().Add(600 * time.Millisecond),
+			Type:   "platform.start",
+			Record: "RequestId: abcdef01-a2b3-4321-cd89-0123456789ab",
+		},
+		{
+			Time:   time.Now().Add(700 * time.Millisecond),
+			Type:   "function",
+			Record: "log line 3, for testing start line record as string",
+		},
+	}
+
+	testEventBytes, err = json.Marshal(testEvents3)
+	assert.NoError(t, err)
+
+	req, err = http.NewRequest("POST", realEndpoint, bytes.NewBuffer(testEventBytes))
+	assert.NoError(t, err)
+
+	go func() {
+		res, err := client.Do(req)
+		assert.NoError(t, err)
+		assert.Equal(t, 200, res.StatusCode)
+		assert.Equal(t, http.NoBody, res.Body)
+	}()
+
+	logLines3, _ := logs.AwaitFunctionLogs()
+
+	assert.Equal(t, 1, len(logLines3))
+	assert.Equal(t, "log line 3, for testing start line record as string", string(logLines3[0].Content))
+	assert.Equal(t, "abcdef01-a2b3-4321-cd89-0123456789ab", logLines3[0].RequestID)
 
 	assert.Nil(t, logs.Close())
 }

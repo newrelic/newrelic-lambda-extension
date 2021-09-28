@@ -7,6 +7,7 @@ var (
 		"/opt/python/lib/python3.6/site-packages/newrelic",
 		"/opt/python/lib/python3.7/newrelic",
 		"/opt/python/lib/python3.8/site-packages/newrelic",
+		"/opt/python/lib/python3.9/site-packages/newrelic",
 	}
 	vendorAgentPathNode   = "/var/task/node_modules/newrelic"
 	vendorAgentPathPython = "/var/task/newrelic"

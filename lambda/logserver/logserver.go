@@ -125,7 +125,7 @@ func (ls *LogServer) handler(res http.ResponseWriter, req *http.Request) {
 			case map[string]interface{}:
 				ls.lastRequestId = event.Record.(map[string]interface{})["requestId"].(string)
 			case string:
-				recordString := fmt.Sprintf("%s", event.Record)
+				recordString := event.Record.(string)
 				ls.lastRequestId = requestIdRegExp.FindStringSubmatch(recordString)[1]
 			}
 			ls.lastRequestIdLock.Unlock()

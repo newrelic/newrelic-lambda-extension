@@ -6,6 +6,7 @@ import (
 	"io/ioutil"
 	"net"
 	"net/http"
+	"regexp"
 	"strconv"
 	"sync"
 	"time"
@@ -26,11 +27,11 @@ type LogLine struct {
 }
 
 type LogServer struct {
-	listenString    string
-	server          *http.Server
-	platformLogChan chan LogLine
-	functionLogChan chan []LogLine
-	lastRequestId   string
+	listenString      string
+	server            *http.Server
+	platformLogChan   chan LogLine
+	functionLogChan   chan []LogLine
+	lastRequestId     string
 	lastRequestIdLock *sync.Mutex
 }
 
@@ -98,6 +99,8 @@ func formatReport(metrics map[string]interface{}) string {
 	return ret
 }
 
+var requestIdRegExp, _ = regexp.Compile("RequestId: ([a-zA-Z0-9-]+)")
+
 func (ls *LogServer) handler(res http.ResponseWriter, req *http.Request) {
 	defer util.Close(req.Body)
 
@@ -118,7 +121,13 @@ func (ls *LogServer) handler(res http.ResponseWriter, req *http.Request) {
 		switch event.Type {
 		case "platform.start":
 			ls.lastRequestIdLock.Lock()
-			ls.lastRequestId = event.Record.(map[string]interface{})["requestId"].(string)
+			switch event.Record.(type) {
+			case map[string]interface{}:
+				ls.lastRequestId = event.Record.(map[string]interface{})["requestId"].(string)
+			case string:
+				recordString := event.Record.(string)
+				ls.lastRequestId = requestIdRegExp.FindStringSubmatch(recordString)[1]
+			}
 			ls.lastRequestIdLock.Unlock()
 		case "platform.report":
 			record := event.Record.(map[string]interface{})
@@ -171,10 +180,10 @@ func startInternal(host string) (*LogServer, error) {
 	server := &http.Server{}
 
 	logServer := &LogServer{
-		listenString:    listener.Addr().String(),
-		server:          server,
-		platformLogChan: make(chan LogLine, platformLogBufferSize),
-		functionLogChan: make(chan []LogLine),
+		listenString:      listener.Addr().String(),
+		server:            server,
+		platformLogChan:   make(chan LogLine, platformLogBufferSize),
+		functionLogChan:   make(chan []LogLine),
 		lastRequestIdLock: &sync.Mutex{},
 	}
 

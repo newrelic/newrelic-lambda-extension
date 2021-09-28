@@ -62,15 +62,15 @@ func TestFunctionLogs(t *testing.T) {
 
 	testEvents := []api.LogEvent{
 		{
-			Time: time.Now().Add(-100*time.Millisecond),
+			Time: time.Now().Add(-100 * time.Millisecond),
 			Type: "platform.start",
 			Record: map[string]interface{}{
 				"requestId": "testRequestId",
 			},
 		},
 		{
-			Time: time.Now().Add(-50*time.Millisecond),
-			Type: "function",
+			Time:   time.Now().Add(-50 * time.Millisecond),
+			Type:   "function",
 			Record: "log line 1",
 		},
 	}
@@ -99,8 +99,8 @@ func TestFunctionLogs(t *testing.T) {
 
 	testEvents2 := []api.LogEvent{
 		{
-			Time: time.Now().Add(500*time.Millisecond),
-			Type: "function",
+			Time:   time.Now().Add(500 * time.Millisecond),
+			Type:   "function",
 			Record: "log line 2",
 		},
 	}
@@ -123,6 +123,38 @@ func TestFunctionLogs(t *testing.T) {
 	assert.Equal(t, 1, len(logLines2))
 	assert.Equal(t, "log line 2", string(logLines2[0].Content))
 	assert.Equal(t, "testRequestId", logLines2[0].RequestID)
+
+	testEvents3 := []api.LogEvent{
+		{
+			Time:   time.Now().Add(600 * time.Millisecond),
+			Type:   "platform.start",
+			Record: "RequestId: abcdef01-a2b3-4321-cd89-0123456789ab",
+		},
+		{
+			Time:   time.Now().Add(700 * time.Millisecond),
+			Type:   "function",
+			Record: "log line 3, for testing start line record as string",
+		},
+	}
+
+	testEventBytes, err = json.Marshal(testEvents3)
+	assert.NoError(t, err)
+
+	req, err = http.NewRequest("POST", realEndpoint, bytes.NewBuffer(testEventBytes))
+	assert.NoError(t, err)
+
+	go func() {
+		res, err := client.Do(req)
+		assert.NoError(t, err)
+		assert.Equal(t, 200, res.StatusCode)
+		assert.Equal(t, http.NoBody, res.Body)
+	}()
+
+	logLines3, _ := logs.AwaitFunctionLogs()
+
+	assert.Equal(t, 1, len(logLines3))
+	assert.Equal(t, "log line 3, for testing start line record as string", string(logLines3[0].Content))
+	assert.Equal(t, "abcdef01-a2b3-4321-cd89-0123456789ab", logLines3[0].RequestID)
 
 	assert.Nil(t, logs.Close())
 }

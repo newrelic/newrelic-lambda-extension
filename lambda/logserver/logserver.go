@@ -99,7 +99,7 @@ func formatReport(metrics map[string]interface{}) string {
 	return ret
 }
 
-var requestIdRegExp, _ = regexp.Compile("RequestId: ([a-f0-9-]+)")
+var requestIdRegExp, _ = regexp.Compile("RequestId: ([a-zA-Z0-9-]+)")
 
 func (ls *LogServer) handler(res http.ResponseWriter, req *http.Request) {
 	defer util.Close(req.Body)

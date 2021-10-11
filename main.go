@@ -218,6 +218,7 @@ func mainLoop(ctx context.Context, invocationClient *client.InvocationClient, ba
 				select {
 				case telemetryBytes := <-telemetryChan:
 					// We received telemetry
+					util.Debugf("Agent telemetry bytes: %s", base64.URLEncoding.EncodeToString(telemetryBytes))
 					batch.AddTelemetry(lastRequestId, telemetryBytes)
 					util.Logf("We suspected a timeout for request %s but got telemetry anyway", lastRequestId)
 				default:

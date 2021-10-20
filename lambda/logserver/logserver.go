@@ -99,7 +99,7 @@ func formatReport(metrics map[string]interface{}) string {
 	return ret
 }
 
-var requestIdRegExp, _ = regexp.Compile("RequestId: ([a-zA-Z0-9-]+)")
+var reportStringRegExp, _ = regexp.Compile("RequestId: ([a-zA-Z0-9-]+)(.*)")
 
 func (ls *LogServer) handler(res http.ResponseWriter, req *http.Request) {
 	defer util.Close(req.Body)
@@ -126,17 +126,29 @@ func (ls *LogServer) handler(res http.ResponseWriter, req *http.Request) {
 				ls.lastRequestId = event.Record.(map[string]interface{})["requestId"].(string)
 			case string:
 				recordString := event.Record.(string)
-				ls.lastRequestId = requestIdRegExp.FindStringSubmatch(recordString)[1]
+				ls.lastRequestId = reportStringRegExp.FindStringSubmatch(recordString)[1]
 			}
 			ls.lastRequestIdLock.Unlock()
 		case "platform.report":
-			record := event.Record.(map[string]interface{})
-			metrics := record["metrics"].(map[string]interface{})
-			requestId := record["requestId"].(string)
+			metricString := ""
+			requestId := ""
+			switch event.Record.(type) {
+			case map[string]interface{}:
+				record := event.Record.(map[string]interface{})
+				metrics := record["metrics"].(map[string]interface{})
+				metricString = formatReport(metrics)
+				requestId = record["requestId"].(string)
+			case string:
+				recordString := event.Record.(string)
+				results := reportStringRegExp.FindStringSubmatch(recordString)
+				requestId = results[1]
+				metricString = results[2]
+			}
+
 			reportStr := fmt.Sprintf(
 				"REPORT RequestId: %v%s",
 				requestId,
-				formatReport(metrics),
+				metricString,
 			)
 			reportLine := LogLine{
 				Time:      event.Time,

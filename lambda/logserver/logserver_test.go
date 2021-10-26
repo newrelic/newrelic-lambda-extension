@@ -124,11 +124,13 @@ func TestFunctionLogs(t *testing.T) {
 	assert.Equal(t, "log line 2", string(logLines2[0].Content))
 	assert.Equal(t, "testRequestId", logLines2[0].RequestID)
 
+	testRequestId := "abcdef01-a2b3-4321-cd89-0123456789ab"
+
 	testEvents3 := []api.LogEvent{
 		{
 			Time:   time.Now().Add(600 * time.Millisecond),
 			Type:   "platform.start",
-			Record: "RequestId: abcdef01-a2b3-4321-cd89-0123456789ab",
+			Record: "RequestId: " + testRequestId,
 		},
 		{
 			Time:   time.Now().Add(700 * time.Millisecond),
@@ -154,7 +156,41 @@ func TestFunctionLogs(t *testing.T) {
 
 	assert.Equal(t, 1, len(logLines3))
 	assert.Equal(t, "log line 3, for testing start line record as string", string(logLines3[0].Content))
-	assert.Equal(t, "abcdef01-a2b3-4321-cd89-0123456789ab", logLines3[0].RequestID)
+	assert.Equal(t, testRequestId, logLines3[0].RequestID)
+
+	platformMetricString := "REPORT RequestId: " + testRequestId + "\tDuration: 25.30 ms\tBilled Duration: 100 ms\tMemory Size: 128 MB\tMax Memory Used: 74 MB\tInit Duration: 202.00 ms"
+
+	testEvents4 := []api.LogEvent{
+		{
+			Time:   time.Now().Add(800 * time.Millisecond),
+			Type:   "platform.report",
+			Record: platformMetricString,
+		},
+		{
+			Time:   time.Now().Add(900 * time.Millisecond),
+			Type:   "function",
+			Record: "log line 4, testing platform metrics as string",
+		},
+	}
+
+	testEventBytes, err = json.Marshal(testEvents4)
+	assert.NoError(t, err)
+
+	req, err = http.NewRequest("POST", realEndpoint, bytes.NewBuffer(testEventBytes))
+	assert.NoError(t, err)
+
+	go func() {
+		res, err := client.Do(req)
+		assert.NoError(t, err)
+		assert.Equal(t, 200, res.StatusCode)
+		assert.Equal(t, http.NoBody, res.Body)
+	}()
+
+	logLines4, _ := logs.AwaitFunctionLogs()
+
+	assert.Equal(t, 1, len(logLines4))
+	assert.Equal(t, "log line 4, testing platform metrics as string", string(logLines4[0].Content))
+	assert.Equal(t, testRequestId, logLines4[0].RequestID)
 
 	assert.Nil(t, logs.Close())
 }

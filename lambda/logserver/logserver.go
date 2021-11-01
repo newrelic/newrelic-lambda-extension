@@ -99,7 +99,7 @@ func formatReport(metrics map[string]interface{}) string {
 	return ret
 }
 
-var reportStringRegExp, _ = regexp.Compile("RequestId: ([a-zA-Z0-9-]+)(.*)")
+var reportStringRegExp, _ = regexp.Compile("RequestId: ([a-fA-F0-9-]+)(.*)")
 
 func (ls *LogServer) handler(res http.ResponseWriter, req *http.Request) {
 	defer util.Close(req.Body)
@@ -126,7 +126,10 @@ func (ls *LogServer) handler(res http.ResponseWriter, req *http.Request) {
 				ls.lastRequestId = event.Record.(map[string]interface{})["requestId"].(string)
 			case string:
 				recordString := event.Record.(string)
-				ls.lastRequestId = reportStringRegExp.FindStringSubmatch(recordString)[1]
+				results := reportStringRegExp.FindStringSubmatch(recordString)
+				if len(results) > 1 {
+					ls.lastRequestId = results[1]
+				}
 			}
 			ls.lastRequestIdLock.Unlock()
 		case "platform.report":
@@ -141,8 +144,14 @@ func (ls *LogServer) handler(res http.ResponseWriter, req *http.Request) {
 			case string:
 				recordString := event.Record.(string)
 				results := reportStringRegExp.FindStringSubmatch(recordString)
-				requestId = results[1]
-				metricString = results[2]
+				if len(results) > 1 {
+					requestId = results[1]
+					if len(results) > 2 {
+						metricString = results[2]
+					}
+				} else {
+					util.Debugf("Unknown platform log: %s", recordString)
+				}
 			}
 
 			reportStr := fmt.Sprintf(

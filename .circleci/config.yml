@@ -50,11 +50,8 @@ jobs:
           keys:
             - go-mod-{{ checksum "go.sum" }}
       - run:
-          name: Build x86_64 distribution
-          command: make dist-x86_64
-      - run:
-          name: Archive x86_64 distribution
-          command: zip -rq /tmp/newrelic-lambda-extension.x86_64.zip preview-extensions-ggqizro707 extensions
+          name: Build and archive x86_64 distribution
+          command: make zip-x86_64
       - store_artifacts:
           path: /tmp/newrelic-lambda-extension.x86_64.zip
           destination: newrelic-lambda-extension
@@ -72,11 +69,8 @@ jobs:
           keys:
             - go-mod-{{ checksum "go.sum" }}
       - run:
-          name: Build arm64 distribution
-          command: make dist-arm64
-      - run:
-          name: Archive arm64 distribution
-          command: zip -rq /tmp/newrelic-lambda-extension.arm64.zip preview-extensions-ggqizro707 extensions
+          name: Build and archive arm64 distribution
+          command: make zip-arm64
       - store_artifacts:
           path: /tmp/newrelic-lambda-extension.arm64.zip
           destination: newrelic-lambda-extension

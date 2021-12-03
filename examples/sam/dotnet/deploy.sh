@@ -9,7 +9,7 @@ sam build
 
 bucket="newrelic-example-${region}-${accountId}"
 
-aws s3 mb --region "${region}" s3://"${bucket}"
+aws s3 mb --region "${region}" "s3://${bucket}"
 
 sam package --region "${region}" --s3-bucket "${bucket}" --output-template-file packaged.yaml
 

@@ -50,7 +50,7 @@ func TestRuntimeCheckNil(t *testing.T) {
 
 func TestLatestAgentTag(t *testing.T) {
 	client = &mockClientError{}
-	assert.Error(t, latestAgentTag(&runtimeConfig{}))
+	assert.Nil(t, latestAgentTag(&runtimeConfig{}))
 
 	client = &mockClientRedirect{}
 	assert.Nil(t, latestAgentTag(&runtimeConfig{}))

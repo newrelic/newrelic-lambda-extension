@@ -46,7 +46,9 @@ func checkAndReturnRuntime() (runtimeConfig, error) {
 func latestAgentTag(r *runtimeConfig) error {
 	resp, err := client.Get(r.agentVersionUrl)
 	if err != nil {
-		return err
+		// Likely a connectivity issue, log the error but skip check
+		util.Debugf("Can't query latest agent version. Request to %v returned error %v", r.agentVersionUrl, err)
+		return nil
 	}
 
 	defer resp.Body.Close()

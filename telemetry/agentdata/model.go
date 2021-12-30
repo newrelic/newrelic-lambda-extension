@@ -12,8 +12,8 @@ func ToTimestamp(v float64) time.Time {
 }
 
 type RawAgentData struct {
-	metadata Metadata
-	data     RawData
+	Metadata Metadata `json:"metadata"`
+	Data     RawData  `json:"data"`
 }
 
 type Metadata struct {

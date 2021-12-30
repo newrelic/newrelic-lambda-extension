@@ -28,6 +28,7 @@ type Configuration struct {
 	LogLevel           string
 	SendFunctionLogs   bool
 	LogServerHost      string
+	OtelEndpoint       string
 }
 
 func ConfigurationFromEnvironment() *Configuration {
@@ -42,6 +43,7 @@ func ConfigurationFromEnvironment() *Configuration {
 	logLevelStr, logLevelOverride := os.LookupEnv("NEW_RELIC_EXTENSION_LOG_LEVEL")
 	sendFunctionLogsStr, sendFunctionLogsOverride := os.LookupEnv("NEW_RELIC_EXTENSION_SEND_FUNCTION_LOGS")
 	logServerHostStr, logServerHostOverride := os.LookupEnv("NEW_RELIC_LOG_SERVER_HOST")
+	OtelEndpoint, OtelEndpointOverride := os.LookupEnv("OTEL_EXPORTER_OTLP_ENDPOINT")
 
 	extensionEnabled := true
 	if extensionEnabledOverride && strings.ToLower(enabledStr) == "false" {
@@ -105,6 +107,10 @@ func ConfigurationFromEnvironment() *Configuration {
 
 	if sendFunctionLogsOverride && sendFunctionLogsStr == "true" {
 		ret.SendFunctionLogs = true
+	}
+
+	if OtelEndpointOverride {
+		ret.OtelEndpoint = OtelEndpoint
 	}
 
 	return ret

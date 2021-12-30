@@ -100,13 +100,13 @@ func CompressedPayloadsForLogEvents(logsEvents []LogsEvent, functionName string,
 		return nil, err
 	}
 
-	context := RequestContext{
+	requestContext := RequestContext{
 		FunctionName:       functionName,
 		InvokedFunctionARN: invokedFunctionARN,
 		LogGroupName:       logGroupName,
 		LogStreamName:      util.Id,
 	}
-	data := RequestData{Context: context, Entry: string(entry)}
+	data := RequestData{Context: requestContext, Entry: string(entry)}
 
 	compressed, err := CompressedJsonPayload(data)
 	if err != nil {

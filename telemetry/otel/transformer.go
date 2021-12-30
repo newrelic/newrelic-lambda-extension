@@ -1,40 +1,35 @@
-package agentdata
+package otel
 
 import (
 	"context"
 	"fmt"
+	"github.com/newrelic/newrelic-lambda-extension/telemetry/agentdata"
 	"go.opentelemetry.io/otel/attribute"
-	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc"
-	tracesdk "go.opentelemetry.io/otel/sdk/trace"
 	"go.opentelemetry.io/otel/trace"
 	"time"
 )
 
-func foo(ctx context.Context, licenseKey string) trace.Tracer {
-	exporter, _ := otlptracegrpc.New(ctx,
-		otlptracegrpc.WithHeaders(map[string]string{"api-key": licenseKey}),
-		otlptracegrpc.WithEndpoint("https://otlp.nr-data.net:4317/"),
-	)
-
-	tp := tracesdk.NewTracerProvider(tracesdk.WithBatcher(exporter))
-	return tp.Tracer("newrelic-lambda-extension")
-}
-
-func ReplaySpans(ctx context.Context, nrSpans []AgentEvent, tracer trace.Tracer) {
+func ReplaySpans(
+	ctx context.Context,
+	nrSpans []agentdata.AgentEvent,
+	tracer trace.Tracer,
+	nrErrorEvents []agentdata.AgentEvent,
+	nrCustomEvents []agentdata.AgentEvent,
+) {
 	childIndex, root := indexAgentEvents(nrSpans)
 
-	ReplaySpan(ctx, tracer, root, childIndex, nil, nil)
+	ReplaySpan(ctx, tracer, root, childIndex, nrErrorEvents, nrCustomEvents)
 }
 
 func ReplaySpan(
 	ctx context.Context,
 	tracer trace.Tracer,
-	nrSpan *AgentEvent,
-	index map[string][]*AgentEvent,
-	nrErrorEvents []*AgentEvent,
-	nrCustomEvents []*AgentEvent,
+	nrSpan *agentdata.AgentEvent,
+	index map[string][]*agentdata.AgentEvent,
+	nrErrorEvents []agentdata.AgentEvent,
+	nrCustomEvents []agentdata.AgentEvent,
 ) {
-	ts := ToTimestamp(nrSpan.Get("timestamp").(float64))
+	ts := agentdata.ToTimestamp(nrSpan.Get("timestamp").(float64))
 	entryPoint := nrSpan.Get("nr.entryPoint")
 	spanKind := trace.SpanKindInternal
 	if entryPoint != nil && entryPoint.(bool) {
@@ -56,11 +51,11 @@ func ReplaySpan(
 
 	//Errors
 	for _, ev := range nrErrorEvents {
-		eventTs := ToTimestamp(ev.Get("timestamp").(float64))
+		eventTs := agentdata.ToTimestamp(ev.Get("timestamp").(float64))
 		errorClass := ev.Get("error.class")
 		errorMessage := ev.Get("error.message")
 
-		eventAttrs := agentEventAttributes(ev)
+		eventAttrs := agentEventAttributes(&ev)
 		if errorClass != nil {
 			eventAttrs = append(eventAttrs, attribute.String("exception.type", errorClass.(string)))
 		}
@@ -85,8 +80,8 @@ func ReplaySpan(
 	//Custom events
 	for _, ev := range nrCustomEvents {
 		name := ev.Get("type").(string)
-		eventTs := ToTimestamp(ev.Get("timestamp").(float64))
-		eventAttrs := agentEventAttributes(ev)
+		eventTs := agentdata.ToTimestamp(ev.Get("timestamp").(float64))
+		eventAttrs := agentEventAttributes(&ev)
 		span.AddEvent(name, trace.WithTimestamp(eventTs), trace.WithAttributes(eventAttrs...))
 	}
 
@@ -101,10 +96,10 @@ func ReplaySpan(
 	span.End(trace.WithTimestamp(endTs))
 }
 
-func indexAgentEvents(agentEvents []AgentEvent) (map[string][]*AgentEvent, *AgentEvent) {
-	ret := make(map[string][]*AgentEvent)
+func indexAgentEvents(agentEvents []agentdata.AgentEvent) (map[string][]*agentdata.AgentEvent, *agentdata.AgentEvent) {
+	ret := make(map[string][]*agentdata.AgentEvent)
 
-	var root *AgentEvent
+	var root *agentdata.AgentEvent
 	for _, ae := range agentEvents {
 		entryPoint := ae.Get("nr.entryPoint")
 		if entryPoint != nil && entryPoint.(bool) {
@@ -130,7 +125,7 @@ var attrFilter = map[string]bool{
 	"priority":  true,
 }
 
-func agentEventAttributes(nrSpan *AgentEvent) []attribute.KeyValue {
+func agentEventAttributes(nrSpan *agentdata.AgentEvent) []attribute.KeyValue {
 	ret := make([]attribute.KeyValue, 0)
 	for k, v := range nrSpan.Flatten() {
 		if !attrFilter[k] {

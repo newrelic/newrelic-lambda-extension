@@ -23,6 +23,11 @@ const (
 	retries int = 3
 )
 
+type TelemetrySender interface {
+	SendTelemetry(ctx context.Context, invokedFunctionARN string, telemetry [][]byte) (error, int)
+	SendFunctionLogs(ctx context.Context, lines []logserver.LogLine) error
+}
+
 type Client struct {
 	httpClient        *http.Client
 	licenseKey        string

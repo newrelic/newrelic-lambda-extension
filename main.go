@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/base64"
 	"fmt"
+	"github.com/newrelic/newrelic-lambda-extension/telemetry/otel"
 	"net/http"
 	"os"
 	"os/signal"
@@ -115,7 +116,12 @@ func main() {
 	}
 
 	// Init the telemetry sending client
-	telemetryClient := telemetry.New(registrationResponse.FunctionName, licenseKey, conf.TelemetryEndpoint, conf.LogEndpoint)
+	var telemetryClient telemetry.TelemetrySender
+	if conf.OtelEndpoint != "" {
+		telemetryClient = otel.NewOtelTelemetrySender(ctx, licenseKey, conf.OtelEndpoint)
+	} else {
+		telemetryClient = telemetry.New(registrationResponse.FunctionName, licenseKey, conf.TelemetryEndpoint, conf.LogEndpoint)
+	}
 	telemetryChan, err := telemetry.InitTelemetryChannel()
 	if err != nil {
 		err2 := invocationClient.InitError(ctx, "telemetryClient.init", err)
@@ -162,7 +168,7 @@ func main() {
 }
 
 // logShipLoop ships function logs to New Relic as they arrive.
-func logShipLoop(ctx context.Context, logServer *logserver.LogServer, telemetryClient *telemetry.Client) {
+func logShipLoop(ctx context.Context, logServer *logserver.LogServer, telemetryClient telemetry.TelemetrySender) {
 	for {
 		functionLogs, more := logServer.AwaitFunctionLogs()
 		if !more {
@@ -177,7 +183,7 @@ func logShipLoop(ctx context.Context, logServer *logserver.LogServer, telemetryC
 }
 
 // mainLoop repeatedly calls the /next api, and processes telemetry and platform logs. The timing is rather complicated.
-func mainLoop(ctx context.Context, invocationClient *client.InvocationClient, batch *telemetry.Batch, telemetryChan chan []byte, logServer *logserver.LogServer, telemetryClient *telemetry.Client) (int, string) {
+func mainLoop(ctx context.Context, invocationClient *client.InvocationClient, batch *telemetry.Batch, telemetryChan chan []byte, logServer *logserver.LogServer, telemetryClient telemetry.TelemetrySender) (int, string) {
 	var (
 		invokedFunctionARN string
 		lastEventStart     time.Time
@@ -301,7 +307,7 @@ func pollLogServer(logServer *logserver.LogServer, batch *telemetry.Batch) {
 	}
 }
 
-func shipHarvest(ctx context.Context, harvested []*telemetry.Invocation, telemetryClient *telemetry.Client, invokedFunctionARN string) {
+func shipHarvest(ctx context.Context, harvested []*telemetry.Invocation, telemetryClient telemetry.TelemetrySender, invokedFunctionARN string) {
 	if len(harvested) > 0 {
 		telemetrySlice := make([][]byte, 0, 2*len(harvested))
 		for _, inv := range harvested {

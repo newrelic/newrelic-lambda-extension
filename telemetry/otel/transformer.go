@@ -99,18 +99,18 @@ func ReplaySpan(
 func indexAgentEvents(agentEvents []agentdata.AgentEvent) (map[string][]*agentdata.AgentEvent, *agentdata.AgentEvent) {
 	ret := make(map[string][]*agentdata.AgentEvent)
 
-	var root *agentdata.AgentEvent
+	var root agentdata.AgentEvent
 	for _, ae := range agentEvents {
 		entryPoint := ae.Get("nr.entryPoint")
 		if entryPoint != nil && entryPoint.(bool) {
-			root = &ae
+			root = ae
 		} else {
 			parentId := ae.Get("parentId").(string)
 			ret[parentId] = append(ret[parentId], &ae)
 		}
 	}
 
-	return ret, root
+	return ret, &root
 }
 
 // attrFilter is a set of attributes that should not be copied across to OTel spans

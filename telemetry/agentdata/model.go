@@ -40,17 +40,20 @@ type RawAgentEventData []interface{}
 func (d *RawAgentEventData) GetAgentEvents() []AgentEvent {
 	ret := make([]AgentEvent, 0, len(*d))
 	for i := 2; i < len(*d); i++ {
-		partsList := (*d)[i].([]map[string]interface{})
-		var agentAttrs map[string]interface{}
-		if len(partsList) > 2 {
-			agentAttrs = partsList[2]
-		}
+		agentEventData := (*d)[i].([]interface{})
+		for j := 0; j < len(agentEventData); j++ {
+			partsList := agentEventData[j].([]interface{})
+			var agentAttrs map[string]interface{}
+			if len(partsList) > 2 {
+				agentAttrs = partsList[2].(map[string]interface{})
+			}
 
-		ret = append(ret, AgentEvent{
-			Intrinsics:      partsList[0],
-			UserAttributes:  partsList[1],
-			AgentAttributes: agentAttrs,
-		})
+			ret = append(ret, AgentEvent{
+				Intrinsics:      partsList[0].(map[string]interface{}),
+				UserAttributes:  partsList[1].(map[string]interface{}),
+				AgentAttributes: agentAttrs,
+			})
+		}
 	}
 	return ret
 }

@@ -1,6 +1,8 @@
 package otel
 
 import (
+	"bytes"
+	"compress/gzip"
 	"context"
 	"encoding/base64"
 	"encoding/json"
@@ -27,6 +29,21 @@ func NewOtelTelemetrySender(ctx context.Context, licenseKey string, endpoint str
 	return OtelTelemetrySender{traceProvider: tp}
 }
 
+func unmarshalEncodedPayload(encoded string, target interface{}) error {
+	decoded, err := base64.StdEncoding.DecodeString(encoded)
+	if err != nil {
+		return err
+	}
+
+	zipReader, err := gzip.NewReader(bytes.NewBuffer(decoded))
+	if err != nil {
+		return err
+	}
+
+	err = json.NewDecoder(zipReader).Decode(target)
+	return err
+}
+
 func (o OtelTelemetrySender) SendTelemetry(ctx context.Context, invokedFunctionARN string, telemetry [][]byte) (error, int) {
 	tracer := o.traceProvider.Tracer("newrelic-lambda-extension")
 
@@ -39,26 +56,16 @@ func (o OtelTelemetrySender) SendTelemetry(ctx context.Context, invokedFunctionA
 			}
 
 			var data agentdata.RawData
-			if parts[0] == 1 {
-				decoded, err := base64.StdEncoding.DecodeString(parts[2].(string))
-				if err != nil {
-					return err, 0
-				}
-
+			version := int(parts[0].(float64))
+			if version == 1 {
 				var rawAgentData agentdata.RawAgentData
-				err = json.Unmarshal(decoded, &rawAgentData)
+				err = unmarshalEncodedPayload(parts[2].(string), &rawAgentData)
 				if err != nil {
 					return err, 0
 				}
-
 				data = rawAgentData.Data
-			} else if parts[0] == 2 {
-				decoded, err := base64.StdEncoding.DecodeString(parts[3].(string))
-				if err != nil {
-					return err, 0
-				}
-
-				err = json.Unmarshal(decoded, &data)
+			} else if version == 2 {
+				err = unmarshalEncodedPayload(parts[3].(string), &data)
 				if err != nil {
 					return err, 0
 				}

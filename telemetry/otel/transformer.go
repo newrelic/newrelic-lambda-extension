@@ -106,7 +106,8 @@ func indexAgentEvents(agentEvents []agentdata.AgentEvent) (map[string][]*agentda
 			root = ae
 		} else {
 			parentId := ae.Get("parentId").(string)
-			ret[parentId] = append(ret[parentId], &ae)
+			event := ae
+			ret[parentId] = append(ret[parentId], &event)
 		}
 	}
 

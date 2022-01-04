@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/newrelic/go-agent/v3/integrations/nrlambda"
 	"github.com/newrelic/go-agent/v3/newrelic"
+	"time"
 )
 
 func handler(ctx context.Context) (string, error) {
@@ -18,6 +19,11 @@ func handler(ctx context.Context) (string, error) {
 
 		// This attribute gets added to the normal AwsLambdaInvocation event
 		txn.AddAttribute("customAttribute", "customAttributeValue")
+
+		seg := txn.StartSegment("CustomSegment")
+		seg.AddAttribute("greeting", "hello, world")
+		time.Sleep(10 * time.Millisecond)
+		seg.End()
 	}
 
 	// As normal, anything you write to stdout ends up in CloudWatch

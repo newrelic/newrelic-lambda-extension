@@ -118,7 +118,7 @@ func main() {
 	// Init the telemetry sending client
 	var telemetryClient telemetry.TelemetrySender
 	if conf.OtelEndpoint != "" {
-		telemetryClient = otel.NewOtelTelemetrySender(ctx, licenseKey, conf.OtelEndpoint)
+		telemetryClient = otel.NewOtelTelemetrySender(ctx, licenseKey, conf.OtelEndpoint, registrationResponse.FunctionName)
 	} else {
 		telemetryClient = telemetry.New(registrationResponse.FunctionName, licenseKey, conf.TelemetryEndpoint, conf.LogEndpoint)
 	}

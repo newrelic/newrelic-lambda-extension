@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"github.com/newrelic/newrelic-lambda-extension/lambda/logserver"
 	"github.com/newrelic/newrelic-lambda-extension/telemetry/agentdata"
+	"github.com/newrelic/newrelic-lambda-extension/util"
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc"
 	tracesdk "go.opentelemetry.io/otel/sdk/trace"
 	"strings"
@@ -17,14 +18,24 @@ type OtelTelemetrySender struct {
 	traceProvider *tracesdk.TracerProvider
 }
 
-func NewOtelTelemetrySender(ctx context.Context, licenseKey string, endpoint string) OtelTelemetrySender {
+func NewOtelTelemetrySender(ctx context.Context, licenseKey string, endpoint string, functionName string) OtelTelemetrySender {
 	exporter, _ := otlptracegrpc.New(ctx,
 		otlptracegrpc.WithHeaders(map[string]string{"api-key": licenseKey}),
 		otlptracegrpc.WithEndpoint(endpoint),
 	)
 
 	// TODO: Resource config should describe this Lambda function
-	tp := tracesdk.NewTracerProvider(tracesdk.WithBatcher(exporter))
+	//attributes := resource.WithAttributes(
+	//	semconv.CloudPlatformAWSLambda,
+	//	semconv.FaaSNameKey.String(functionName),
+	//)
+	//r, err := resource.New(ctx, attributes)
+	//if err != nil {
+	//	util.Panic(err)
+	//}
+	//tp := tracesdk.NewTracerProvider(tracesdk.WithSyncer(exporter), tracesdk.WithResource(r))
+
+	tp := tracesdk.NewTracerProvider(tracesdk.WithSyncer(exporter))
 
 	return OtelTelemetrySender{traceProvider: tp}
 }
@@ -47,8 +58,12 @@ func unmarshalEncodedPayload(encoded string, target interface{}) error {
 func (o OtelTelemetrySender) SendTelemetry(ctx context.Context, invokedFunctionARN string, telemetry [][]byte) (error, int) {
 	tracer := o.traceProvider.Tracer("newrelic-lambda-extension")
 
+	util.Logln("Starting OTLP send")
+	count := 0
 	for _, buf := range telemetry {
 		if strings.Contains(string(buf), "NR_LAMBDA_MONITORING") {
+			count++
+
 			parts := make([]interface{}, 0, 4)
 			err := json.Unmarshal(buf, &parts)
 			if err != nil {
@@ -77,13 +92,17 @@ func (o OtelTelemetrySender) SendTelemetry(ctx context.Context, invokedFunctionA
 				data.ErrorEventData.GetAgentEvents(),
 				data.CustomEventData.GetAgentEvents(),
 			)
+			util.Logln("Finished trace.")
 		}
 	}
 
-	err := o.traceProvider.ForceFlush(ctx)
-	if err != nil {
-		return err, 0
-	}
+	//util.Logln("Forcing flush")
+	//err := o.traceProvider.ForceFlush(ctx)
+	//if err != nil {
+	//	return err, 0
+	//}
+
+	util.Logf("Sent %v traces", count)
 
 	return nil, len(telemetry)
 }

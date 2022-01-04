@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/newrelic/newrelic-lambda-extension/telemetry/agentdata"
 	"go.opentelemetry.io/otel/attribute"
+	semconv "go.opentelemetry.io/otel/semconv/v1.7.0"
 	"go.opentelemetry.io/otel/trace"
 	"time"
 )
@@ -15,10 +16,19 @@ func ReplaySpans(
 	tracer trace.Tracer,
 	nrErrorEvents []agentdata.AgentEvent,
 	nrCustomEvents []agentdata.AgentEvent,
+	metadata agentdata.Metadata,
 ) {
 	childIndex, root := indexAgentEvents(nrSpans)
 
-	ReplaySpan(ctx, tracer, root, childIndex, nrErrorEvents, nrCustomEvents)
+	extraAttrs := make([]attribute.KeyValue, 0, 2)
+	if metadata.Arn != "" {
+		extraAttrs = append(extraAttrs, semconv.FaaSIDKey.String(metadata.Arn))
+	}
+	if metadata.FunctionVersion != "" {
+		extraAttrs = append(extraAttrs, semconv.FaaSVersionKey.String(metadata.FunctionVersion))
+	}
+
+	ReplaySpan(ctx, tracer, root, childIndex, nrErrorEvents, nrCustomEvents, extraAttrs...)
 }
 
 func ReplaySpan(
@@ -28,6 +38,7 @@ func ReplaySpan(
 	index map[string][]*agentdata.AgentEvent,
 	nrErrorEvents []agentdata.AgentEvent,
 	nrCustomEvents []agentdata.AgentEvent,
+	extraAttrs ...attribute.KeyValue,
 ) {
 	ts := agentdata.ToTimestamp(nrSpan.Get("timestamp").(float64))
 	entryPoint := nrSpan.Get("nr.entryPoint")
@@ -46,6 +57,7 @@ func ReplaySpan(
 		nrSpan.Get("name").(string),
 		trace.WithTimestamp(ts),
 		trace.WithAttributes(attrs...),
+		trace.WithAttributes(extraAttrs...),
 		trace.WithSpanKind(spanKind),
 	)
 
@@ -87,7 +99,7 @@ func ReplaySpan(
 
 	id := nrSpan.Get("guid").(string)
 	for _, child := range index[id] {
-		ReplaySpan(spanCtx, tracer, child, index, nil, nil)
+		ReplaySpan(spanCtx, tracer, child, index, nil, nil, extraAttrs...)
 	}
 
 	durationSeconds := nrSpan.Get("duration").(float64)

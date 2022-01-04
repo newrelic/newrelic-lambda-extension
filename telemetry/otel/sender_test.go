@@ -3,7 +3,6 @@ package otel
 import (
 	"bytes"
 	"context"
-	"fmt"
 	"github.com/stretchr/testify/assert"
 	"go.opentelemetry.io/otel/exporters/stdout/stdouttrace"
 	tracesdk "go.opentelemetry.io/otel/sdk/trace"
@@ -37,5 +36,5 @@ func TestOtelTelemetrySender_SendTelemetry(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, 4, count)
 
-	fmt.Println(buf.String())
+	//fmt.Println(buf.String())
 }

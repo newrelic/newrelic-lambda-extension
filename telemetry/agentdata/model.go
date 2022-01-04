@@ -26,6 +26,24 @@ type Metadata struct {
 	AgentLanguage        string `json:"agent_language"`
 }
 
+func (m *Metadata) FromMap(src map[string]interface{}) {
+	m.Arn = src["arn"].(string)
+	m.ProtocolVersion = int(src["protocol_version"].(float64))
+	if fv, ok := src["function_version"]; ok {
+		m.FunctionVersion = fv.(string)
+	} else {
+		m.FunctionVersion = ""
+	}
+	if ee, ok := src["execution_environment"]; ok {
+		m.ExecutionEnvironment = ee.(string)
+	} else {
+		m.ExecutionEnvironment = ""
+	}
+	m.AgentVersion = src["agent_version"].(string)
+	m.MetadataVersion = int(src["metadata_version"].(float64))
+	m.AgentLanguage = src["agent_language"].(string)
+}
+
 type RawData struct {
 	AnalyticEventData RawAgentEventData `json:"analytic_event_data"`
 	SpanEventData     RawAgentEventData `json:"span_event_data"`

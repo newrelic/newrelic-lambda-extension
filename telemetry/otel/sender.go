@@ -10,7 +10,9 @@ import (
 	"github.com/newrelic/newrelic-lambda-extension/telemetry/agentdata"
 	"github.com/newrelic/newrelic-lambda-extension/util"
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc"
+	"go.opentelemetry.io/otel/sdk/resource"
 	tracesdk "go.opentelemetry.io/otel/sdk/trace"
+	semconv "go.opentelemetry.io/otel/semconv/v1.7.0"
 	"strings"
 )
 
@@ -25,17 +27,15 @@ func NewOtelTelemetrySender(ctx context.Context, licenseKey string, endpoint str
 	)
 
 	// TODO: Resource config should describe this Lambda function
-	//attributes := resource.WithAttributes(
-	//	semconv.CloudPlatformAWSLambda,
-	//	semconv.FaaSNameKey.String(functionName),
-	//)
-	//r, err := resource.New(ctx, attributes)
-	//if err != nil {
-	//	util.Panic(err)
-	//}
-	//tp := tracesdk.NewTracerProvider(tracesdk.WithSyncer(exporter), tracesdk.WithResource(r))
-
-	tp := tracesdk.NewTracerProvider(tracesdk.WithSyncer(exporter))
+	attributes := resource.WithAttributes(
+		semconv.CloudPlatformAWSLambda,
+		semconv.FaaSNameKey.String(functionName),
+	)
+	r, err := resource.New(ctx, attributes)
+	if err != nil {
+		util.Panic(err)
+	}
+	tp := tracesdk.NewTracerProvider(tracesdk.WithBatcher(exporter), tracesdk.WithResource(r))
 
 	return OtelTelemetrySender{traceProvider: tp}
 }
@@ -58,7 +58,7 @@ func unmarshalEncodedPayload(encoded string, target interface{}) error {
 func (o OtelTelemetrySender) SendTelemetry(ctx context.Context, invokedFunctionARN string, telemetry [][]byte) (error, int) {
 	tracer := o.traceProvider.Tracer("newrelic-lambda-extension")
 
-	util.Logln("Starting OTLP send")
+	util.Debugln("Starting OTLP send")
 	count := 0
 	for _, buf := range telemetry {
 		if strings.Contains(string(buf), "NR_LAMBDA_MONITORING") {
@@ -71,6 +71,7 @@ func (o OtelTelemetrySender) SendTelemetry(ctx context.Context, invokedFunctionA
 			}
 
 			var data agentdata.RawData
+			var metadata agentdata.Metadata
 			version := int(parts[0].(float64))
 			if version == 1 {
 				var rawAgentData agentdata.RawAgentData
@@ -79,8 +80,13 @@ func (o OtelTelemetrySender) SendTelemetry(ctx context.Context, invokedFunctionA
 					return err, 0
 				}
 				data = rawAgentData.Data
+				metadata = rawAgentData.Metadata
 			} else if version == 2 {
 				err = unmarshalEncodedPayload(parts[3].(string), &data)
+				if err != nil {
+					return err, 0
+				}
+				metadata.FromMap(parts[2].(map[string]interface{}))
 				if err != nil {
 					return err, 0
 				}
@@ -91,18 +97,18 @@ func (o OtelTelemetrySender) SendTelemetry(ctx context.Context, invokedFunctionA
 				tracer,
 				data.ErrorEventData.GetAgentEvents(),
 				data.CustomEventData.GetAgentEvents(),
+				metadata,
 			)
-			util.Logln("Finished trace.")
+			util.Debugln("Finished trace.")
 		}
 	}
 
-	//util.Logln("Forcing flush")
-	//err := o.traceProvider.ForceFlush(ctx)
-	//if err != nil {
-	//	return err, 0
-	//}
+	err := o.traceProvider.ForceFlush(ctx)
+	if err != nil {
+		return err, 0
+	}
 
-	util.Logf("Sent %v traces", count)
+	util.Logf("Sent %v traces via OTLP", count)
 
 	return nil, len(telemetry)
 }

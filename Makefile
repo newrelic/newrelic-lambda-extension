@@ -26,3 +26,6 @@ test:
 
 coverage:
 	./coverage.sh
+
+publish: zip-x86_64
+	aws lambda publish-layer-version --no-cli-pager --layer-name newrelic-lambda-extension-x86_64 --zip-file fileb:///tmp/newrelic-lambda-extension.x86_64.zip

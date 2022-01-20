@@ -33,8 +33,7 @@ func TestMissingInvocation(t *testing.T) {
 func TestWithInvocationRipeHarvest(t *testing.T) {
 	batch := NewBatch(ripe, rot)
 
-	// To test a ripe harvest, we need to have done at least one harvest cycle before
-	batch.Harvest(requestStart)
+	batch.lastHarvest = requestStart
 
 	batch.AddInvocation(testRequestId, requestStart)
 	batch.AddInvocation(testRequestId2, requestStart.Add(100*time.Millisecond))

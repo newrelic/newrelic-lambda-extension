@@ -53,7 +53,6 @@ func (b *Batch) AddTelemetry(requestId string, telemetry []byte) *Invocation {
 // Harvest checks to see if it's time to harvest, and returns harvested invocations, or nil. The caller must ensure that harvested invocations are sent.
 func (b *Batch) Harvest(now time.Time) []*Invocation {
 	if len(b.invocations) == 0 {
-		b.lastHarvest = now
 		return nil
 	}
 
@@ -84,8 +83,10 @@ func (b *Batch) aggressiveHarvest(now time.Time) []*Invocation {
 			delete(b.invocations, k)
 		}
 	}
-	b.lastHarvest = now
-	b.eldest = epochStart
+	if len(ret) > 0 {
+		b.lastHarvest = now
+		b.eldest = epochStart
+	}
 	util.Debugf("Aggressive harvest yielded %d invocations\n", len(ret))
 	return ret
 }
@@ -103,7 +104,9 @@ func (b *Batch) ripeHarvest(now time.Time) []*Invocation {
 		}
 	}
 	b.eldest = newEldest
-	b.lastHarvest = now
+	if len(ret) > 0 {
+		b.lastHarvest = now
+	}
 	util.Debugf("Ripe harvest yielded %d invocations\n", len(ret))
 	return ret
 }

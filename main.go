@@ -44,10 +44,10 @@ func main() {
 	}()
 
 	// Allow extension to be interrupted with CTRL-C
-	c := make(chan os.Signal, 1)
-	signal.Notify(c, os.Interrupt)
+	ctrlCChan := make(chan os.Signal, 1)
+	signal.Notify(ctrlCChan, os.Interrupt)
 	go func() {
-		for _ = range c {
+		for range ctrlCChan {
 			cancel()
 			util.Fatal("Exiting...")
 		}
@@ -191,7 +191,7 @@ func mainLoop(ctx context.Context, invocationClient *client.InvocationClient, ba
 		select {
 		case <-ctx.Done():
 			// We're already done
-			return eventCounter, ""
+			return eventCounter, invokedFunctionARN
 		default:
 			// Our call to next blocks. It is likely that the container is frozen immediately after we call NextEvent.
 			event, err := invocationClient.NextEvent(ctx)
@@ -225,9 +225,6 @@ func mainLoop(ctx context.Context, invocationClient *client.InvocationClient, ba
 				}
 			}
 
-			invokedFunctionARN = event.InvokedFunctionARN
-			lastRequestId = event.RequestID
-
 			if event.EventType == api.Shutdown {
 				if event.ShutdownReason == api.Timeout && lastRequestId != "" {
 					// Synthesize the timeout error message that the platform produces, and LLC parses
@@ -247,33 +244,43 @@ func mainLoop(ctx context.Context, invocationClient *client.InvocationClient, ba
 				}
 
 				return eventCounter, invokedFunctionARN
+			} else {
+				// Reset probablyTimeout if the event after the suspected timeout wasn't a timeout shutdown.
+				probablyTimeout = false
 			}
+
+			// Note: shutdown events do not have these properties; we now know this is an invocation event.
+			invokedFunctionARN = event.InvokedFunctionARN
+			lastRequestId = event.RequestID
 
 			// Create an invocation record to hold telemetry
 			batch.AddInvocation(lastRequestId, eventStart)
 
-			// Await agent telemetry. This may time out
+			// Await agent telemetry, which may time out.
+
 			// timeoutInstant is when the invocation will time out
 			timeoutInstant := time.Unix(0, event.DeadlineMs*int64(time.Millisecond))
 
-			// Set the timeout timer for a smidge before the actual timeout;
-			// we can recover from early.
-			timeoutWatchBegins := 100 * time.Millisecond
-			hardTimeout := timeoutInstant.Sub(time.Now())
-			softTimeout := hardTimeout - timeoutWatchBegins
+			// Set the timeout timer for a smidge before the actual timeout; we can recover from false timeouts.
+			timeoutWatchBegins := 200 * time.Millisecond
+			timeLimitContext, timeLimitCancel := context.WithDeadline(ctx, timeoutInstant.Add(-timeoutWatchBegins))
 
-			hardCtx, hardCancel := context.WithTimeout(ctx, hardTimeout)
-			defer hardCancel()
-
-			softCtx, softCancel := context.WithTimeout(hardCtx, softTimeout)
-			defer softCancel()
+			// Before we begin to await telemetry, harvest and ship, in parallel with handler execution.
+			go func(invokedFunctionARN string, harvested []*telemetry.Invocation) {
+				// Use the outer context, because if we don't send successfully, we've lost data; the single-invocation timeout doesn't apply here.
+				shipHarvest(ctx, harvested, telemetryClient, invokedFunctionARN)
+			}(invokedFunctionARN, batch.Harvest(time.Now()))
 
 			select {
-			case <-softCtx.Done():
+			case <-timeLimitContext.Done():
+				timeLimitCancel()
+
 				// We are about to timeout
 				probablyTimeout = true
 				continue
 			case telemetryBytes := <-telemetryChan:
+				timeLimitCancel()
+
 				// We received telemetry
 				util.Debugf("Agent telemetry bytes: %s", base64.URLEncoding.EncodeToString(telemetryBytes))
 				inv := batch.AddTelemetry(lastRequestId, telemetryBytes)
@@ -282,8 +289,12 @@ func mainLoop(ctx context.Context, invocationClient *client.InvocationClient, ba
 				}
 
 				pollLogServer(logServer, batch)
-				harvested := batch.Harvest(time.Now())
-				shipHarvest(hardCtx, harvested, telemetryClient, invokedFunctionARN)
+
+				//This will be a no-op, unless we do an aggressive harvest here.
+				go func(invokedFunctionARN string, harvested []*telemetry.Invocation) {
+					// Use the outer context, because if we don't send successfully, we've lost data.
+					shipHarvest(ctx, harvested, telemetryClient, invokedFunctionARN)
+				}(invokedFunctionARN, batch.Harvest(time.Now()))
 			}
 
 			lastEventStart = eventStart

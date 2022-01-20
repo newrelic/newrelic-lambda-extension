@@ -30,11 +30,38 @@ func TestMissingInvocation(t *testing.T) {
 	assert.Nil(t, invocation)
 }
 
+func TestEmptyHarvest(t *testing.T) {
+	batch := NewBatch(ripe, rot)
+	res := batch.Harvest(requestStart)
+
+	assert.Nil(t, res)
+}
+
+func TestEmptyRotHarvest(t *testing.T) {
+	batch := NewBatch(ripe, rot)
+
+	batch.AddInvocation("test", requestStart)
+
+	res := batch.Harvest(requestStart)
+
+	assert.Empty(t, res)
+}
+
+func TestEmptyRipeHarvest(t *testing.T) {
+	batch := NewBatch(ripe, rot)
+
+	batch.lastHarvest = requestStart.Add(-ripe)
+	batch.AddInvocation("test", requestStart)
+
+	res := batch.Harvest(requestStart)
+
+	assert.Empty(t, res)
+}
+
 func TestWithInvocationRipeHarvest(t *testing.T) {
 	batch := NewBatch(ripe, rot)
 
-	// To test a ripe harvest, we need to have done at least one harvest cycle before
-	batch.Harvest(requestStart)
+	batch.lastHarvest = requestStart
 
 	batch.AddInvocation(testRequestId, requestStart)
 	batch.AddInvocation(testRequestId2, requestStart.Add(100*time.Millisecond))

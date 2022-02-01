@@ -17,5 +17,5 @@ aws cloudformation deploy \
 	--region "${region}" \
 	--template-file packaged.yaml \
 	--stack-name NewrelicExampleNode \
-	--capabilities CAPABILITY_IAM \
+	--capabilities CAPABILITY_IAM CAPABILITY_NAMED_IAM \
 	--parameter-overrides "NRAccountId=${accountId}"

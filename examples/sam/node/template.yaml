@@ -7,15 +7,20 @@ Parameters:
     Type: String
     Description: Your New Relic account ID; necessary for distributed tracing.
     AllowedPattern: '[0-9]+'
+  FunctionName:
+    Type: String
+    Description: Name of your function.
+    AllowedPattern: '[A-Za-z0-9-]+'
+    Default: newrelic-example-nodejs
 
 Resources:
-  NewRelicExample:
+  NewRelicExampleNode:
     Type: AWS::Serverless::Function
     Properties:
       # In this example, we're using the SAM CLI to package and deploy our lambda. SAM will transform this value during the publish step.
       CodeUri: newrelic-example-node/
       Description: A simple Lambda, with New Relic telemetry
-      FunctionName: newrelic-example-nodejs
+      FunctionName: !Ref FunctionName
       # The handler for your function needs to be the one provided by the instrumentation layer, below.
       Handler: newrelic-lambda-wrapper.handler
       Runtime: nodejs14.x
@@ -29,15 +34,60 @@ Resources:
       Layers:
         # This layer includes the New Relic Lambda Extension, a sidecar process that sends telemetry,
         # as well as the New Relic Agent for Node.js, and a handler wrapper that makes integration easy.
-        - !Sub arn:${AWS::Partition}:lambda:${AWS::Region}:451483290750:layer:NewRelicNodeJS14X:36
+        - !Sub arn:${AWS::Partition}:lambda:${AWS::Region}:451483290750:layer:NewRelicNodeJS14X:37
+      Role:
+        Fn::GetAtt:
+          - IamRoleLambdaExecution
+          - Arn
+  # The managed policy being added to the execution role allows the lambda to know the value
+  # of the New Relic licence key. We need this so we can send telemetry back to New Relic.
+  IamRoleLambdaExecution:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - lambda.amazonaws.com
+            Action:
+              - sts:AssumeRole
       Policies:
-        # This policy allows the lambda to know the value of the New Relic licence key. We need this so
-        # that we can send telemetry back to New Relic
-        - AWSSecretsManagerGetSecretValuePolicy:
-            SecretArn: !ImportValue NewRelicLicenseKeySecret-NewRelic-LicenseKeySecretARN
+        - PolicyName:
+            Fn::Join:
+              - '-'
+              - - !Ref FunctionName
+                - dev
+                - lambda
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogStream
+                  - logs:CreateLogGroup
+                Resource: "*"
+              - Effect: Allow
+                Action:
+                  - logs:PutLogEvents
+                Resource: "*"
+      Path: /
+      RoleName:
+        Fn::Join:
+          - '-'
+          - - NewRelicExampleNode
+            - LambdaExecutionRole
+            - !Ref AWS::Region
+      # This assumes that a managed secret containing the NR license key has been created in the current region.
+      # We also assume that an access policy has been created in this region for that secret,
+      # and here we attach it to the function's execution role.
+      ManagedPolicyArns:
+        - !Sub arn:${AWS::Partition}:iam::${AWS::AccountId}:policy/NewRelic-ViewLicenseKey-${AWS::Region}
+
   Logs:
     Type: AWS::Logs::LogGroup
     Properties:
-      LogGroupName: {"Fn::Join": ["", ["/aws/lambda/", {"Ref": "NewRelicExample"}]]}
+      LogGroupName: {"Fn::Join": ["", ["/aws/lambda/", {"Ref": "FunctionName"}]]}
       # Lambda functions will auto-create their log group on first execution, but it retains logs forever, which can get expensive.
-      RetentionInDays: 7
+      RetentionInDays: 3

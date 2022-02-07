@@ -20,6 +20,8 @@ Resources:
       # Lambda Extensions are not supported in the "java8" runtime.
       Runtime: java11
       MemorySize: 512
+      # Currently, we don't support Image based PackageType
+      PackageType: Zip
       Environment:
         Variables:
           NEW_RELIC_LAMBDA_HANDLER: com.newrelic.lambda.example.App::handleRequest
@@ -44,6 +46,8 @@ Resources:
       Handler: com.newrelic.java.HandlerWrapper::handleStreamsRequest
       Runtime: java11
       MemorySize: 512
+      # Currently, we don't support Image based PackageType
+      PackageType: Zip
       Environment:
         Variables:
           NEW_RELIC_LAMBDA_HANDLER: com.newrelic.lambda.example.Stream::handleRequest

@@ -19,6 +19,8 @@ Resources:
       # The handler for your function needs to be the one provided by the instrumentation layer, below.
       Handler: newrelic-lambda-wrapper.handler
       Runtime: nodejs14.x
+      # Currently, we don't support Image based PackageType
+      PackageType: Zip
       Environment:
         Variables:
           # For the instrumentation handler to invoke your real handler, we need this value

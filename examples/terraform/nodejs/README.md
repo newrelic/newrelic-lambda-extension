@@ -15,7 +15,7 @@ know that all the telemetry plumbing is connected correctly.
 - The [Terraform CLI](https://learn.hashicorp.com/tutorials/terraform/install-cli)
 - [newrelic-lambda](https://github.com/newrelic/newrelic-lambda-cli#installation) CLI tool
 
-Make sure you've run the `newrelic-lambda install` command in your
+Make sure you've run the `newrelic-lambda integrations install` command in your
 AWS Region, and included the `--enable-license-key-secret` flag.
 
 ### deploy script

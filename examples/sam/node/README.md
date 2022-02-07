@@ -16,7 +16,7 @@ know that all the telemetry plumbing is connected correctly.
 - The [AWS SAM CLI](https://docs.aws.amazon.com/serverless-application-model/latest/developerguide/serverless-sam-cli-install.html)
 - [newrelic-lambda](https://github.com/newrelic/newrelic-lambda-cli#installation) CLI tool
 
-Make sure you've run the `newrelic-lambda install` command in your
+Make sure you've run the `newrelic-lambda integrations install` command in your
 AWS Region, and included the `--enable-license-key-secret` flag.
 
 ### deploy script

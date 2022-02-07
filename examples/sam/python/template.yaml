@@ -19,8 +19,6 @@ Resources:
       # The handler for your function needs to be the one provided by the instrumentation layer, below.
       Handler: newrelic_lambda_wrapper.handler
       Runtime: python3.8
-      # Currently, we don't support Image based PackageType
-      PackageType: Zip
       Environment:
         Variables:
           # For the instrumentation handler to invoke your real handler, we need this value

@@ -32,8 +32,6 @@ Resources:
       CodeUri: python/rest_handler/
       Handler: newrelic_lambda_wrapper.handler
       Runtime: python3.8
-      # Currently, we don't support Image based PackageType
-      PackageType: Zip
       Environment:
         Variables:
           # For the instrumentation handler to invoke your real handler, we need this value
@@ -79,8 +77,6 @@ Resources:
       Runtime: nodejs12.x
       CodeUri: node/
       Handler: newrelic-lambda-wrapper.handler
-      # Currently, we don't support Image based PackageType
-      PackageType: Zip
       Environment:
         Variables:
           # For the instrumentation handler to invoke your real handler, we need this value

@@ -14,6 +14,7 @@ func TestConfigurationFromEnvironmentZero(t *testing.T) {
 		RipeMillis:       DefaultRipeMillis,
 		RotMillis:        DefaultRotMillis,
 		LogLevel:         DefaultLogLevel,
+		LogsEnabled:      true,
 		NRHandler:        EmptyNRWrapper,
 		LogServerHost:    defaultLogServerHost,
 	}
@@ -26,6 +27,7 @@ func TestConfigurationFromEnvironment(t *testing.T) {
 	conf := ConfigurationFromEnvironment()
 
 	assert.Equal(t, conf.ExtensionEnabled, true)
+	assert.Equal(t, conf.LogsEnabled, true)
 
 	os.Setenv("NEW_RELIC_LAMBDA_EXTENSION_ENABLED", "false")
 	os.Setenv("NEW_RELIC_LAMBDA_HANDLER", "newrelic_lambda_wrapper.handler")
@@ -37,6 +39,7 @@ func TestConfigurationFromEnvironment(t *testing.T) {
 	os.Setenv("NEW_RELIC_HARVEST_ROT_MILLIS", "0")
 	os.Setenv("NEW_RELIC_EXTENSION_LOG_LEVEL", "DEBUG")
 	os.Setenv("NEW_RELIC_EXTENSION_SEND_FUNCTION_LOGS", "true")
+	os.Setenv("NEW_RELIC_EXTENSION_LOGS_ENABLED", "false")
 
 	defer func() {
 		os.Unsetenv("NEW_RELIC_LAMBDA_EXTENSION_ENABLED")
@@ -49,6 +52,7 @@ func TestConfigurationFromEnvironment(t *testing.T) {
 		os.Unsetenv("NEW_RELIC_HARVEST_ROT_MILLIS")
 		os.Unsetenv("NEW_RELIC_EXTENSION_LOG_LEVEL")
 		os.Unsetenv("NEW_RELIC_EXTENSION_SEND_FUNCTION_LOGS")
+		os.Unsetenv("NEW_RELIC_EXTENSION_LOGS_ENABLED")
 	}()
 
 	conf = ConfigurationFromEnvironment()
@@ -63,6 +67,7 @@ func TestConfigurationFromEnvironment(t *testing.T) {
 	assert.Equal(t, uint32(DefaultRotMillis), conf.RotMillis)
 	assert.Equal(t, "DEBUG", conf.LogLevel)
 	assert.Equal(t, true, conf.SendFunctionLogs)
+	assert.Equal(t, false, conf.LogsEnabled)
 }
 
 func TestConfigurationFromEnvironmentSecretId(t *testing.T) {

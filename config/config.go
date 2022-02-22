@@ -26,6 +26,7 @@ type Configuration struct {
 	RipeMillis         uint32
 	RotMillis          uint32
 	LogLevel           string
+	LogsEnabled        bool
 	SendFunctionLogs   bool
 	LogServerHost      string
 }
@@ -40,6 +41,7 @@ func ConfigurationFromEnvironment() *Configuration {
 	ripeMillisStr, ripeMillisOverride := os.LookupEnv("NEW_RELIC_HARVEST_RIPE_MILLIS")
 	rotMillisStr, rotMillisOverride := os.LookupEnv("NEW_RELIC_HARVEST_ROT_MILLIS")
 	logLevelStr, logLevelOverride := os.LookupEnv("NEW_RELIC_EXTENSION_LOG_LEVEL")
+	logsEnabledStr, logsEnabledOverride := os.LookupEnv("NEW_RELIC_EXTENSION_LOGS_ENABLED")
 	sendFunctionLogsStr, sendFunctionLogsOverride := os.LookupEnv("NEW_RELIC_EXTENSION_SEND_FUNCTION_LOGS")
 	logServerHostStr, logServerHostOverride := os.LookupEnv("NEW_RELIC_LOG_SERVER_HOST")
 
@@ -47,7 +49,7 @@ func ConfigurationFromEnvironment() *Configuration {
 	if extensionEnabledOverride && strings.ToLower(enabledStr) == "false" {
 		extensionEnabled = false
 	}
-	ret := &Configuration{ExtensionEnabled: extensionEnabled}
+	ret := &Configuration{ExtensionEnabled: extensionEnabled, LogsEnabled: true}
 
 	if lkOverride {
 		ret.LicenseKey = licenseKey
@@ -105,6 +107,14 @@ func ConfigurationFromEnvironment() *Configuration {
 
 	if sendFunctionLogsOverride && sendFunctionLogsStr == "true" {
 		ret.SendFunctionLogs = true
+	}
+
+	if sendFunctionLogsOverride && sendFunctionLogsStr == "true" {
+		ret.SendFunctionLogs = true
+	}
+
+	if logsEnabledOverride && logsEnabledStr == "false" {
+		ret.LogsEnabled = false
 	}
 
 	return ret

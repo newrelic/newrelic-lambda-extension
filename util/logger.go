@@ -3,67 +3,82 @@ package util
 import "log"
 
 var logger = Logger{
+	isEnabled:      true,
 	isDebugEnabled: false,
 }
 
 type Logger struct {
+	isEnabled      bool
 	isDebugEnabled bool
 }
 
-func ConfigLogger(isDebugEnabled bool) {
+func ConfigLogger(logsEnabled bool, isDebugEnabled bool) {
 	// Go Logging config
 	log.SetPrefix("[NR_EXT] ")
 	log.SetFlags(0)
 
 	log.Println("New Relic Lambda Extension starting up")
 
+	logger.isEnabled = logsEnabled
 	logger.isDebugEnabled = isDebugEnabled
 }
 
 func (l Logger) Debugf(format string, v ...interface{}) {
-	if l.isDebugEnabled {
+	if l.isEnabled && l.isDebugEnabled {
 		log.Printf(format, v...)
 	}
 }
 
 func (l Logger) Debugln(v ...interface{}) {
-	if l.isDebugEnabled {
+	if l.isEnabled && l.isDebugEnabled {
 		log.Println(v...)
 	}
 }
 
 func (l Logger) Logf(format string, v ...interface{}) {
-	log.Printf(format, v...)
+	if l.isEnabled {
+		log.Printf(format, v...)
+	}
 }
 
 func (l Logger) Logln(v ...interface{}) {
-	log.Println(v...)
+	if l.isEnabled {
+		log.Println(v...)
+	}
 }
 
 func Debugf(format string, v ...interface{}) {
-	if logger.isDebugEnabled {
+	if logger.isEnabled && logger.isDebugEnabled {
 		log.Printf(format, v...)
 	}
 }
 
 func Debugln(v ...interface{}) {
-	if logger.isDebugEnabled {
+	if logger.isEnabled && logger.isDebugEnabled {
 		log.Println(v...)
 	}
 }
 
 func Logf(format string, v ...interface{}) {
-	log.Printf(format, v...)
+	if logger.isEnabled {
+		log.Printf(format, v...)
+	}
 }
 
 func Logln(v ...interface{}) {
-	log.Println(v...)
+	if logger.isEnabled {
+		log.Println(v...)
+	}
 }
 
 func Fatal(v ...interface{}) {
-	log.Fatal(v...)
+	if logger.isEnabled {
+		log.Fatal(v...)
+	}
 }
 
 func Panic(v ...interface{}) {
-	log.Panic(v...)
+	if logger.isEnabled {
+		log.Panic(v...)
+	}
 }

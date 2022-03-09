@@ -49,7 +49,13 @@ func ConfigurationFromEnvironment() *Configuration {
 	if extensionEnabledOverride && strings.ToLower(enabledStr) == "false" {
 		extensionEnabled = false
 	}
-	ret := &Configuration{ExtensionEnabled: extensionEnabled, LogsEnabled: true}
+
+	logsEnabled := true
+	if logsEnabledOverride && strings.ToLower(logsEnabledStr) == "false" {
+		logsEnabled = false
+	}
+
+	ret := &Configuration{ExtensionEnabled: extensionEnabled, LogsEnabled: logsEnabled}
 
 	if lkOverride {
 		ret.LicenseKey = licenseKey
@@ -111,10 +117,6 @@ func ConfigurationFromEnvironment() *Configuration {
 
 	if sendFunctionLogsOverride && sendFunctionLogsStr == "true" {
 		ret.SendFunctionLogs = true
-	}
-
-	if logsEnabledOverride && logsEnabledStr == "false" {
-		ret.LogsEnabled = false
 	}
 
 	return ret

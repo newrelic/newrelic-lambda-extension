@@ -57,7 +57,7 @@ func main() {
 	conf := config.ConfigurationFromEnvironment()
 
 	// Optionally enable debug logging, disabled by default
-	util.ConfigLogger(conf.LogLevel == config.DebugLogLevel)
+	util.ConfigLogger(conf.LogsEnabled, conf.LogLevel == config.DebugLogLevel)
 
 	// Extensions must register
 	registrationClient := client.New(http.Client{})

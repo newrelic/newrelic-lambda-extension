@@ -265,11 +265,11 @@ func mainLoop(ctx context.Context, invocationClient *client.InvocationClient, ba
 			timeoutWatchBegins := 200 * time.Millisecond
 			timeLimitContext, timeLimitCancel := context.WithDeadline(ctx, timeoutInstant.Add(-timeoutWatchBegins))
 
-			// Before we begin to await telemetry, harvest and ship, in parallel with handler execution.
-			go func(invokedFunctionARN string, harvested []*telemetry.Invocation) {
-				// Use the outer context, because if we don't send successfully, we've lost data; the single-invocation timeout doesn't apply here.
-				shipHarvest(ctx, harvested, telemetryClient, invokedFunctionARN)
-			}(invokedFunctionARN, batch.Harvest(time.Now()))
+			// Before we begin to await telemetry, harvest and ship. Ripe telemetry will mostly be handled here. Even that is a
+			// minority of invocations. Putting this here lets us run the HTTP request to send to NR in parallel with the Lambda
+			// handler, reducing or eliminating our latency impact.
+			pollLogServer(logServer, batch)
+			shipHarvest(ctx, batch.Harvest(time.Now()), telemetryClient, invokedFunctionARN)
 
 			select {
 			case <-timeLimitContext.Done():
@@ -288,13 +288,10 @@ func mainLoop(ctx context.Context, invocationClient *client.InvocationClient, ba
 					util.Logf("Failed to add telemetry for request %v", lastRequestId)
 				}
 
+				// Opportunity for an aggressive harvest, in which case, we definitely want to wait for the HTTP POST
+				// to complete. Mostly, nothing really happens here.
 				pollLogServer(logServer, batch)
-
-				//This will be a no-op, unless we do an aggressive harvest here.
-				go func(invokedFunctionARN string, harvested []*telemetry.Invocation) {
-					// Use the outer context, because if we don't send successfully, we've lost data.
-					shipHarvest(ctx, harvested, telemetryClient, invokedFunctionARN)
-				}(invokedFunctionARN, batch.Harvest(time.Now()))
+				shipHarvest(ctx, batch.Harvest(time.Now()), telemetryClient, invokedFunctionARN)
 			}
 
 			lastEventStart = eventStart

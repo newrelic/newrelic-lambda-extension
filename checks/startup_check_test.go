@@ -2,7 +2,9 @@ package checks
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"net/http"
 	"testing"
 
 	"github.com/newrelic/newrelic-lambda-extension/config"
@@ -10,6 +12,12 @@ import (
 	"github.com/newrelic/newrelic-lambda-extension/lambda/logserver"
 	"github.com/stretchr/testify/assert"
 )
+
+type mockClientError struct{}
+
+func (c *mockClientError) Get(string) (*http.Response, error) {
+	return nil, errors.New("Something went wrong")
+}
 
 type TestLogSender struct {
 	sent []logserver.LogLine

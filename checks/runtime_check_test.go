@@ -1,8 +1,10 @@
+//go:build !race
+// +build !race
+
 package checks
 
 import (
 	"bytes"
-	"errors"
 	"io/ioutil"
 	"net/http"
 	"os"
@@ -11,12 +13,6 @@ import (
 
 	"github.com/stretchr/testify/assert"
 )
-
-type mockClientError struct{}
-
-func (c *mockClientError) Get(string) (*http.Response, error) {
-	return nil, errors.New("Something went wrong")
-}
 
 type mockClientRedirect struct{}
 

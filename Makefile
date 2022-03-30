@@ -22,6 +22,9 @@ zip-arm64: dist-arm64
 	zip -r /tmp/newrelic-lambda-extension.arm64.zip preview-extensions-ggqizro707 extensions
 
 test:
+	@echo "Normal tests"
+	go test ./...
+	@echo "\n\nRace check"
 	go test -race ./...
 
 coverage:

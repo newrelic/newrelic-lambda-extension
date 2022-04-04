@@ -14,7 +14,7 @@ build_tags="-tags lambda.norpc"
 # Custom runtimes need a bootstrap executable. See https://docs.aws.amazon.com/lambda/latest/dg/runtimes-custom.html
 handler="bootstrap"
 
-env GOARCH=amd64 GOOS=linux go build "${build_tags}" -ldflags="-s -w" -o ${handler}
+env GOARCH=amd64 GOOS=linux go build ${build_tags} -ldflags="-s -w" -o ${handler}
 zip go-example.zip "${handler}"
 
 bucket="newrelic-example-${region}-${accountId}"

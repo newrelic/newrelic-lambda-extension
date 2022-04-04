@@ -13,7 +13,7 @@ aws s3 mb --region "${region}" "s3://${bucket}"
 
 sam package --region "${region}" --s3-bucket "${bucket}" --output-template-file packaged.yaml
 
-sam deploy \
+aws cloudformation deploy \
 	--region "${region}" \
 	--template-file packaged.yaml \
 	--stack-name NewrelicExampleDotnet \

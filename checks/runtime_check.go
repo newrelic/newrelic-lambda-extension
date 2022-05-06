@@ -1,7 +1,6 @@
 package checks
 
 import (
-	"errors"
 	"io/ioutil"
 	"net/http"
 	"path/filepath"
@@ -66,7 +65,9 @@ func latestAgentTag(r *runtimeConfig) error {
 
 	rs := re.FindStringSubmatch(string(body))
 	if len(rs) != 2 {
-		return errors.New("Can't determine latest agent version.")
+		// FIXME: This is way too brittle, should use https://api.github.com/repos/
+		util.Debugf("Can't determine latest agent version: %v", rs)
+		return nil
 	}
 
 	r.AgentVersion = rs[1]

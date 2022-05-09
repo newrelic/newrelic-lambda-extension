@@ -42,7 +42,7 @@ func TestClientSend(t *testing.T) {
 
 	defer srv.Close()
 
-	client := NewWithHTTPClient(srv.Client(), "", "a mock license key", srv.URL, srv.URL)
+	client := NewWithHTTPClient(srv.Client(), "", "a mock license key", srv.URL, srv.URL, &Batch{})
 
 	ctx := context.Background()
 	bytes := []byte("foobar")
@@ -51,7 +51,7 @@ func TestClientSend(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, 1, successCount)
 
-	client = New("", "mock license key", srv.URL, srv.URL)
+	client = New("", "mock license key", srv.URL, srv.URL, &Batch{})
 	assert.NotNil(t, client)
 }
 
@@ -93,7 +93,7 @@ func TestClientSendRetry(t *testing.T) {
 
 	httpClient := srv.Client()
 	httpClient.Timeout = 200 * time.Millisecond
-	client := NewWithHTTPClient(httpClient, "", "a mock license key", srv.URL, srv.URL)
+	client := NewWithHTTPClient(httpClient, "", "a mock license key", srv.URL, srv.URL, &Batch{})
 
 	ctx := context.Background()
 	bytes := []byte("foobar")
@@ -115,7 +115,7 @@ func TestClientSendOutOfRetries(t *testing.T) {
 
 	httpClient := srv.Client()
 	httpClient.Timeout = 200 * time.Millisecond
-	client := NewWithHTTPClient(httpClient, "", "a mock license key", srv.URL, srv.URL)
+	client := NewWithHTTPClient(httpClient, "", "a mock license key", srv.URL, srv.URL, &Batch{})
 
 	ctx := context.Background()
 	bytes := []byte("foobar")
@@ -131,7 +131,7 @@ func TestClientUnreachableEndpoint(t *testing.T) {
 		Timeout: time.Millisecond * 1,
 	}
 
-	client := NewWithHTTPClient(httpClient, "", "a mock license key", "http://10.123.123.123:12345", "http://10.123.123.123:12345")
+	client := NewWithHTTPClient(httpClient, "", "a mock license key", "http://10.123.123.123:12345", "http://10.123.123.123:12345", &Batch{})
 
 	ctx := context.Background()
 	bytes := []byte("foobar")

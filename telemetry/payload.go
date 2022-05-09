@@ -61,6 +61,10 @@ func decodeUncompress(input string) ([]byte, error) {
 
 // ExtracTraceID extracts the trace ID within a payload, if present
 func ExtractTraceID(data []byte) (string, error) {
+	if !bytes.Contains(data, []byte("NR_LAMBDA_MONITORING")) {
+		return "", nil
+	}
+
 	_, segments, err := parsePayload(data)
 	if err != nil {
 		return "", err

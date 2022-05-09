@@ -8,12 +8,42 @@ import (
 
 func TestParsePayload(t *testing.T) {
 	payload := []byte("[1, \"NR_LAMBDA_MONITORING\", {\"arn\": \"AWS_LAMBDA_FUNCTION_ARN\", \"protocol_version\": 16, \"function_version\": \"15\", \"execution_environment\": \"AWS_Lambda_python3.6\", \"agent_version\": \"4.2.0.100\", \"metadata_version\": 2, \"agent_language\": \"python\"}, \"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\"]")
-
 	metadata, data, err := parsePayload(payload)
-
 	assert.NotNil(t, metadata)
 	assert.NotNil(t, data)
 	assert.Nil(t, err)
+}
+
+func TestParsePayloadBlank(t *testing.T) {
+	payload := []byte("")
+	metadata, data, err := parsePayload(payload)
+	assert.Nil(t, metadata)
+	assert.Nil(t, data)
+	assert.Error(t, err)
+}
+
+func TestParsePayloadInvalidMetaData(t *testing.T) {
+	payload := []byte("[1, \"NR_LAMBDA_MONITORING\", \"foobar\", null]")
+	metadata, data, err := parsePayload(payload)
+	assert.Nil(t, metadata)
+	assert.Nil(t, data)
+	assert.Error(t, err)
+}
+
+func TestParsePayloadInvalidCompressedData(t *testing.T) {
+	payload := []byte("[1, \"NR_LAMBDA_MONITORING\", {\"arn\": \"AWS_LAMBDA_FUNCTION_ARN\", \"protocol_version\": 16, \"function_version\": \"15\", \"execution_environment\": \"AWS_Lambda_python3.6\", \"agent_version\": \"4.2.0.100\", \"metadata_version\": 2, \"agent_language\": \"python\"}, \"foobar\"]")
+	metadata, data, err := parsePayload(payload)
+	assert.Nil(t, metadata)
+	assert.Nil(t, data)
+	assert.Error(t, err)
+}
+
+func TestParsePayloadInvalidData(t *testing.T) {
+	payload := []byte("[1, \"NR_LAMBDA_MONITORING\", {\"arn\": \"AWS_LAMBDA_FUNCTION_ARN\", \"protocol_version\": 16, \"function_version\": \"15\", \"execution_environment\": \"AWS_Lambda_python3.6\", \"agent_version\": \"4.2.0.100\", \"metadata_version\": 2, \"agent_language\": \"python\"}, \"H4sIAK6pdWIC/0vLz09KLAIAlR/2ngYAAAA=\"]")
+	metadata, data, err := parsePayload(payload)
+	assert.Nil(t, metadata)
+	assert.Nil(t, data)
+	assert.Error(t, err)
 }
 
 func TestExtractTraceIDAnalyticEvent(t *testing.T) {

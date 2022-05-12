@@ -41,6 +41,14 @@ func (b *Batch) AddInvocation(requestId string, start time.Time) {
 func (b *Batch) AddTelemetry(requestId string, telemetry []byte) *Invocation {
 	inv, ok := b.invocations[requestId]
 	if ok {
+		traceId, err := ExtractTraceID(telemetry)
+		if err != nil {
+			util.Debugln(err)
+		}
+		// We don't want to unset a previously set trace ID
+		if traceId != "" {
+			inv.TraceId = traceId
+		}
 		inv.Telemetry = append(inv.Telemetry, telemetry)
 		if b.eldest.Equal(epochStart) {
 			b.eldest = inv.Start
@@ -115,6 +123,7 @@ func (b *Batch) ripeHarvest(now time.Time) []*Invocation {
 type Invocation struct {
 	Start     time.Time
 	RequestId string
+	TraceId   string
 	Telemetry [][]byte
 }
 
@@ -135,4 +144,13 @@ func (inv *Invocation) IsRipe() bool {
 // IsEmpty is true when the invocation has no telemetry. The invocation has begun, but has received no agent payload, nor platform logs.
 func (inv *Invocation) IsEmpty() bool {
 	return len(inv.Telemetry) == 0
+}
+
+// RetrieveTraceID looks up a trace ID using the provided request ID
+func (b *Batch) RetrieveTraceID(requestId string) string {
+	inv, ok := b.invocations[requestId]
+	if ok {
+		return inv.TraceId
+	}
+	return ""
 }

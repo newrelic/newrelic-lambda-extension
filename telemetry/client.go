@@ -29,19 +29,20 @@ type Client struct {
 	telemetryEndpoint string
 	logEndpoint       string
 	functionName      string
+	batch             *Batch
 }
 
 // New creates a telemetry client with sensible defaults
-func New(functionName string, licenseKey string, telemetryEndpointOverride string, logEndpointOverride string) *Client {
+func New(functionName string, licenseKey string, telemetryEndpointOverride string, logEndpointOverride string, batch *Batch) *Client {
 	httpClient := &http.Client{
 		Timeout: time.Second * 2,
 	}
 
-	return NewWithHTTPClient(httpClient, functionName, licenseKey, telemetryEndpointOverride, logEndpointOverride)
+	return NewWithHTTPClient(httpClient, functionName, licenseKey, telemetryEndpointOverride, logEndpointOverride, batch)
 }
 
 // NewWithHTTPClient is just like New, but the HTTP client can be overridden
-func NewWithHTTPClient(httpClient *http.Client, functionName string, licenseKey string, telemetryEndpointOverride string, logEndpointOverride string) *Client {
+func NewWithHTTPClient(httpClient *http.Client, functionName string, licenseKey string, telemetryEndpointOverride string, logEndpointOverride string, batch *Batch) *Client {
 	telemetryEndpoint := getInfraEndpointURL(licenseKey, telemetryEndpointOverride)
 	logEndpoint := getLogEndpointURL(licenseKey, logEndpointOverride)
 	return &Client{
@@ -50,6 +51,7 @@ func NewWithHTTPClient(httpClient *http.Client, functionName string, licenseKey 
 		telemetryEndpoint: telemetryEndpoint,
 		logEndpoint:       logEndpoint,
 		functionName:      functionName,
+		batch:             batch,
 	}
 }
 
@@ -192,7 +194,14 @@ func (c *Client) SendFunctionLogs(ctx context.Context, lines []logserver.LogLine
 	for _, l := range lines {
 		// Unix time in ms
 		ts := l.Time.UnixNano() / 1e6
-		logMessages = append(logMessages, NewFunctionLogMessage(ts, l.RequestID, string(l.Content)))
+		var traceId string
+		if c.batch != nil {
+			// There is a race condition here. Telemetry batch may be late, so the trace
+			// ID would be blank. This would require a lock to handle, which would delay
+			// logs being sent. Not sure if worth the performance hit yet.
+			traceId = c.batch.RetrieveTraceID(l.RequestID)
+		}
+		logMessages = append(logMessages, NewFunctionLogMessage(ts, l.RequestID, traceId, string(l.Content)))
 		util.Debugf("Sending function logs for request %s", l.RequestID)
 	}
 	// The Log API expects an array

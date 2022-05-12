@@ -30,7 +30,7 @@ type FunctionLogMessage struct {
 	Attributes map[string]interface{} `json:"attributes"`
 }
 
-func NewFunctionLogMessage(timestamp int64, requestId string, message string) FunctionLogMessage {
+func NewFunctionLogMessage(timestamp int64, requestId, traceId, message string) FunctionLogMessage {
 	return FunctionLogMessage{
 		Message:   message,
 		Timestamp: timestamp,
@@ -39,6 +39,7 @@ func NewFunctionLogMessage(timestamp int64, requestId string, message string) Fu
 				"lambda_request_id": requestId,
 			},
 			"faas.execution": requestId,
+			"trace.id":       traceId,
 		},
 	}
 }

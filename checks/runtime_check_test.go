@@ -4,22 +4,12 @@
 package checks
 
 import (
-	"bytes"
-	"io/ioutil"
-	"net/http"
 	"os"
 	"path/filepath"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 )
-
-type mockClientRedirect struct{}
-
-func (c *mockClientRedirect) Get(string) (*http.Response, error) {
-	body := ioutil.NopCloser(bytes.NewBufferString("Hello World"))
-	return &http.Response{Body: body, StatusCode: 301}, nil
-}
 
 func TestRuntimeCheck(t *testing.T) {
 	dirname, err := os.MkdirTemp("", "")
@@ -45,9 +35,15 @@ func TestRuntimeCheckNil(t *testing.T) {
 }
 
 func TestLatestAgentTag(t *testing.T) {
-	client = &mockClientError{}
-	assert.Nil(t, latestAgentTag(&runtimeConfig{}))
+	r := &runtimeConfig{agentVersionGitOrg: runtimeConfigs[Python].agentVersionGitOrg, agentVersionGitRepo: runtimeConfigs[Python].agentVersionGitRepo}
+	err := latestAgentTag(r)
+	assert.NotEmpty(t, r.AgentVersion)
+	assert.Nil(t, err)
+}
 
-	client = &mockClientRedirect{}
-	assert.Nil(t, latestAgentTag(&runtimeConfig{}))
+func TestLatestAgentTagError(t *testing.T) {
+	r := &runtimeConfig{agentVersionGitOrg: "", agentVersionGitRepo: ""}
+	err := latestAgentTag(r)
+	assert.Empty(t, r.AgentVersion)
+	assert.Nil(t, err)
 }

@@ -1,12 +1,13 @@
 package checks
 
 import (
-	"io/ioutil"
+	"context"
 	"net/http"
 	"path/filepath"
 	"regexp"
 	"time"
 
+	"github.com/google/go-github/v44/github"
 	"github.com/newrelic/newrelic-lambda-extension/util"
 )
 
@@ -15,8 +16,9 @@ type httpClient interface {
 }
 
 var (
-	client httpClient
-	re     = regexp.MustCompile(`\/releases\/tag\/(v[0-9.]+)`)
+	client       httpClient
+	githubClient *github.Client
+	re           = regexp.MustCompile(`\/releases\/tag\/(v[0-9.]+)`)
 )
 
 func init() {
@@ -26,6 +28,7 @@ func init() {
 		},
 		Timeout: time.Second * 10,
 	}
+	githubClient = github.NewClient(&http.Client{Timeout: time.Second * 10})
 }
 
 func checkAndReturnRuntime() (runtimeConfig, error) {
@@ -43,33 +46,17 @@ func checkAndReturnRuntime() (runtimeConfig, error) {
 }
 
 func latestAgentTag(r *runtimeConfig) error {
-	resp, err := client.Get(r.agentVersionUrl)
+	ctx := context.Background()
+	release, _, err := githubClient.Repositories.GetLatestRelease(ctx, r.agentVersionGitOrg, r.agentVersionGitRepo)
+
 	if err != nil {
-		// Likely a connectivity issue, log the error but skip check
-		util.Debugf("Can't query latest agent version. Request to %v returned error %v", r.agentVersionUrl, err)
+		util.Debugf("Could not retrieve latest GitHub release: %v", err)
 		return nil
 	}
 
-	defer resp.Body.Close()
-
-	if resp.StatusCode >= 300 && resp.StatusCode != 302 {
-		// The version check HTTP request failed; this doesn't tell us anything
-		util.Debugf("Can't query latest agent version. Request to %v returned status %v", r.agentVersionUrl, resp.StatusCode)
-		return nil
+	if release.TagName != nil {
+		r.AgentVersion = *release.TagName
 	}
 
-	body, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		return err
-	}
-
-	rs := re.FindStringSubmatch(string(body))
-	if len(rs) != 2 {
-		// FIXME: This is way too brittle, should use https://api.github.com/repos/
-		util.Debugf("Can't determine latest agent version: %v", rs)
-		return nil
-	}
-
-	r.AgentVersion = rs[1]
 	return nil
 }

@@ -15,14 +15,15 @@ var (
 )
 
 type runtimeConfig struct {
-	AgentVersion     string
-	agentVersionUrl  string
-	agentVersionFile string
-	fileType         string
-	language         Runtime
-	layerAgentPaths  []string
-	vendorAgentPath  string
-	wrapperName      string
+	AgentVersion        string
+	agentVersionGitOrg  string
+	agentVersionGitRepo string
+	agentVersionFile    string
+	fileType            string
+	language            Runtime
+	layerAgentPaths     []string
+	vendorAgentPath     string
+	wrapperName         string
 }
 
 type Runtime string
@@ -35,21 +36,23 @@ const (
 // Runtime static values
 var runtimeConfigs = map[Runtime]runtimeConfig{
 	Node: {
-		language:         Node,
-		wrapperName:      "newrelic-lambda-wrapper.handler",
-		fileType:         "js",
-		layerAgentPaths:  layerAgentPathNode,
-		vendorAgentPath:  vendorAgentPathNode,
-		agentVersionFile: "package.json",
-		agentVersionUrl:  "https://github.com/newrelic/node-newrelic/releases/latest",
+		language:            Node,
+		wrapperName:         "newrelic-lambda-wrapper.handler",
+		fileType:            "js",
+		layerAgentPaths:     layerAgentPathNode,
+		vendorAgentPath:     vendorAgentPathNode,
+		agentVersionFile:    "package.json",
+		agentVersionGitOrg:  "newrelic",
+		agentVersionGitRepo: "node-newrelic",
 	},
 	Python: {
-		language:         Python,
-		wrapperName:      "newrelic_lambda_wrapper.handler",
-		fileType:         "py",
-		layerAgentPaths:  layerAgentPathsPython,
-		vendorAgentPath:  vendorAgentPathPython,
-		agentVersionFile: "version.txt",
-		agentVersionUrl:  "https://github.com/newrelic/newrelic-python-agent/releases/latest",
+		language:            Python,
+		wrapperName:         "newrelic_lambda_wrapper.handler",
+		fileType:            "py",
+		layerAgentPaths:     layerAgentPathsPython,
+		vendorAgentPath:     vendorAgentPathPython,
+		agentVersionFile:    "version.txt",
+		agentVersionGitOrg:  "newrelic",
+		agentVersionGitRepo: "newrelic-python-agent",
 	},
 }

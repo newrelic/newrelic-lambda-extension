@@ -14,7 +14,7 @@ import (
 func parsePayload(data []byte) (metadata, uncompressedData map[string]json.RawMessage, err error) {
 	var arr [4]json.RawMessage
 
-	if err = json.Unmarshal(data, &arr); nil != err {
+	if err = json.Unmarshal(data, &arr); err != nil {
 		err = fmt.Errorf("unable to unmarshal payload data array: %v", err)
 		return
 	}
@@ -22,17 +22,17 @@ func parsePayload(data []byte) (metadata, uncompressedData map[string]json.RawMe
 	var dataJSON []byte
 	compressed := strings.Trim(string(arr[3]), `"`)
 
-	if dataJSON, err = decodeUncompress(compressed); nil != err {
+	if dataJSON, err = decodeUncompress(compressed); err != nil {
 		err = fmt.Errorf("unable to uncompress payload: %v", err)
 		return
 	}
 
-	if err = json.Unmarshal(dataJSON, &uncompressedData); nil != err {
+	if err = json.Unmarshal(dataJSON, &uncompressedData); err != nil {
 		err = fmt.Errorf("unable to unmarshal uncompressed payload: %v", err)
 		return
 	}
 
-	if err = json.Unmarshal(arr[2], &metadata); nil != err {
+	if err = json.Unmarshal(arr[2], &metadata); err != nil {
 		err = fmt.Errorf("unable to unmarshal payload metadata: %v", err)
 		return
 	}
@@ -42,13 +42,13 @@ func parsePayload(data []byte) (metadata, uncompressedData map[string]json.RawMe
 
 func decodeUncompress(input string) ([]byte, error) {
 	decoded, err := base64.StdEncoding.DecodeString(input)
-	if nil != err {
+	if err != nil {
 		return nil, err
 	}
 
 	buf := bytes.NewBuffer(decoded)
 	gz, err := gzip.NewReader(buf)
-	if nil != err {
+	if err != nil {
 		return nil, err
 	}
 
@@ -59,13 +59,18 @@ func decodeUncompress(input string) ([]byte, error) {
 	return out.Bytes(), nil
 }
 
-// ExtracTraceID extracts the trace ID within a payload, if present
+// ExtractTraceID extracts the trace ID within a payload, if present
 func ExtractTraceID(data []byte) (string, error) {
-	if !bytes.Contains(data, []byte("NR_LAMBDA_MONITORING")) {
+	decoded, err := base64.StdEncoding.DecodeString(string(data))
+	if err != nil {
+		return "", err
+	}
+
+	if !bytes.Contains(decoded, []byte("NR_LAMBDA_MONITORING")) {
 		return "", nil
 	}
 
-	_, segments, err := parsePayload(data)
+	_, segments, err := parsePayload(decoded)
 	if err != nil {
 		return "", err
 	}

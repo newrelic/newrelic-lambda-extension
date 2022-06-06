@@ -41,6 +41,10 @@ func (b *Batch) AddInvocation(requestId string, start time.Time) {
 func (b *Batch) AddTelemetry(requestId string, telemetry []byte) *Invocation {
 	inv, ok := b.invocations[requestId]
 	if ok {
+		inv.Telemetry = append(inv.Telemetry, telemetry)
+		if b.eldest.Equal(epochStart) {
+			b.eldest = inv.Start
+		}
 		traceId, err := ExtractTraceID(telemetry)
 		if err != nil {
 			util.Debugln(err)
@@ -48,10 +52,6 @@ func (b *Batch) AddTelemetry(requestId string, telemetry []byte) *Invocation {
 		// We don't want to unset a previously set trace ID
 		if traceId != "" {
 			inv.TraceId = traceId
-		}
-		inv.Telemetry = append(inv.Telemetry, telemetry)
-		if b.eldest.Equal(epochStart) {
-			b.eldest = inv.Start
 		}
 		return inv
 	}

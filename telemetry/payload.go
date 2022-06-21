@@ -11,8 +11,10 @@ import (
 	"strings"
 )
 
-func parsePayload(data []byte) (metadata, uncompressedData map[string]json.RawMessage, err error) {
-	var arr [4]json.RawMessage
+type uncompressedData map[string]map[string]json.RawMessage
+
+func parsePayload(data []byte) (uncompressedData uncompressedData, err error) {
+	var arr [3]json.RawMessage
 
 	if err = json.Unmarshal(data, &arr); err != nil {
 		err = fmt.Errorf("unable to unmarshal payload data array: %v", err)
@@ -20,7 +22,7 @@ func parsePayload(data []byte) (metadata, uncompressedData map[string]json.RawMe
 	}
 
 	var dataJSON []byte
-	compressed := strings.Trim(string(arr[3]), `"`)
+	compressed := strings.Trim(string(arr[2]), `"`)
 
 	if dataJSON, err = decodeUncompress(compressed); err != nil {
 		err = fmt.Errorf("unable to uncompress payload: %v", err)
@@ -29,11 +31,6 @@ func parsePayload(data []byte) (metadata, uncompressedData map[string]json.RawMe
 
 	if err = json.Unmarshal(dataJSON, &uncompressedData); err != nil {
 		err = fmt.Errorf("unable to unmarshal uncompressed payload: %v", err)
-		return
-	}
-
-	if err = json.Unmarshal(arr[2], &metadata); err != nil {
-		err = fmt.Errorf("unable to unmarshal payload metadata: %v", err)
 		return
 	}
 
@@ -70,19 +67,24 @@ func ExtractTraceID(data []byte) (string, error) {
 		return "", nil
 	}
 
-	_, segments, err := parsePayload(decoded)
+	segments, err := parsePayload(decoded)
 	if err != nil {
 		return "", err
 	}
 
-	analyticEvents, ok := segments["analytic_event_data"]
+	dataSegment, ok := segments["data"]
+	if !ok {
+		return "", errors.New("No trace ID found in payload")
+	}
+
+	analyticEvents, ok := dataSegment["analytic_event_data"]
 	if ok {
 		var parsedAnalyticEvents []json.RawMessage
 		if err := json.Unmarshal(analyticEvents, &parsedAnalyticEvents); err != nil {
 			return "", err
 		}
 
-		if len(parsedAnalyticEvents) == 3 {
+		if len(parsedAnalyticEvents) > 2 {
 			var analyticEvent [][]struct {
 				TraceID string `json:"traceId"`
 			}
@@ -95,14 +97,14 @@ func ExtractTraceID(data []byte) (string, error) {
 		}
 	}
 
-	spanEvents, ok := segments["span_event_data"]
+	spanEvents, ok := dataSegment["span_event_data"]
 	if ok {
 		var parsedSpanEvents []json.RawMessage
 		if err := json.Unmarshal(spanEvents, &parsedSpanEvents); err != nil {
 			return "", err
 		}
 
-		if len(parsedSpanEvents) == 3 {
+		if len(parsedSpanEvents) > 2 {
 			var spanEvent [][]struct {
 				TraceID string `json:"traceId"`
 			}

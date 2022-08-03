@@ -183,13 +183,15 @@ func (c *Client) sendPayloads(compressedPayloads []*bytes.Buffer, builder reques
 	return successCount, sentBytes, nil
 }
 
-func (c *Client) SendFunctionLogs(ctx context.Context, lines []logserver.LogLine) error {
+func (c *Client) SendFunctionLogs(ctx context.Context, invokedFunctionARN string, lines []logserver.LogLine) error {
 	start := time.Now()
 
 	common := map[string]interface{}{
 		"plugin":    util.Id,
+		"faas.arn":  invokedFunctionARN,
 		"faas.name": c.functionName,
 	}
+
 	logMessages := make([]FunctionLogMessage, 0, len(lines))
 	for _, l := range lines {
 		// Unix time in ms

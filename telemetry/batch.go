@@ -17,10 +17,11 @@ type Batch struct {
 	invocations     map[string]*Invocation
 	ripeDuration    time.Duration
 	veryOldDuration time.Duration
+	extractTraceID  bool
 }
 
 // NewBatch constructs a new batch.
-func NewBatch(ripeMillis int64, rotMillis int64) *Batch {
+func NewBatch(ripeMillis, rotMillis int64, extractTraceID bool) *Batch {
 	initialSize := uint32(math.Min(float64(ripeMillis)/100, 100))
 	return &Batch{
 		lastHarvest:     epochStart,
@@ -28,6 +29,7 @@ func NewBatch(ripeMillis int64, rotMillis int64) *Batch {
 		invocations:     make(map[string]*Invocation, initialSize),
 		ripeDuration:    time.Duration(ripeMillis) * time.Millisecond,
 		veryOldDuration: time.Duration(rotMillis) * time.Millisecond,
+		extractTraceID:  extractTraceID,
 	}
 }
 
@@ -45,13 +47,15 @@ func (b *Batch) AddTelemetry(requestId string, telemetry []byte) *Invocation {
 		if b.eldest.Equal(epochStart) {
 			b.eldest = inv.Start
 		}
-		traceId, err := ExtractTraceID(telemetry)
-		if err != nil {
-			util.Debugln(err)
-		}
-		// We don't want to unset a previously set trace ID
-		if traceId != "" {
-			inv.TraceId = traceId
+		if b.extractTraceID {
+			traceId, err := ExtractTraceID(telemetry)
+			if err != nil {
+				util.Debugln(err)
+			}
+			// We don't want to unset a previously set trace ID
+			if traceId != "" {
+				inv.TraceId = traceId
+			}
 		}
 		return inv
 	}

@@ -93,7 +93,7 @@ func main() {
 	}
 
 	// Set up the telemetry buffer
-	batch := telemetry.NewBatch(int64(conf.RipeMillis), int64(conf.RotMillis))
+	batch := telemetry.NewBatch(int64(conf.RipeMillis), int64(conf.RotMillis), conf.CollectTraceID)
 
 	// Start the Logs API server, and register it
 	logServer, err := logserver.Start(conf)
@@ -120,7 +120,7 @@ func main() {
 	}
 
 	// Init the telemetry sending client
-	telemetryClient := telemetry.New(registrationResponse.FunctionName, licenseKey, conf.TelemetryEndpoint, conf.LogEndpoint, batch)
+	telemetryClient := telemetry.New(registrationResponse.FunctionName, licenseKey, conf.TelemetryEndpoint, conf.LogEndpoint, batch, conf.CollectTraceID)
 	telemetryChan, err := telemetry.InitTelemetryChannel()
 	if err != nil {
 		err2 := invocationClient.InitError(ctx, "telemetryClient.init", err)

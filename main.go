@@ -22,7 +22,12 @@ import (
 	"github.com/newrelic/newrelic-lambda-extension/telemetry"
 )
 
-var rootCtx context.Context
+var (
+	invokedFunctionARN string
+	lastEventStart     time.Time
+	lastRequestId      string
+	rootCtx            context.Context
+)
 
 func init() {
 	rootCtx = context.Background()
@@ -140,7 +145,7 @@ func main() {
 	}()
 
 	// Call next, and process telemetry, until we're shut down
-	eventCounter, invokedFunctionARN := mainLoop(ctx, invocationClient, batch, telemetryChan, logServer, telemetryClient)
+	eventCounter := mainLoop(ctx, invocationClient, batch, telemetryChan, logServer, telemetryClient)
 
 	util.Logf("New Relic Extension shutting down after %v events\n", eventCounter)
 
@@ -151,7 +156,7 @@ func main() {
 
 	pollLogServer(logServer, batch)
 	finalHarvest := batch.Close()
-	shipHarvest(ctx, finalHarvest, telemetryClient, invokedFunctionARN)
+	shipHarvest(ctx, finalHarvest, telemetryClient)
 
 	util.Debugln("Waiting for background tasks to complete")
 	backgroundTasks.Wait()
@@ -169,7 +174,7 @@ func logShipLoop(ctx context.Context, logServer *logserver.LogServer, telemetryC
 			return
 		}
 
-		err := telemetryClient.SendFunctionLogs(ctx, functionLogs)
+		err := telemetryClient.SendFunctionLogs(ctx, invokedFunctionARN, functionLogs)
 		if err != nil {
 			util.Logf("Failed to send %d function logs", len(functionLogs))
 		}
@@ -177,13 +182,7 @@ func logShipLoop(ctx context.Context, logServer *logserver.LogServer, telemetryC
 }
 
 // mainLoop repeatedly calls the /next api, and processes telemetry and platform logs. The timing is rather complicated.
-func mainLoop(ctx context.Context, invocationClient *client.InvocationClient, batch *telemetry.Batch, telemetryChan chan []byte, logServer *logserver.LogServer, telemetryClient *telemetry.Client) (int, string) {
-	var (
-		invokedFunctionARN string
-		lastEventStart     time.Time
-		lastRequestId      string
-	)
-
+func mainLoop(ctx context.Context, invocationClient *client.InvocationClient, batch *telemetry.Batch, telemetryChan chan []byte, logServer *logserver.LogServer, telemetryClient *telemetry.Client) int {
 	eventCounter := 0
 	probablyTimeout := false
 
@@ -191,7 +190,7 @@ func mainLoop(ctx context.Context, invocationClient *client.InvocationClient, ba
 		select {
 		case <-ctx.Done():
 			// We're already done
-			return eventCounter, invokedFunctionARN
+			return eventCounter
 		default:
 			// Our call to next blocks. It is likely that the container is frozen immediately after we call NextEvent.
 			event, err := invocationClient.NextEvent(ctx)
@@ -243,7 +242,7 @@ func mainLoop(ctx context.Context, invocationClient *client.InvocationClient, ba
 					batch.AddTelemetry(lastRequestId, []byte(errorMessage))
 				}
 
-				return eventCounter, invokedFunctionARN
+				return eventCounter
 			} else {
 				// Reset probablyTimeout if the event after the suspected timeout wasn't a timeout shutdown.
 				probablyTimeout = false
@@ -269,7 +268,7 @@ func mainLoop(ctx context.Context, invocationClient *client.InvocationClient, ba
 			// minority of invocations. Putting this here lets us run the HTTP request to send to NR in parallel with the Lambda
 			// handler, reducing or eliminating our latency impact.
 			pollLogServer(logServer, batch)
-			shipHarvest(ctx, batch.Harvest(time.Now()), telemetryClient, invokedFunctionARN)
+			shipHarvest(ctx, batch.Harvest(time.Now()), telemetryClient)
 
 			select {
 			case <-timeLimitContext.Done():
@@ -291,7 +290,7 @@ func mainLoop(ctx context.Context, invocationClient *client.InvocationClient, ba
 				// Opportunity for an aggressive harvest, in which case, we definitely want to wait for the HTTP POST
 				// to complete. Mostly, nothing really happens here.
 				pollLogServer(logServer, batch)
-				shipHarvest(ctx, batch.Harvest(time.Now()), telemetryClient, invokedFunctionARN)
+				shipHarvest(ctx, batch.Harvest(time.Now()), telemetryClient)
 			}
 
 			lastEventStart = eventStart
@@ -309,7 +308,7 @@ func pollLogServer(logServer *logserver.LogServer, batch *telemetry.Batch) {
 	}
 }
 
-func shipHarvest(ctx context.Context, harvested []*telemetry.Invocation, telemetryClient *telemetry.Client, invokedFunctionARN string) {
+func shipHarvest(ctx context.Context, harvested []*telemetry.Invocation, telemetryClient *telemetry.Client) {
 	if len(harvested) > 0 {
 		telemetrySlice := make([][]byte, 0, 2*len(harvested))
 		for _, inv := range harvested {

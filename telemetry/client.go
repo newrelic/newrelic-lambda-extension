@@ -30,19 +30,20 @@ type Client struct {
 	logEndpoint       string
 	functionName      string
 	batch             *Batch
+	collectTraceID    bool
 }
 
 // New creates a telemetry client with sensible defaults
-func New(functionName string, licenseKey string, telemetryEndpointOverride string, logEndpointOverride string, batch *Batch) *Client {
+func New(functionName string, licenseKey string, telemetryEndpointOverride string, logEndpointOverride string, batch *Batch, collectTraceID bool) *Client {
 	httpClient := &http.Client{
 		Timeout: time.Second * 2,
 	}
 
-	return NewWithHTTPClient(httpClient, functionName, licenseKey, telemetryEndpointOverride, logEndpointOverride, batch)
+	return NewWithHTTPClient(httpClient, functionName, licenseKey, telemetryEndpointOverride, logEndpointOverride, batch, collectTraceID)
 }
 
 // NewWithHTTPClient is just like New, but the HTTP client can be overridden
-func NewWithHTTPClient(httpClient *http.Client, functionName string, licenseKey string, telemetryEndpointOverride string, logEndpointOverride string, batch *Batch) *Client {
+func NewWithHTTPClient(httpClient *http.Client, functionName string, licenseKey string, telemetryEndpointOverride string, logEndpointOverride string, batch *Batch, collectTraceID bool) *Client {
 	telemetryEndpoint := getInfraEndpointURL(licenseKey, telemetryEndpointOverride)
 	logEndpoint := getLogEndpointURL(licenseKey, logEndpointOverride)
 	return &Client{
@@ -52,6 +53,7 @@ func NewWithHTTPClient(httpClient *http.Client, functionName string, licenseKey 
 		logEndpoint:       logEndpoint,
 		functionName:      functionName,
 		batch:             batch,
+		collectTraceID:    collectTraceID,
 	}
 }
 
@@ -197,7 +199,7 @@ func (c *Client) SendFunctionLogs(ctx context.Context, invokedFunctionARN string
 		// Unix time in ms
 		ts := l.Time.UnixNano() / 1e6
 		var traceId string
-		if c.batch != nil {
+		if c.batch != nil && c.collectTraceID {
 			// There is a race condition here. Telemetry batch may be late, so the trace
 			// ID would be blank. This would require a lock to handle, which would delay
 			// logs being sent. Not sure if worth the performance hit yet.

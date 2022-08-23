@@ -24,21 +24,21 @@ var (
 )
 
 func TestMissingInvocation(t *testing.T) {
-	batch := NewBatch(ripe, rot)
+	batch := NewBatch(ripe, rot, false)
 
 	invocation := batch.AddTelemetry(testNoSuchRequestId, bytes.NewBufferString(testTelemetry).Bytes())
 	assert.Nil(t, invocation)
 }
 
 func TestEmptyHarvest(t *testing.T) {
-	batch := NewBatch(ripe, rot)
+	batch := NewBatch(ripe, rot, false)
 	res := batch.Harvest(requestStart)
 
 	assert.Nil(t, res)
 }
 
 func TestEmptyRotHarvest(t *testing.T) {
-	batch := NewBatch(ripe, rot)
+	batch := NewBatch(ripe, rot, false)
 
 	batch.AddInvocation("test", requestStart)
 
@@ -48,7 +48,7 @@ func TestEmptyRotHarvest(t *testing.T) {
 }
 
 func TestEmptyRipeHarvest(t *testing.T) {
-	batch := NewBatch(ripe, rot)
+	batch := NewBatch(ripe, rot, false)
 
 	batch.lastHarvest = requestStart.Add(-ripe)
 	batch.AddInvocation("test", requestStart)
@@ -59,7 +59,7 @@ func TestEmptyRipeHarvest(t *testing.T) {
 }
 
 func TestWithInvocationRipeHarvest(t *testing.T) {
-	batch := NewBatch(ripe, rot)
+	batch := NewBatch(ripe, rot, false)
 
 	batch.lastHarvest = requestStart
 
@@ -82,7 +82,7 @@ func TestWithInvocationRipeHarvest(t *testing.T) {
 }
 
 func TestWithInvocationAggressiveHarvest(t *testing.T) {
-	batch := NewBatch(ripe, rot)
+	batch := NewBatch(ripe, rot, false)
 
 	batch.AddInvocation(testRequestId, requestStart)
 	batch.AddInvocation(testRequestId2, requestStart.Add(100*time.Millisecond))
@@ -101,7 +101,7 @@ func TestWithInvocationAggressiveHarvest(t *testing.T) {
 }
 
 func TestBatch_Close(t *testing.T) {
-	batch := NewBatch(ripe, rot)
+	batch := NewBatch(ripe, rot, false)
 
 	batch.AddInvocation(testRequestId, requestStart)
 	batch.AddInvocation(testRequestId2, requestStart.Add(100*time.Millisecond))

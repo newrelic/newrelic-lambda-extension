@@ -7,3 +7,4 @@ response.out
 .aws-sam/
 coverage.txt
 preview-extensions-ggqizro707
+localExtensions/

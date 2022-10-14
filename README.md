@@ -68,6 +68,17 @@ To publish the extension to your AWS account, run the following command:
 
 This packages the extension, and publishes a new layer version in your AWS account. Be sure that the AWS CLI is configured correctly. You can use the usual [AWS CLI environment variables](https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-envvars.html) to control the account and region for the CLI.
 
+## Building for custom New Relic Lambda Layers
+
+It can be helpful to build for both x86 and arm64 architectures, if you're creating your own [New Relic Lambda Layers](https://github.com/newrelic/newrelic-lambda-layers). With Docker installed and running, run these commands in this project's root directory:
+
+```shell
+docker build --tag my-extension-container .
+docker run -v $PWD:/newrelic-lambda-extension my-extension-container:latest 
+```
+The extensions will be built into `localExtensions/arm64` and `localExtensions/x86_64`.
+
+
 ## Startup Checks
 
 This Lambda Extension will perform a series of checks on initialization. Should any of

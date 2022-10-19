@@ -2,6 +2,7 @@ package telemetry
 
 import (
 	"bytes"
+	"sync"
 	"testing"
 	"time"
 
@@ -117,4 +118,57 @@ func TestBatch_Close(t *testing.T) {
 
 	harvested := batch.Close()
 	assert.Equal(t, 2, len(harvested))
+}
+
+func TestBatchAsync(t *testing.T) {
+	batch := NewBatch(ripe, rot, false)
+
+	batch.lastHarvest = requestStart
+
+	wg := sync.WaitGroup{}
+	wg.Add(3)
+
+	go func() {
+		batch.AddInvocation(testRequestId, requestStart)
+		wg.Done()
+	}()
+	go func() {
+		batch.AddInvocation(testRequestId2, requestStart.Add(100*time.Millisecond))
+		wg.Done()
+	}()
+	go func() {
+		batch.AddInvocation(testRequestId3, requestStart.Add(200*time.Millisecond))
+		wg.Done()
+	}()
+
+	// Doing this to try to trigger a panic
+	go batch.RetrieveTraceID(testRequestId)
+
+	wg.Wait()
+
+	var invocation, invocation2 *Invocation
+	wg.Add(2)
+
+	go func() {
+		invocation = batch.AddTelemetry(testRequestId, bytes.NewBufferString(testTelemetry).Bytes())
+		wg.Done()
+	}()
+	go func() {
+		invocation2 = batch.AddTelemetry(testRequestId, bytes.NewBufferString(moreTestTelemetry).Bytes())
+		wg.Done()
+	}()
+
+	// Doing this to try to trigger a panic
+	go batch.RetrieveTraceID(testRequestId)
+
+	wg.Wait()
+	assert.NotNil(t, invocation)
+	assert.Equal(t, invocation, invocation2)
+
+	batch.AddTelemetry(testRequestId2, bytes.NewBufferString(testTelemetry).Bytes())
+
+	harvested := batch.Harvest(requestStart.Add(ripe*time.Millisecond + time.Millisecond))
+	go assert.Equal(t, 1, len(harvested))
+	go assert.Equal(t, testRequestId, harvested[0].RequestId)
+	go assert.Equal(t, 2, len(harvested[0].Telemetry))
 }

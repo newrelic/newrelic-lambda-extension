@@ -1,0 +1,34 @@
+# This workflow will build a golang project
+# For more information see: https://docs.github.com/en/actions/automating-builds-and-tests/building-and-testing-go
+
+name: Build Release Assets
+on: release
+jobs:
+  releases-matrix:
+    name: Release Zip
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        make_directive: [zip-x86_64, zip-arm64]
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: set up Go
+        uses: actions/setup-go@v3
+        with:
+          go-version: 1.19
+
+      - name: make zip
+        run: make ${{ matrix.make_directive }}
+      
+      - name: upload artifact
+        run: |
+          tag=$(git tag | sort -V | tail -1)
+          if [ -f /tmp/newrelic-lambda-extension.x86_64.zip ];then
+            file=/tmp/newrelic-lambda-extension.x86_64.zip
+          else
+            file=/tmp/newrelic-lambda-extension.arm64.zip
+          fi
+          
+          gh auth login --with-token ${{ secrets.GITHUB_TOKEN }}
+          gh release upload $tag $file        

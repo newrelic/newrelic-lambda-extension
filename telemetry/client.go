@@ -3,11 +3,15 @@ package telemetry
 import (
 	"bytes"
 	"context"
+	"encoding/binary"
 	"io/ioutil"
 	"net/http"
 	"net/url"
 	"strings"
 	"time"
+
+	crypto_rand "crypto/rand"
+	math_rand "math/rand"
 
 	"github.com/newrelic/newrelic-lambda-extension/lambda/logserver"
 
@@ -20,24 +24,35 @@ const (
 	LogEndpointEU   string = "https://log-api.eu.newrelic.com/log/v1"
 	LogEndpointUS   string = "https://log-api.newrelic.com/log/v1"
 
-	retries int = 3
+	// Worst case wait time = 15 seconds
+	retries               int = 5
+	retryTimeoutMaxMillis int = 2 * 1000
 )
 
 type Client struct {
 	httpClient        *http.Client
+	batch             *Batch
 	licenseKey        string
 	telemetryEndpoint string
 	logEndpoint       string
 	functionName      string
-	batch             *Batch
 	collectTraceID    bool
 }
 
 // New creates a telemetry client with sensible defaults
 func New(functionName string, licenseKey string, telemetryEndpointOverride string, logEndpointOverride string, batch *Batch, collectTraceID bool) *Client {
 	httpClient := &http.Client{
-		Timeout: time.Second * 2,
+		Timeout: time.Second * 1,
 	}
+
+	// Create random seed for timeout to avoid instances created at the same time
+	// from creating a wall of retry requests to the collector
+	var b [8]byte
+	_, err := crypto_rand.Read(b[:])
+	if err != nil {
+		panic("cannot seed math/rand package with cryptographically secure random number generator")
+	}
+	math_rand.Seed(int64(binary.LittleEndian.Uint64(b[:])))
 
 	return NewWithHTTPClient(httpClient, functionName, licenseKey, telemetryEndpointOverride, logEndpointOverride, batch, collectTraceID)
 }
@@ -154,9 +169,14 @@ func (c *Client) sendPayloads(compressedPayloads []*bytes.Buffer, builder reques
 				switch err.(type) {
 				case *url.Error:
 					// Retry on timeout
+					// With a 0-2 second random sleep time in between retries
+					// to avoid a large batch of lambdas requesting to send data
+					// to the collector server at the exact same time.
 					if err.(*url.Error).Timeout() {
 						if attemptNum < retries {
 							util.Debugln("Retrying after timeout", err)
+							sleepTime := math_rand.Intn(retryTimeoutMaxMillis)
+							time.Sleep(time.Duration(sleepTime) * time.Millisecond)
 						} else {
 							util.Logf("Request failed. Ran out of retries after %v attempts.", attemptNum)
 							//We'll exit the loop naturally at this point

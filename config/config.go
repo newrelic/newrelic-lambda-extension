@@ -4,6 +4,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"time"
 )
 
 const (
@@ -12,24 +13,26 @@ const (
 	DefaultLogLevel      = "INFO"
 	DebugLogLevel        = "DEBUG"
 	defaultLogServerHost = "sandbox.localdomain"
+	DefaultClientTimeout = 10 * time.Second
 )
 
 var EmptyNRWrapper = "Undefined"
 
 type Configuration struct {
 	ExtensionEnabled   bool
+	LogsEnabled        bool
+	SendFunctionLogs   bool
+	CollectTraceID     bool
+	RipeMillis         uint32
+	RotMillis          uint32
 	LicenseKey         string
 	LicenseKeySecretId string
 	NRHandler          string
 	TelemetryEndpoint  string
 	LogEndpoint        string
-	RipeMillis         uint32
-	RotMillis          uint32
 	LogLevel           string
-	LogsEnabled        bool
-	SendFunctionLogs   bool
 	LogServerHost      string
-	CollectTraceID     bool
+	ClientTimeout      time.Duration
 }
 
 func ConfigurationFromEnvironment() *Configuration {
@@ -39,6 +42,7 @@ func ConfigurationFromEnvironment() *Configuration {
 	nrHandler, nrOverride := os.LookupEnv("NEW_RELIC_LAMBDA_HANDLER")
 	telemetryEndpoint, teOverride := os.LookupEnv("NEW_RELIC_TELEMETRY_ENDPOINT")
 	logEndpoint, leOverride := os.LookupEnv("NEW_RELIC_LOG_ENDPOINT")
+	clientTimeout, ctOverride := os.LookupEnv("NEW_RELIC_DATA_COLLECTION_TIMEOUT")
 	ripeMillisStr, ripeMillisOverride := os.LookupEnv("NEW_RELIC_HARVEST_RIPE_MILLIS")
 	rotMillisStr, rotMillisOverride := os.LookupEnv("NEW_RELIC_HARVEST_ROT_MILLIS")
 	logLevelStr, logLevelOverride := os.LookupEnv("NEW_RELIC_EXTENSION_LOG_LEVEL")
@@ -58,6 +62,14 @@ func ConfigurationFromEnvironment() *Configuration {
 	}
 
 	ret := &Configuration{ExtensionEnabled: extensionEnabled, LogsEnabled: logsEnabled}
+
+	ret.ClientTimeout = DefaultClientTimeout
+	if ctOverride && clientTimeout != "" {
+		clientTimeout, err := time.ParseDuration(clientTimeout)
+		if err == nil {
+			ret.ClientTimeout = clientTimeout
+		}
+	}
 
 	if lkOverride {
 		ret.LicenseKey = licenseKey

@@ -14,6 +14,10 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+const (
+	clientTestingTimeout = 300 * time.Millisecond
+)
+
 func TestClientSend(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		assert.Equal(t, r.Method, http.MethodPost)
@@ -42,7 +46,7 @@ func TestClientSend(t *testing.T) {
 
 	defer srv.Close()
 
-	client := NewWithHTTPClient(srv.Client(), "", "a mock license key", srv.URL, srv.URL, &Batch{}, false)
+	client := NewWithHTTPClient(srv.Client(), "", "a mock license key", srv.URL, srv.URL, &Batch{}, false, clientTestingTimeout)
 
 	ctx := context.Background()
 	bytes := []byte("foobar")
@@ -51,7 +55,7 @@ func TestClientSend(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, 1, successCount)
 
-	client = New("", "mock license key", srv.URL, srv.URL, &Batch{}, false)
+	client = New("", "mock license key", srv.URL, srv.URL, &Batch{}, false, clientTestingTimeout)
 	assert.NotNil(t, client)
 }
 
@@ -61,7 +65,7 @@ func TestClientSendRetry(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 
 		if atomic.LoadInt32(&count) == 0 {
-			time.Sleep(300 * time.Millisecond)
+			time.Sleep(50 * time.Millisecond)
 		} else {
 			assert.Equal(t, r.Method, http.MethodPost)
 
@@ -92,8 +96,8 @@ func TestClientSendRetry(t *testing.T) {
 	defer srv.Close()
 
 	httpClient := srv.Client()
-	httpClient.Timeout = 200 * time.Millisecond
-	client := NewWithHTTPClient(httpClient, "", "a mock license key", srv.URL, srv.URL, &Batch{}, false)
+	httpClient.Timeout = 50 * time.Millisecond
+	client := NewWithHTTPClient(httpClient, "", "a mock license key", srv.URL, srv.URL, &Batch{}, false, clientTestingTimeout)
 
 	ctx := context.Background()
 	bytes := []byte("foobar")
@@ -104,26 +108,24 @@ func TestClientSendRetry(t *testing.T) {
 	assert.Equal(t, int32(2), atomic.LoadInt32(&count))
 }
 
-func TestClientSendOutOfRetries(t *testing.T) {
-	var count int32 = 0
+func TestClientReachesDataTimeout(t *testing.T) {
+	startTime := time.Now()
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		atomic.AddInt32(&count, 1)
-		time.Sleep(300 * time.Millisecond)
+		time.Sleep(200 * time.Millisecond)
 	}))
 
 	defer srv.Close()
 
 	httpClient := srv.Client()
-	httpClient.Timeout = 200 * time.Millisecond
-	client := NewWithHTTPClient(httpClient, "", "a mock license key", srv.URL, srv.URL, &Batch{}, false)
+	httpClient.Timeout = 100 * time.Millisecond
+	client := NewWithHTTPClient(httpClient, "", "a mock license key", srv.URL, srv.URL, &Batch{}, false, clientTestingTimeout)
 
 	ctx := context.Background()
 	bytes := []byte("foobar")
 	err, successCount := client.SendTelemetry(ctx, "arn:aws:lambda:us-east-1:1234:function:newrelic-example-go", [][]byte{bytes})
-
+	assert.LessOrEqual(t, int(time.Since(startTime)), int(clientTestingTimeout+10*time.Millisecond))
 	assert.NoError(t, err)
 	assert.Equal(t, 0, successCount)
-	assert.Equal(t, int32(retries), atomic.LoadInt32(&count))
 }
 
 func TestClientUnreachableEndpoint(t *testing.T) {
@@ -131,7 +133,7 @@ func TestClientUnreachableEndpoint(t *testing.T) {
 		Timeout: time.Millisecond * 1,
 	}
 
-	client := NewWithHTTPClient(httpClient, "", "a mock license key", "http://10.123.123.123:12345", "http://10.123.123.123:12345", &Batch{}, false)
+	client := NewWithHTTPClient(httpClient, "", "a mock license key", "http://10.123.123.123:12345", "http://10.123.123.123:12345", &Batch{}, false, clientTestingTimeout)
 
 	ctx := context.Background()
 	bytes := []byte("foobar")

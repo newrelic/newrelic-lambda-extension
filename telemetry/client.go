@@ -116,7 +116,7 @@ func (c *Client) SendTelemetry(ctx context.Context, invokedFunctionARN string, t
 	}
 
 	transmitStart := time.Now()
-	successCount, sentBytes, _ := c.sendPayloads(compressedPayloads, builder)
+	successCount, sentBytes := c.sendPayloads(compressedPayloads, builder)
 	end := time.Now()
 	totalTime := end.Sub(start)
 	transmissionTime := end.Sub(transmitStart)
@@ -135,7 +135,7 @@ func (c *Client) SendTelemetry(ctx context.Context, invokedFunctionARN string, t
 
 type requestBuilder func(buffer *bytes.Buffer) (*http.Request, error)
 
-func (c *Client) sendPayloads(compressedPayloads []*bytes.Buffer, builder requestBuilder) (successCount int, sentBytes int, err error) {
+func (c *Client) sendPayloads(compressedPayloads []*bytes.Buffer, builder requestBuilder) (successCount int, sentBytes int) {
 	successCount = 0
 	sentBytes = 0
 	for _, p := range compressedPayloads {
@@ -168,7 +168,7 @@ func (c *Client) sendPayloads(compressedPayloads []*bytes.Buffer, builder reques
 		}
 	}
 
-	return successCount, sentBytes, nil
+	return successCount, sentBytes
 }
 
 type AttemptData struct {
@@ -282,7 +282,7 @@ func (c *Client) SendFunctionLogs(ctx context.Context, invokedFunctionARN string
 	}
 
 	transmitStart := time.Now()
-	successCount, sentBytes, err := c.sendPayloads(compressedPayloads, builder)
+	successCount, sentBytes := c.sendPayloads(compressedPayloads, builder)
 	end := time.Now()
 	totalTime := end.Sub(start)
 	transmissionTime := end.Sub(transmitStart)

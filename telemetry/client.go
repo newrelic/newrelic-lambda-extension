@@ -41,7 +41,7 @@ type Client struct {
 // New creates a telemetry client with sensible defaults
 func New(functionName string, licenseKey string, telemetryEndpointOverride string, logEndpointOverride string, batch *Batch, collectTraceID bool, clientTimeout time.Duration) *Client {
 	httpClient := &http.Client{
-		Timeout: 500 * time.Millisecond,
+		Timeout: 800 * time.Millisecond,
 	}
 
 	// Create random seed for timeout to avoid instances created at the same time

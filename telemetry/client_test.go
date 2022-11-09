@@ -158,7 +158,7 @@ func TestClientGetsHTTPError(t *testing.T) {
 	ctx := context.Background()
 	bytes := []byte("foobar")
 	err, successCount := client.SendTelemetry(ctx, "arn:aws:lambda:us-east-1:1234:function:newrelic-example-go", [][]byte{bytes})
-	assert.LessOrEqual(t, int(time.Since(startTime)), int(clientTestingTimeout)) // should exit as soon as a non-timeout error occurs without retrying
+	assert.Less(t, int(time.Since(startTime)), int(clientTestingTimeout)) // should exit as soon as a non-timeout error occurs without retrying
 	assert.NoError(t, err)
 	assert.Equal(t, 0, successCount)
 }

@@ -15,7 +15,7 @@ import (
 )
 
 const (
-	clientTestingTimeout = 400 * time.Millisecond
+	clientTestingTimeout = 800 * time.Millisecond
 )
 
 func TestClientSend(t *testing.T) {
@@ -111,7 +111,7 @@ func TestClientSendRetry(t *testing.T) {
 func TestClientReachesDataTimeout(t *testing.T) {
 	startTime := time.Now()
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		time.Sleep(300 * time.Millisecond)
+		time.Sleep(400 * time.Millisecond)
 	}))
 
 	defer srv.Close()

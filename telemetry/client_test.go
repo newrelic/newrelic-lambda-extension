@@ -143,6 +143,26 @@ func TestClientUnreachableEndpoint(t *testing.T) {
 	assert.Equal(t, 0, successCount)
 }
 
+func TestClientGetsHTTPError(t *testing.T) {
+	startTime := time.Now()
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(500)
+	}))
+
+	defer srv.Close()
+
+	httpClient := srv.Client()
+	httpClient.Timeout = 100 * time.Millisecond
+	client := NewWithHTTPClient(httpClient, "", "a mock license key", srv.URL, srv.URL, &Batch{}, false, clientTestingTimeout)
+
+	ctx := context.Background()
+	bytes := []byte("foobar")
+	err, successCount := client.SendTelemetry(ctx, "arn:aws:lambda:us-east-1:1234:function:newrelic-example-go", [][]byte{bytes})
+	assert.LessOrEqual(t, int(time.Since(startTime)), int(clientTestingTimeout)) // should exit as soon as a non-timeout error occurs without retrying
+	assert.NoError(t, err)
+	assert.Equal(t, 0, successCount)
+}
+
 func TestGetInfraEndpointURL(t *testing.T) {
 	assert.Equal(t, "barbaz", getInfraEndpointURL("foobar", "barbaz"))
 	assert.Equal(t, InfraEndpointUS, getInfraEndpointURL("us license key", ""))

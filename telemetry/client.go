@@ -3,11 +3,17 @@ package telemetry
 import (
 	"bytes"
 	"context"
+	"encoding/binary"
+	"fmt"
 	"io/ioutil"
+	"log"
+	"net"
 	"net/http"
-	"net/url"
 	"strings"
 	"time"
+
+	crypto_rand "crypto/rand"
+	math_rand "math/rand"
 
 	"github.com/newrelic/newrelic-lambda-extension/lambda/logserver"
 
@@ -19,31 +25,39 @@ const (
 	InfraEndpointUS string = "https://cloud-collector.newrelic.com/aws/lambda/v1"
 	LogEndpointEU   string = "https://log-api.eu.newrelic.com/log/v1"
 	LogEndpointUS   string = "https://log-api.newrelic.com/log/v1"
-
-	retries int = 3
 )
 
 type Client struct {
 	httpClient        *http.Client
+	batch             *Batch
+	timeout           time.Duration
 	licenseKey        string
 	telemetryEndpoint string
 	logEndpoint       string
 	functionName      string
-	batch             *Batch
 	collectTraceID    bool
 }
 
 // New creates a telemetry client with sensible defaults
-func New(functionName string, licenseKey string, telemetryEndpointOverride string, logEndpointOverride string, batch *Batch, collectTraceID bool) *Client {
+func New(functionName string, licenseKey string, telemetryEndpointOverride string, logEndpointOverride string, batch *Batch, collectTraceID bool, clientTimeout time.Duration) *Client {
 	httpClient := &http.Client{
-		Timeout: time.Second * 2,
+		Timeout: 800 * time.Millisecond,
 	}
 
-	return NewWithHTTPClient(httpClient, functionName, licenseKey, telemetryEndpointOverride, logEndpointOverride, batch, collectTraceID)
+	// Create random seed for timeout to avoid instances created at the same time
+	// from creating a wall of retry requests to the collector
+	var b [8]byte
+	_, err := crypto_rand.Read(b[:])
+	if err != nil {
+		log.Fatal("cannot seed math/rand package with cryptographically secure random number generator")
+	}
+	math_rand.Seed(int64(binary.LittleEndian.Uint64(b[:])))
+
+	return NewWithHTTPClient(httpClient, functionName, licenseKey, telemetryEndpointOverride, logEndpointOverride, batch, collectTraceID, clientTimeout)
 }
 
 // NewWithHTTPClient is just like New, but the HTTP client can be overridden
-func NewWithHTTPClient(httpClient *http.Client, functionName string, licenseKey string, telemetryEndpointOverride string, logEndpointOverride string, batch *Batch, collectTraceID bool) *Client {
+func NewWithHTTPClient(httpClient *http.Client, functionName string, licenseKey string, telemetryEndpointOverride string, logEndpointOverride string, batch *Batch, collectTraceID bool, clientTimeout time.Duration) *Client {
 	telemetryEndpoint := getInfraEndpointURL(licenseKey, telemetryEndpointOverride)
 	logEndpoint := getLogEndpointURL(licenseKey, logEndpointOverride)
 	return &Client{
@@ -54,6 +68,7 @@ func NewWithHTTPClient(httpClient *http.Client, functionName string, licenseKey 
 		functionName:      functionName,
 		batch:             batch,
 		collectTraceID:    collectTraceID,
+		timeout:           clientTimeout,
 	}
 }
 
@@ -101,7 +116,7 @@ func (c *Client) SendTelemetry(ctx context.Context, invokedFunctionARN string, t
 	}
 
 	transmitStart := time.Now()
-	successCount, sentBytes, err := c.sendPayloads(compressedPayloads, builder)
+	successCount, sentBytes := c.sendPayloads(compressedPayloads, builder)
 	end := time.Now()
 	totalTime := end.Sub(start)
 	transmissionTime := end.Sub(transmitStart)
@@ -120,69 +135,107 @@ func (c *Client) SendTelemetry(ctx context.Context, invokedFunctionARN string, t
 
 type requestBuilder func(buffer *bytes.Buffer) (*http.Request, error)
 
-func (c *Client) sendPayloads(compressedPayloads []*bytes.Buffer, builder requestBuilder) (successCount int, sentBytes int, err error) {
+func (c *Client) sendPayloads(compressedPayloads []*bytes.Buffer, builder requestBuilder) (successCount int, sentBytes int) {
 	successCount = 0
 	sentBytes = 0
 	for _, p := range compressedPayloads {
 		sentBytes += p.Len()
 		currentPayloadBytes := p.Bytes()
 
-		var res *http.Response
-		var err error
-		var responseBody string
-		for attemptNum := 1; attemptNum <= retries; attemptNum++ {
+		var response AttemptData
+
+		timer := time.NewTimer(c.timeout)
+
+		quit := make(chan bool, 1)
+		data := make(chan AttemptData)
+		go c.attemptSend(currentPayloadBytes, builder, data, quit)
+
+		select {
+		case <-timer.C:
+			response.Error = fmt.Errorf("failed to send data within user defined timeout period: %s", c.timeout.String())
+			quit <- true
+		case response = <-data:
+			timer.Stop()
+		}
+
+		if response.Error != nil {
+			util.Logf("Telemetry client error: %s", response.Error)
+			sentBytes -= p.Len()
+		} else if response.Response.StatusCode >= 300 {
+			util.Logf("Telemetry client response: [%s] %s", response.Response.Status, response.ResponseBody)
+		} else {
+			successCount += 1
+		}
+	}
+
+	return successCount, sentBytes
+}
+
+type AttemptData struct {
+	Error        error
+	ResponseBody string
+	Response     *http.Response
+}
+
+func (c *Client) attemptSend(currentPayloadBytes []byte, builder requestBuilder, dataChan chan AttemptData, quit chan bool) {
+	baseSleepTime := 200 * time.Millisecond
+
+	for attempts := 0; ; attempts++ {
+		select {
+		case <-quit:
+			return
+		default:
 			// Construct request for this try
-			var req *http.Request
-			req, err = builder(bytes.NewBuffer(currentPayloadBytes))
+			req, err := builder(bytes.NewBuffer(currentPayloadBytes))
 			if err != nil {
-				break
+				dataChan <- AttemptData{
+					Error: err,
+				}
+				return
 			}
 			//Make request, check for timeout
-			res, err = c.httpClient.Do(req)
+			res, err := c.httpClient.Do(req)
+
+			// send response data and exit
 			if err == nil {
 				// Success. Process response and exit retry loop
 				defer util.Close(res.Body)
 
 				bodyBytes, err := ioutil.ReadAll(res.Body)
 				if err != nil {
-					break
+					dataChan <- AttemptData{
+						Error: err,
+					}
+					return
 				}
 
-				responseBody = string(bodyBytes)
-				break
-			} else {
-				switch err.(type) {
-				case *url.Error:
-					// Retry on timeout
-					if err.(*url.Error).Timeout() {
-						if attemptNum < retries {
-							util.Debugln("Retrying after timeout", err)
-						} else {
-							util.Logf("Request failed. Ran out of retries after %v attempts.", attemptNum)
-							//We'll exit the loop naturally at this point
-						}
-					} else {
-						//Other errors are fatal
-						break
-					}
-				default:
-					//Other errors are fatal
-					break
+				// Successfully sent bytes
+				dataChan <- AttemptData{
+					Error:        nil,
+					ResponseBody: string(bodyBytes),
+					Response:     res,
 				}
+				return
+			}
+
+			// if error is http timeout, retry
+			if err, ok := err.(net.Error); ok && err.Timeout() {
+				util.Debugln("Retrying after timeout", err)
+				time.Sleep(baseSleepTime + time.Duration(math_rand.Intn(400)))
+
+				// double wait time after 3 timed out attempts
+				if attempts%3 == 0 {
+					baseSleepTime *= 2
+				}
+			} else {
+				// All other error types are fatal
+				dataChan <- AttemptData{
+					Error: err,
+				}
+				return
 			}
 		}
-
-		if err != nil {
-			util.Logf("Telemetry client error: %s", err)
-			sentBytes -= p.Len()
-		} else if res.StatusCode >= 300 {
-			util.Logf("Telemetry client response: [%s] %s", res.Status, responseBody)
-		} else {
-			successCount += 1
-		}
 	}
-
-	return successCount, sentBytes, nil
 }
 
 func (c *Client) SendFunctionLogs(ctx context.Context, invokedFunctionARN string, lines []logserver.LogLine) error {
@@ -229,7 +282,7 @@ func (c *Client) SendFunctionLogs(ctx context.Context, invokedFunctionARN string
 	}
 
 	transmitStart := time.Now()
-	successCount, sentBytes, err := c.sendPayloads(compressedPayloads, builder)
+	successCount, sentBytes := c.sendPayloads(compressedPayloads, builder)
 	end := time.Now()
 	totalTime := end.Sub(start)
 	transmissionTime := end.Sub(transmitStart)

@@ -17,6 +17,7 @@ func TestConfigurationFromEnvironmentZero(t *testing.T) {
 		LogsEnabled:      true,
 		NRHandler:        EmptyNRWrapper,
 		LogServerHost:    defaultLogServerHost,
+		ClientTimeout:    DefaultClientTimeout,
 	}
 	assert.Equal(t, expected, conf)
 }
@@ -40,6 +41,7 @@ func TestConfigurationFromEnvironment(t *testing.T) {
 	os.Setenv("NEW_RELIC_EXTENSION_LOG_LEVEL", "DEBUG")
 	os.Setenv("NEW_RELIC_EXTENSION_SEND_FUNCTION_LOGS", "true")
 	os.Setenv("NEW_RELIC_EXTENSION_LOGS_ENABLED", "false")
+	os.Setenv("NEW_RELIC_DATA_COLLECTION_TIMEOUT", "5s")
 
 	defer func() {
 		os.Unsetenv("NEW_RELIC_LAMBDA_EXTENSION_ENABLED")
@@ -53,6 +55,7 @@ func TestConfigurationFromEnvironment(t *testing.T) {
 		os.Unsetenv("NEW_RELIC_EXTENSION_LOG_LEVEL")
 		os.Unsetenv("NEW_RELIC_EXTENSION_SEND_FUNCTION_LOGS")
 		os.Unsetenv("NEW_RELIC_EXTENSION_LOGS_ENABLED")
+		os.Unsetenv("NEW_RELIC_DATA_COLLECTION_TIMEOUT")
 	}()
 
 	conf = ConfigurationFromEnvironment()

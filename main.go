@@ -120,7 +120,7 @@ func main() {
 	}
 
 	// Init the telemetry sending client
-	telemetryClient := telemetry.New(registrationResponse.FunctionName, licenseKey, conf.TelemetryEndpoint, conf.LogEndpoint, batch, conf.CollectTraceID)
+	telemetryClient := telemetry.New(registrationResponse.FunctionName, licenseKey, conf.TelemetryEndpoint, conf.LogEndpoint, batch, conf.CollectTraceID, conf.ClientTimeout)
 	telemetryChan, err := telemetry.InitTelemetryChannel()
 	if err != nil {
 		err2 := invocationClient.InitError(ctx, "telemetryClient.init", err)

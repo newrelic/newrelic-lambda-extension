@@ -2,7 +2,7 @@ version: 2
 jobs:
   build:
     docker:
-      - image: circleci/golang:1
+      - image: cimg/go:1.19
     environment:
       TEST_RESULTS: /tmp/test-results
     steps:
@@ -31,7 +31,7 @@ jobs:
 
   coverage:
     docker:
-      - image: circleci/golang:1
+      - image: cimg/go:1.19
     steps:
       - checkout
       - run:
@@ -43,7 +43,7 @@ jobs:
 
   build-release-x86_64:
     docker:
-      - image: circleci/golang:1
+      - image: cimg/go:1.19
     steps:
       - checkout
       - restore_cache:
@@ -62,7 +62,7 @@ jobs:
 
   build-release-arm64:
     docker:
-      - image: circleci/golang:1
+      - image: cimg/go:1.19
     steps:
       - checkout
       - restore_cache:
@@ -81,7 +81,7 @@ jobs:
 
   publish-release-x86_64:
     docker:
-      - image: circleci/golang:1
+      - image: cimg/go:1.19
     steps:
       - attach_workspace:
           at: /tmp/workspace
@@ -100,7 +100,7 @@ jobs:
 
   publish-release-arm64:
     docker:
-      - image: circleci/golang:1
+      - image: cimg/go:1.19
     steps:
       - attach_workspace:
           at: /tmp/workspace

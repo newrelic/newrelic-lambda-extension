@@ -82,6 +82,31 @@ func TestWithInvocationRipeHarvest(t *testing.T) {
 	assert.Equal(t, 2, len(harvested[0].Telemetry))
 }
 
+func TestWithInvocationRipeHarvestExtractTraceID(t *testing.T) {
+	batch := NewBatch(ripe, rot, false)
+	batch.extractTraceID = true
+
+	batch.lastHarvest = requestStart
+
+	batch.AddInvocation(testRequestId, requestStart)
+	batch.AddInvocation(testRequestId2, requestStart.Add(100*time.Millisecond))
+	batch.AddInvocation(testRequestId3, requestStart.Add(200*time.Millisecond))
+
+	invocation := batch.AddTelemetry(testRequestId, bytes.NewBufferString(testTelemetry).Bytes())
+	assert.NotNil(t, invocation)
+
+	invocation2 := batch.AddTelemetry(testRequestId, bytes.NewBufferString(moreTestTelemetry).Bytes())
+	assert.Equal(t, invocation, invocation2)
+
+	batch.AddTelemetry(testRequestId2, bytes.NewBufferString(testTelemetry).Bytes())
+
+	harvested := batch.Harvest(requestStart.Add(ripe*time.Millisecond + time.Millisecond))
+	assert.Equal(t, 1, len(harvested))
+	assert.Equal(t, testRequestId, harvested[0].RequestId)
+	assert.Equal(t, 2, len(harvested[0].Telemetry))
+	assert.True(t, batch.invocations[testRequestId].IsEmpty())
+}
+
 func TestWithInvocationAggressiveHarvest(t *testing.T) {
 	batch := NewBatch(ripe, rot, false)
 
@@ -118,6 +143,50 @@ func TestBatch_Close(t *testing.T) {
 
 	harvested := batch.Close()
 	assert.Equal(t, 2, len(harvested))
+}
+
+func TestBatch_Duplicates(t *testing.T) {
+	batch := NewBatch(ripe, rot, false)
+
+	batch.AddInvocation(testRequestId, requestStart)
+	batch.AddInvocation(testRequestId, requestStart)
+
+	// Test duplicate on ingestion
+	assert.Equal(t, 1, len(batch.invocations))
+
+	invocation := batch.AddTelemetry(testRequestId, bytes.NewBufferString(testTelemetry).Bytes())
+	assert.NotNil(t, invocation)
+
+	// Harvest telemtry from invocation
+	harvested := batch.aggressiveHarvest(time.Now())
+	// verify that invocation gets harvested
+	assert.Equal(t, 1, len(harvested))
+	// verify that the harvested invocation is still in the map
+	assert.Equal(t, 1, len(batch.invocations))
+	// verify that the remaining invocation was marked as sent and the data was cleared from memory
+	assert.Nil(t, batch.invocations[testRequestId].Invocation)
+	assert.True(t, batch.invocations[testRequestId].Sent)
+
+	// verify that when adding an invocation with an ID of a harvested/sent invocation
+	// the state of the map remains the same, and no new invocation gets created
+	batch.AddInvocation(testRequestId, requestStart)
+	assert.Equal(t, 1, len(batch.invocations))
+	assert.Nil(t, batch.invocations[testRequestId].Invocation)
+	assert.True(t, batch.invocations[testRequestId].Sent)
+
+	// Verify that the content can not be harvested with ripe harvest after its already been harvested
+	harvested = batch.ripeHarvest(time.Now())
+	assert.Equal(t, 0, len(harvested))
+	assert.Equal(t, 1, len(batch.invocations))
+	assert.Nil(t, batch.invocations[testRequestId].Invocation)
+	assert.True(t, batch.invocations[testRequestId].Sent)
+
+	// Verify that the content can not be harvested with aggressive harvest after its already been harvested
+	harvested = batch.aggressiveHarvest(time.Now())
+	assert.Equal(t, 0, len(harvested))
+	assert.Equal(t, 1, len(batch.invocations))
+	assert.Nil(t, batch.invocations[testRequestId].Invocation)
+	assert.True(t, batch.invocations[testRequestId].Sent)
 }
 
 func TestBatchAsync(t *testing.T) {

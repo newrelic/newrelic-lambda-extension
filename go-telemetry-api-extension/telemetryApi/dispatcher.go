@@ -9,15 +9,13 @@ import (
 	"os"
 	"strconv"
 
-	"errors"
-
 	"github.com/golang-collections/go-datastructures/queue"
 )
 
 type Dispatcher struct {
 	httpClient   *http.Client
 	postUri      string
-        licenseKey   string
+	licenseKey   string
 	minBatchSize int64
 }
 
@@ -40,7 +38,7 @@ func NewDispatcher() *Dispatcher {
 	return &Dispatcher{
 		httpClient:   &http.Client{},
 		postUri:      dispatchPostUri,
-                licenseKey:   licenseKey,
+		licenseKey:   licenseKey,
 		minBatchSize: dispatchMinBatchSize,
 	}
 
@@ -51,7 +49,7 @@ func (d *Dispatcher) Dispatch(ctx context.Context, logEventsQueue *queue.Queue, 
 		l.Info("[dispatcher:Dispatch] Dispatching", logEventsQueue.Len(), "log events")
 		logEntries, _ := logEventsQueue.Get(logEventsQueue.Len())
 
-		err = sendDataToNR(ctx, logEntries, d)
+		err := sendDataToNR(ctx, logEntries, d)
 		if err != nil {
 			l.Error("[dispatcher:Dispatch] Failed to dispatch, returning to queue:", err)
 			for logEntry := range logEntries {

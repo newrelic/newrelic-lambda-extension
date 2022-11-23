@@ -1,0 +1,18 @@
+AWSTemplateFormatVersion: 2010-09-09
+Transform: AWS::Serverless-2016-10-31
+Description: go-telemetry-api-extension
+
+Resources:
+  GoTelemetryApiExtensionLayer:
+    Type: AWS::Serverless::LayerVersion
+    Metadata:
+      BuildMethod: makefile
+    Properties:
+      LayerName: go-telemetry-api-extension-layer
+      ContentUri: .
+      LicenseInfo: MIT-0
+      RetentionPolicy: Delete
+
+      Environment:
+        Variables:
+          DISPATCH_MIN_BATCH_SIZE: 10

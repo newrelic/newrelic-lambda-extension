@@ -62,6 +62,7 @@ type Client struct {
 	httpClient  *http.Client
 	baseUrl     string
 	ExtensionID string
+	functionName string
 }
 
 var l = log.WithFields(log.Fields{"pkg": "extensionApi"})
@@ -77,6 +78,7 @@ func NewClient() *Client {
 
 // Registers the extension with Extensions API
 func (e *Client) Register(ctx context.Context, extensionName string) (string, error) {
+
 	const action = "/register"
 	url := e.baseUrl + action
 
@@ -117,6 +119,7 @@ func (e *Client) Register(ctx context.Context, extensionName string) (string, er
 		return "", err
 	}
 
+	e.functionName = res.FunctionName
 	e.ExtensionID = httpRes.Header.Get(extensionIdentiferHeader)
 	l.Info("[client:Register] Registration success with extensionId ", e.ExtensionID)
 	return e.ExtensionID, nil

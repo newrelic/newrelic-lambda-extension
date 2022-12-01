@@ -17,9 +17,10 @@ type Dispatcher struct {
 	postUri      string
 	licenseKey   string
 	minBatchSize int64
+	functionName string
 }
 
-func NewDispatcher() *Dispatcher {
+func NewDispatcher(functionName string) *Dispatcher {
 	dispatchPostUri := os.Getenv("DISPATCH_POST_URI")
 	if len(dispatchPostUri) == 0 {
 		panic("dispatchPostUri undefined")
@@ -40,6 +41,7 @@ func NewDispatcher() *Dispatcher {
 		postUri:      dispatchPostUri,
 		licenseKey:   licenseKey,
 		minBatchSize: dispatchMinBatchSize,
+		functionName: functionName,
 	}
 
 }

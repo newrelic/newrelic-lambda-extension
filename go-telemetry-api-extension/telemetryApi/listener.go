@@ -74,7 +74,6 @@ func (s *TelemetryApiListener) http_handler(w http.ResponseWriter, r *http.Reque
 		l.Error("[listener:http_handler] Error reading body:", err)
 		return
 	}
-
 	// Parse and put the log messages into the queue
 	var slice []interface{}
 	_ = json.Unmarshal(body, &slice)

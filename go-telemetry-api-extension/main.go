@@ -65,8 +65,7 @@ func main() {
 		panic(err)
 	}
 	l.Info("[main] Subscription success")
-
-	dispatcher := telemetryApi.NewDispatcher()
+	dispatcher := telemetryApi.NewDispatcher(extensionApiClient.functionName)
 
 	// Will block until invoke or shutdown event is received or cancelled via the context.
 	for {

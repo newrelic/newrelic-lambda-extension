@@ -2,6 +2,11 @@ AWSTemplateFormatVersion: 2010-09-09
 Transform: AWS::Serverless-2016-10-31
 Description: go-telemetry-api-extension
 
+Parameters:
+  LICENSE_KEY:
+    Type: String
+    Description: Your New Relic ingest key.
+
 Resources:
   GoTelemetryApiExtensionLayer:
     Type: AWS::Serverless::LayerVersion
@@ -16,3 +21,6 @@ Resources:
       Environment:
         Variables:
           DISPATCH_MIN_BATCH_SIZE: 10
+          DEBUG_LOGGING_ENABLED: True
+          LOGGING_ENABLED: True
+          NEW_RELIC_LICENSE_KEY: !Sub ${LICENSE_KEY}

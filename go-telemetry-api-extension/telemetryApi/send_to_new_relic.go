@@ -72,7 +72,7 @@ func sendBatch(ctx context.Context, d *Dispatcher, uri string, bodyBytes []byte)
 	return err
 }
 
-func sendDataToNR(ctx context.Context, logEntries []LambdaTelemetryEvent, d *Dispatcher) error {
+func sendDataToNR(ctx context.Context, logEntries []interface{}, d *Dispatcher) error {
 
 	// will be replaced later
 	var lambda_name = "---"
@@ -94,7 +94,7 @@ func sendDataToNR(ctx context.Context, logEntries []LambdaTelemetryEvent, d *Dis
 
 	for _, event := range logEntries {
 		//json.Unmarshal([]byte(ev), &event)
-		msInt, err := time.Parse(time.RFC3339, event.Time)
+		msInt, err := time.Parse(time.RFC3339, event.(LambdaTelemetryEvent).Time)
 		if err != nil {
 			return err
 		}
@@ -107,10 +107,10 @@ func sendDataToNR(ctx context.Context, logEntries []LambdaTelemetryEvent, d *Dis
 
 		data["events"] = append(data["events"], map[string]interface{}{
 			"timestamp": msInt.UnixMilli(),
-			"eventType": "Lambda_Ext_" + replacer.Replace(event.Type),
+			"eventType": "Lambda_Ext_" + replacer.Replace(event.(LambdaTelemetryEvent).Type),
 		})
 
-		switch event.Type {
+		switch event.(LambdaTelemetryEvent).Type {
 		case "platform.iniStart":
 
 		case "platform.iniRuntimeDone":
@@ -131,13 +131,13 @@ func sendDataToNR(ctx context.Context, logEntries []LambdaTelemetryEvent, d *Dis
 
 		}
 
-		if event.Record != nil {
+		if event.(LambdaTelemetryEvent).Record != nil {
 			data["logging"] = append(data["logging"], map[string]interface{}{
 				"timestamp": msInt.UnixMilli(),
-				"message":   event.Record,
+				"message":   event.(LambdaTelemetryEvent).Record,
 				"attributes": map[string]map[string]string{
 					"aws": {
-						"event":  event.Type,
+						"event":  event.(LambdaTelemetryEvent).Type,
 						"lambda": lambda_name,
 					},
 				},
@@ -145,11 +145,11 @@ func sendDataToNR(ctx context.Context, logEntries []LambdaTelemetryEvent, d *Dis
 		}
 
 		// metrics
-		if event.Record != nil {
-			if val, ok := event.Record["metrics"]; ok {
+		if event.(LambdaTelemetryEvent).Record != nil {
+			if val, ok := event.(LambdaTelemetryEvent).Record["metrics"]; ok {
 				mts := []map[string]interface{}{}
 				for key := range val {
-					mts := appand(mts, map[string]interface{}(`{
+					mts := append(mts, map[string]interface{}(`{
 						"name": "aws.telemetry.lambda_ext."+lambda_name+"."+key,
 						"value": event["record"]["metrics"][key]
 					}`))

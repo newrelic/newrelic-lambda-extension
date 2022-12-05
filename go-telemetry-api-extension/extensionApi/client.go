@@ -59,10 +59,14 @@ const (
 
 // Client is a simple client for the Lambda Extensions API
 type Client struct {
-	httpClient  *http.Client
-	baseUrl     string
-	ExtensionID string
+	httpClient   *http.Client
+	baseUrl      string
+	ExtensionID  string
 	functionName string
+}
+
+func (e *Client) GetFunctionName() string {
+	return e.functionName
 }
 
 var l = log.WithFields(log.Fields{"pkg": "extensionApi"})

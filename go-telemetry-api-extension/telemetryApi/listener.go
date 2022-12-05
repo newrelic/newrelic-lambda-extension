@@ -75,7 +75,7 @@ func (s *TelemetryApiListener) http_handler(w http.ResponseWriter, r *http.Reque
 		return
 	}
 	// Parse and put the log messages into the queue
-	var slice []interface{}
+	var slice []LambdaTelemetryEvent
 	_ = json.Unmarshal(body, &slice)
 
 	for _, el := range slice {
@@ -97,4 +97,10 @@ func (s *TelemetryApiListener) Shutdown() {
 			s.httpServer = nil
 		}
 	}
+}
+
+type LambdaTelemetryEvent struct {
+	Time   string
+	Type   string
+	Record any
 }

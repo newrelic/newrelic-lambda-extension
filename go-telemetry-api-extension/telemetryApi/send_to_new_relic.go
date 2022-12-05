@@ -11,6 +11,7 @@ import (
 	"strings"
 	"net/http"
 	"strconv"
+	"time"
 	"github.com/google/uuid"
 )
 
@@ -76,7 +77,7 @@ func sendBatch(ctx context.Context, d *Dispatcher, uri string, bodyBytes []byte)
 
 func sendDataToNR(ctx context.Context, logEntries []interface{}, d *Dispatcher) error {
 
-	// will be replaced later
+// will be replaced later
         var lambda_name = "---"
 // should be as below
 //        var lambda_name = d.functionName
@@ -85,32 +86,38 @@ func sendDataToNR(ctx context.Context, logEntries []interface{}, d *Dispatcher) 
 	// NB "." is not allowed in NR eventType
 	var replacer = strings.NewReplacer(".", "_")
 
-	data := make(map[string][]string)
-//	data := make(map[string][]interface{})
-        data["events"] = []string{}
-        data["traces"] = []string{}
-        data["logging"] = []string{}
-        data["metrics"] = []string{}
+	data := make(map[string][]interface{})
+        data["events"] := []map[string]interface{}{}
+	data["traces"] := []map[string]interface{}{}
+	data["logging"] := []map[string]interface{}{}
+	data["metrics"] := []map[string]interface{}{}
 
-	for _, event := range logEntries {
-//  do some processing and add line to payload
-//		payload.AddLogLine(time.Now().UnixMilli(), "debug", "message")
+	var bb map[string]any
+	var event map[string]any
 
-		msInt, err := strconv.ParseInt(event["time"], 10, 64)
+	for _, ev := range logEntries {
+		json.Unmarshal([]byte(ev), &event)
+		msInt, err := time.Parse(time.RFC3339, event["time"])
 		if err != nil {
 			return err
 		}
 		// events
-		data["events"] := append(data["events"], fmt.Sprintf("%v",`{
-			"timestamp": time.UnixMilli(msInt)
+		json.Unmarshal([]byte(`{
+                        "timestamp": msInt.UnixMilli()
+                        "eventType": "Lambda_Ext_"+ replacer.Replace(event["type"])
+                }`), &bb)
+                data["events"] := append(data["events"], bb)
+/*
+		data["events"] := append(data["events"], map[string]interface{}(`{
+			"timestamp": msInt.UnixMilli()
 			"eventType": "Lambda_Ext_"+ replacer.Replace(event["type"])
 		}`))
-
+*/
 		// logging
 		if val, ok := event["record"]; ok {
 			if len(val) > 0 {
-				data["logging"] := append(data["logging"], fmt.Sprintf("%v",`{
-					"timestamp": time.UnixMilli(msInt),
+				data["logging"] := append(data["logging"], map[string]interface{}(`{
+					"timestamp": msInt.UnixMilli(),
 					"message": event["record"],
 					"attributes": {
 						"aws": {
@@ -123,9 +130,9 @@ func sendDataToNR(ctx context.Context, logEntries []interface{}, d *Dispatcher) 
 		}
 		// metrics
 		if reflect.ValueOf(event["record"]).Kind() == reflect.Map && val, ok := event["record"]["metrics"]; ok {
-			mts := [...]string{}
+			mts := []map[string]interface{}{}
 			for key := range val {
-				mts := appand(mts, fmt.Sprintf("%v",`{
+				mts := appand(mts, map[string]interface{}(`{
 					"name": "aws.telemetry.lambda_ext."+lambda_name+"."+key,
 					"value": event["record"]["metrics"][key]
 				}`))
@@ -134,9 +141,9 @@ func sendDataToNR(ctx context.Context, logEntries []interface{}, d *Dispatcher) 
 			if val, ok := event["record"]["requestId"]; ok {
 				rid = val
 			}
-			data["metrics"] := append(data["metrics"], fmt.Sprintf("%v",`{
+			data["metrics"] := append(data["metrics"], map[string]interface{}(`{
 				"common" : {
-					"timestamp": time.UnixMilli(msInt),
+					"timestamp": msInt.UnixMilli(),
 					"attributes": {
 						"event": event["type"],
 						"requestId": rid,
@@ -158,7 +165,7 @@ func sendDataToNR(ctx context.Context, logEntries []interface{}, d *Dispatcher) 
 						"service.name": agent_name
 						}
 				}`
-				start, err := strconv.ParseInt(event["start"], 10, 64)
+				start, err := time.Parse(time.RFC3339, event["time"])
 		                if err != nil {
 					return err
 				}
@@ -166,22 +173,21 @@ func sendDataToNR(ctx context.Context, logEntries []interface{}, d *Dispatcher) 
 					if (key == "durationMs") {
 						el["attributes"]["duration.ms"] := span[key]
 					} else if (key =="start") {
-						el["timestamp"] := time.UnixMilli(start)
+						el["timestamp"] := start.UnixMilli()
 					} else {
 						el["attributes"][key] := span[key]
 					}
 				}
-				data["traces"] := append(data["traces"], fmt.Sprintf("%v",el))
+				data["traces"] := append(data["traces"], el)
 			}
 		}
 	}
 	// data ready
 	if (len(data) > 0) {
-// send logs
+		// send logs
 		if (len(data["logging"]) > 0) {
-//bodyBytes := payload.Marshal()
-//bodyBytes, _ := json.Marshal(map[string]string{"message": fmt.Sprintf("%v", logEntries)})
-			dt := NewLogPayload(`{
+//			bodyBytes, _ := json.Marshal(map[string]interface{}(`{
+			bodyBytes := `{
 				"common": {
 					"attributes": {
 						"aws": {
@@ -192,26 +198,25 @@ func sendDataToNR(ctx context.Context, logEntries []interface{}, d *Dispatcher) 
 						}
 				},
 				"logs": data["logging"]
-			}`)
-			bodyBytes := dt.Marshal()
-fmt.Println(reflect.TypeOf(bodyBytes))
+			}`
+//			}`))
 			err := sendBatch(ctx, d, getEndpointURL(d.licenseKey,"logging"), bodyBytes)
 		}
-// send metrics
+		// send metrics
 		if (len(data["metrics"]) > 0) {
 			for payload := range data["metrics"] {
-				bodyBytes := NewLogPayload(payload).Marshal()
+				bodyBytes, _ := json.Marshal(payload)
 				err := sendBatch(ctx, d, getEndpointURL(d.licenseKey,"metrics"), bodyBytes)
 			}
 		}
-// send events
+		// send events
                 if (len(data["events"]) > 0) {
-			bodyBytes := NewLogPayload(data["events"]).Marshal()
+			bodyBytes, _ := json.Marshal(data["events"])
 			err := sendBatch(ctx, d, getEndpointURL(d.licenseKey,"events"), bodyBytes)
 		}
-// send traces
+		// send traces
 		if (len(data["traces"]) > 0) {
-			dt := NewLogPayload(`{
+			bodyBytes, _ := json.Marshal(map[string]interface{}(`{
 				"common": {
 					"attributes": {
 						"host": "aws.amazon.com",
@@ -219,8 +224,7 @@ fmt.Println(reflect.TypeOf(bodyBytes))
 					}
 				},
 				"spans": data["traces"]
-			}`)
-			bodyBytes := dt.Marshal()
+			}`))
 			err := sendBatch(ctx, d, getEndpointURL(d.licenseKey,"traces"), bodyBytes)
 		}
 	}

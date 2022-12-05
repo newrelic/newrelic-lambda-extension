@@ -13,9 +13,9 @@ Notes:
 package main
 
 import (
+	"context"
 	"newrelic-lambda-extension/go-telemetry-api-extension/extensionApi"
 	"newrelic-lambda-extension/go-telemetry-api-extension/telemetryApi"
-	"context"
 	"os"
 	"os/signal"
 	"path"
@@ -65,7 +65,7 @@ func main() {
 		panic(err)
 	}
 	l.Info("[main] Subscription success")
-	dispatcher := telemetryApi.NewDispatcher(extensionApiClient.functionName)
+	dispatcher := telemetryApi.NewDispatcher(extensionApiClient.GetFunctionName())
 
 	// Will block until invoke or shutdown event is received or cancelled via the context.
 	for {

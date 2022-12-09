@@ -10,7 +10,10 @@ import (
 	"reflect"
 	"strings"
 	"time"
+	"github.com/google/uuid"
 )
+
+const EXTENSION_LAMBDA_VERSION = "1.0"
 
 const (
 	LogEndpointEU string = "https://log-api.eu.newrelic.com/log/v1"
@@ -19,8 +22,8 @@ const (
 	MetricsEndpointEU string = "https://metric-api.eu.newrelic.com/metric/v1"
 	MetricsEndpointUS string = "https://metric-api.newrelic.com/metric/v1"
 
-	EventsEndpointEU string = "https://insights-collector.eu01.nr-data.net"
-	EventsEndpointUS string = "https://insights-collector.newrelic.com"
+	EventsEndpointEU string = "https://insights-collector.eu01.nr-data.net/v1/accounts/"
+	EventsEndpointUS string = "https://insights-collector.newrelic.com/v1/accounts/"
 
 	TracesEndpointEU string = "https://trace-api.eu.newrelic.com/trace/v1"
 	TracesEndpointUS string = "https://trace-api.newrelic.com/trace/v1"
@@ -67,6 +70,10 @@ func sendBatch(ctx context.Context, d *Dispatcher, uri string, bodyBytes []byte)
 	// the headers might be different for different endpoints
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Api-Key", d.licenseKey)
+	if strings.Contains(uri, "trace") {
+	        req.Header.Set("Data-Format", "newrelic")
+		req.Header.Set("Data-Format-Version", "1")
+	}
 	_, err = d.httpClient.Do(req)
 
 	return err
@@ -74,10 +81,7 @@ func sendBatch(ctx context.Context, d *Dispatcher, uri string, bodyBytes []byte)
 
 func sendDataToNR(ctx context.Context, logEntries []interface{}, d *Dispatcher) error {
 
-	// will be replaced later
-	var lambda_name = "---"
-	// should be as below
-	//        var lambda_name = d.functionName
+	var lambda_name = d.functionName
 	var agent_name = path.Base(os.Args[0])
 
 	// NB "." is not allowed in NR eventType
@@ -89,116 +93,88 @@ func sendDataToNR(ctx context.Context, logEntries []interface{}, d *Dispatcher) 
 	data["logging"] = []map[string]interface{}{}
 	data["metrics"] = []map[string]interface{}{}
 
-	var bb map[string]any
-	//	var event map[string]any
-
+	// current logic - terminate processing on an error, can be changed later
 	for _, event := range logEntries {
-		//json.Unmarshal([]byte(ev), &event)
 		msInt, err := time.Parse(time.RFC3339, event.(LambdaTelemetryEvent).Time)
 		if err != nil {
 			return err
 		}
 		// events
-		json.Unmarshal([]byte(`{
-                        "timestamp": msInt.UnixMilli()
-                        "eventType": "Lambda_Ext_"+ replacer.Replace(event["type"])
-                }`), &bb)
-		data["events"] = append(data["events"], bb)
-
 		data["events"] = append(data["events"], map[string]interface{}{
 			"timestamp": msInt.UnixMilli(),
-			"eventType": "Lambda_Ext_" + replacer.Replace(event.(LambdaTelemetryEvent).Type),
+			"eventType": "AwsLambdaExtensionGo",
+			"extension.name": agent_name,
+			"extension.version": EXTENSION_LAMBDA_VERSION,
+			"lambda.name": lambda_name,
+			"lambda.logevent.type": replacer.Replace(event.(LambdaTelemetryEvent).Type),
 		})
-
-		switch event.(LambdaTelemetryEvent).Type {
-		case "platform.iniStart":
-
-		case "platform.iniRuntimeDone":
-
-		case "platform.iniReport":
-
-		case "platform.start":
-
-		case "platform.runtimeDone":
-
-		case "platform.report":
-
-		case "platform.extension":
-
-		case "platform.telemetrySubscription":
-
-		case "platform.logsDropped":
-
-		}
-
+		// logs
 		if event.(LambdaTelemetryEvent).Record != nil {
 			data["logging"] = append(data["logging"], map[string]interface{}{
 				"timestamp": msInt.UnixMilli(),
 				"message":   event.(LambdaTelemetryEvent).Record,
 				"attributes": map[string]map[string]string{
+					"plugin" : { "type": "lambda extension"},
 					"aws": {
-						"event":  event.(LambdaTelemetryEvent).Type,
-						"lambda": lambda_name,
+						"lambda.logevent.type": event.(LambdaTelemetryEvent).Type,
+						"extension.name": agent_name,
+						"extension.version": EXTENSION_LAMBDA_VERSION,
+						"lambda.name": lambda_name,
 					},
 				},
 			})
-		}
 
+		if reflect.ValueOf(event.(LambdaTelemetryEvent).Record).Kind() == reflect.Map {
+			eventRecord := event.(LambdaTelemetryEvent).Record.(map[string]interface{})
 		// metrics
-		if event.(LambdaTelemetryEvent).Record != nil {
-			if val, ok := event.(LambdaTelemetryEvent).Record["metrics"]; ok {
-				mts := []map[string]interface{}{}
-				for key := range val {
-					mts := append(mts, map[string]interface{}(`{
-						"name": "aws.telemetry.lambda_ext."+lambda_name+"."+key,
-						"value": event["record"]["metrics"][key]
-					}`))
-				}
-				rid := ""
-				if val, ok := event["record"]["requestId"]; ok {
-					rid = val
-				}
-				data["metrics"] = append(data["metrics"], map[string]interface{}(`{
-					"common" : {
-						"timestamp": msInt.UnixMilli(),
-						"attributes": {
-							"event": event["type"],
-							"requestId": rid,
-							"extension": agent_name
-							}
-					},
-					"metrics": mts
-				}`))
+			rid := ""
+			if v, okk := eventRecord["requestId"].(string); okk {
+				rid = v
 			}
-		}
+			if val, ok := eventRecord["metrics"].(map[string]interface{}); ok {
+				for key := range val {
+					data["metrics"] = append(data["metrics"], map[string]interface{}{
+						"name": "aws.telemetry.lambda_ext."+key,
+						"value": val[key],
+						"timestamp": msInt.UnixMilli(),
+						"attributes": map[string]interface{}{
+							"lambda.logevent.type": event.(LambdaTelemetryEvent).Type,
+							"requestId": rid,
+							"extension.name": agent_name,
+							"extension.version": EXTENSION_LAMBDA_VERSION,
+							"lambda.name": lambda_name,
+						},
+					})
+				}
+			}
 		// spans
-		if reflect.ValueOf(event["record"]).Kind() == reflect.Map {
-			if val, ok := event["record"]["spans"]; ok {
-				spans := [...]string{}
-				for span := range val {
-					el := `{
-						"trace.id": event["record"]["requestId"],
-						"id": uuid.New().String(),
-						"attributes": {
-							"event": event["type"],
-							"service.name": agent_name
-							}
-					}`
-					start, err := time.Parse(time.RFC3339, event["time"])
-					if err != nil {
-						return err
-					}
-					for key := range span {
+			if val, ok := eventRecord["spans"].([]interface{}); ok {
+				for _, span := range val {
+					attributes := make(map[string]interface{})
+                                        attributes["event"] = event.(LambdaTelemetryEvent).Type
+                                        attributes["service.name"] = agent_name
+					var start time.Time
+					for key,v := range span.(map[string]interface{}) {
 						if key == "durationMs" {
-							el["attributes"]["duration.ms"] = span[key]
+                                                        attributes["duration.ms"] = v.(float64)
 						} else if key == "start" {
-							el["timestamp"] = start.UnixMilli()
+							start, err = time.Parse(time.RFC3339, v.(string))
+							if err != nil {
+								return err
+							}
 						} else {
-							el["attributes"][key] = span[key]
+							attributes[key] = v.(string)
 						}
+					}
+					el := map[string]interface{}{
+						"trace.id": rid,
+						"timestamp": start.UnixMilli(),
+						"id": (uuid.New()).String(),
+						"attributes": attributes,
 					}
 					data["traces"] = append(data["traces"], el)
 				}
+			}
 			}
 		}
 	}
@@ -206,48 +182,56 @@ func sendDataToNR(ctx context.Context, logEntries []interface{}, d *Dispatcher) 
 	if len(data) > 0 {
 		// send logs
 		if len(data["logging"]) > 0 {
-			//			bodyBytes, _ := json.Marshal(map[string]interface{}(`{
-			bodyBytes := `{
-				"common": {
-					"attributes": {
-						"aws": {
-							"logType": "aws/lambda-ext",
-							"function": lambda_name,
-							"extension": agent_name
-							}
-						}
-				},
-				"logs": data["logging"]
-			}`
-			//			}`))
-			err := sendBatch(ctx, d, getEndpointURL(d.licenseKey, "logging"), bodyBytes)
+			bodyBytes, _ := json.Marshal(data["logging"])
+			er := sendBatch(ctx, d, getEndpointURL(d.licenseKey, "logging", ""), bodyBytes)
+			if er != nil {
+				return er
+			}
 		}
 		// send metrics
 		if len(data["metrics"]) > 0 {
-			for payload := range data["metrics"] {
-				bodyBytes, _ := json.Marshal(payload)
-				err := sendBatch(ctx, d, getEndpointURL(d.licenseKey, "metrics"), bodyBytes)
+			var dataMet[]map[string][]map[string]interface{}
+			dataMet = append(dataMet, map[string][]map[string]interface{}{
+				"metrics": data["metrics"],
+			})
+			bodyBytes, _ := json.Marshal(dataMet)
+			er := sendBatch(ctx, d, getEndpointURL(d.licenseKey, "metrics", ""), bodyBytes)
+			if er != nil {
+				return er
 			}
 		}
 		// send events
 		if len(data["events"]) > 0 {
-			bodyBytes, _ := json.Marshal(data["events"])
-			err := sendBatch(ctx, d, getEndpointURL(d.licenseKey, "events"), bodyBytes)
+			ACCOUNT_ID := os.Getenv("ACCOUNT_ID")
+		        if len(ACCOUNT_ID) > 0 {
+				bodyBytes, _ := json.Marshal(data["events"])
+				er := sendBatch(ctx, d, getEndpointURL(d.licenseKey, "events", "")+ACCOUNT_ID+"/events", bodyBytes)
+				if er != nil {
+					return er
+				}
+		        } else {
+			        l.Info("ACCOUNT_ID is not set, therefore no events data sent")
+			}
 		}
 		// send traces
 		if len(data["traces"]) > 0 {
-			bodyBytes, _ := json.Marshal(map[string]interface{}(`{
-				"common": {
+			var dataTraces[]map[string]interface{}
+			dataTraces = append(dataTraces, map[string]interface{}{
+				"common": map[string]map[string]string{
 					"attributes": {
 						"host": "aws.amazon.com",
-						"service.name": lambda_name
-					}
+						"service.name": lambda_name,
+					},
 				},
-				"spans": data["traces"]
-			}`))
-			err := sendBatch(ctx, d, getEndpointURL(d.licenseKey, "traces"), bodyBytes)
+				"spans": data["traces"],
+			})
+			bodyBytes, _ := json.Marshal(dataTraces)
+			er := sendBatch(ctx, d, getEndpointURL(d.licenseKey, "traces", ""), bodyBytes)
+			if er != nil {
+				return er
+			}
 		}
 	}
 
-	return err // if one of the sents failed, it'd be nice to know which
+	return nil // success
 }

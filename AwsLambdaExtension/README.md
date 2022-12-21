@@ -24,14 +24,14 @@ To run this example, you will need to ensure that your build architecture matche
 
 Building and saving package into a `bin/extensions` directory:
 ```bash
-$ cd go-telemetry-api-extension
-$ GOOS=linux GOARCH=amd64 go build -o bin/extensions/go-telemetry-api-extension main.go
-$ chmod +x bin/extensions/go-telemetry-api-extension
+$ cd AwsLambdaExtension
+$ GOOS=linux GOARCH=amd64 go build -o bin/extensions/AwsLambdaExtension main.go
+$ chmod +x bin/extensions/AwsLambdaExtension
 ```
 
 ## Layer Setup Process
 The extensions .zip file should contain a root directory called `extensions/`, where the extension executables are located.
-You must include the `go-telemetry-api-extension` binary.
+You must include the `AwsLambdaExtension` binary.
 
 Creating zip package for the extension:
 ```bash
@@ -43,14 +43,14 @@ Publish a new layer using the `extension.zip` using below command. The output sh
 
 ```bash
 aws lambda publish-layer-version \
-    --layer-name "go-telemetry-api-extension" \
+    --layer-name "AwsLambdaExtension" \
     --zip-file  "fileb://extension.zip"
 ```
 
 Note the `LayerVersionArn` that is produced in the output. eg. 
 
 ```
-LayerVersionArn: arn:aws:lambda:<region>:123456789012:layer:<layerName>:1
+LayerVersionArn: arn:aws:lambda:<region>:533243300146:layer:<layerName>:<layerVersion>
 ```
 
 Or use `build.sh` script to build and deploy the extension.

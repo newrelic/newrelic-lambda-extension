@@ -14,8 +14,8 @@ package main
 
 import (
 	"context"
-	"newrelic-lambda-extension/go-telemetry-api-extension/extensionApi"
-	"newrelic-lambda-extension/go-telemetry-api-extension/telemetryApi"
+	"newrelic-lambda-extension/AwsLambdaExtension/extensionApi"
+	"newrelic-lambda-extension/AwsLambdaExtension/telemetryApi"
 	"os"
 	"os/signal"
 	"path"

@@ -102,7 +102,7 @@ func sendDataToNR(ctx context.Context, logEntries []interface{}, d *Dispatcher) 
 		// events
 		data["events"] = append(data["events"], map[string]interface{}{
 			"timestamp": msInt.UnixMilli(),
-			"eventType": "AwsLambdaExtensionGo",
+			"eventType": "AwsLambdaExtension",
 			"extension.name": agent_name,
 			"extension.version": EXTENSION_LAMBDA_VERSION,
 			"lambda.name": lambda_name,

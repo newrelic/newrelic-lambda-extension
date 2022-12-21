@@ -14,21 +14,15 @@ import (
 
 type Dispatcher struct {
 	httpClient   *http.Client
-	postUri      string
 	licenseKey   string
 	minBatchSize int64
 	functionName string
 }
 
 func NewDispatcher(functionName string) *Dispatcher {
-	dispatchPostUri := os.Getenv("DISPATCH_POST_URI")
-	if len(dispatchPostUri) == 0 {
-		panic("dispatchPostUri undefined")
-	}
-
-	licenseKey := os.Getenv("LICENSE_KEY")
+	licenseKey := os.Getenv("NEW_RELIC_LICENSE_KEY")
 	if len(licenseKey) == 0 {
-		panic("licenseKey undefined")
+		panic("NEW_RELIC_LICENSE_KEY undefined")
 	}
 
 	dispatchMinBatchSize, err := strconv.ParseInt(os.Getenv("DISPATCH_MIN_BATCH_SIZE"), 0, 16)
@@ -38,7 +32,6 @@ func NewDispatcher(functionName string) *Dispatcher {
 
 	return &Dispatcher{
 		httpClient:   &http.Client{},
-		postUri:      dispatchPostUri,
 		licenseKey:   licenseKey,
 		minBatchSize: dispatchMinBatchSize,
 		functionName: functionName,

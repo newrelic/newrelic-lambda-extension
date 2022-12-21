@@ -1,4 +1,4 @@
-module newrelic-lambda-extension/go-telemetry-api-extension
+module newrelic-lambda-extension/AwsLambdaExtension
 
 go 1.18
 

@@ -202,7 +202,7 @@ func sendDataToNR(ctx context.Context, logEntries []interface{}, d *Dispatcher) 
 		}
 		// send events
 		if len(data["events"]) > 0 {
-			ACCOUNT_ID := os.Getenv("ACCOUNT_ID")
+			ACCOUNT_ID := os.Getenv("NEW_RELIC_ACCOUNT_ID")
 		        if len(ACCOUNT_ID) > 0 {
 				bodyBytes, _ := json.Marshal(data["events"])
 				er := sendBatch(ctx, d, getEndpointURL(d.licenseKey, "events", "")+ACCOUNT_ID+"/events", bodyBytes)
@@ -210,7 +210,7 @@ func sendDataToNR(ctx context.Context, logEntries []interface{}, d *Dispatcher) 
 					return er
 				}
 		        } else {
-			        l.Info("ACCOUNT_ID is not set, therefore no events data sent")
+			        l.Info("NEW_RELIC_ACCOUNT_ID is not set, therefore no events data sent")
 			}
 		}
 		// send traces

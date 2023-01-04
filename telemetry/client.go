@@ -25,6 +25,11 @@ const (
 	InfraEndpointUS string = "https://cloud-collector.newrelic.com/aws/lambda/v1"
 	LogEndpointEU   string = "https://log-api.eu.newrelic.com/log/v1"
 	LogEndpointUS   string = "https://log-api.newrelic.com/log/v1"
+
+	// WIP (configuration options?)
+	SendTimeoutRetryBase  time.Duration = 200 * time.Millisecond
+	SendTimeoutMaxRetries int           = 20
+	SendTimeoutMaxBackOff time.Duration = 5 * time.Second
 )
 
 type Client struct {
@@ -178,9 +183,9 @@ type AttemptData struct {
 }
 
 func (c *Client) attemptSend(currentPayloadBytes []byte, builder requestBuilder, dataChan chan AttemptData, quit chan bool) {
-	baseSleepTime := 200 * time.Millisecond
+	baseSleepTime := SendTimeoutRetryBase
 
-	for attempts := 0; ; attempts++ {
+	for attempts := 0; attempts < SendTimeoutMaxRetries; attempts++ {
 		select {
 		case <-quit:
 			return
@@ -226,6 +231,9 @@ func (c *Client) attemptSend(currentPayloadBytes []byte, builder requestBuilder,
 				// double wait time after 3 timed out attempts
 				if attempts%3 == 0 {
 					baseSleepTime *= 2
+				}
+				if baseSleepTime > SendTimeoutMaxBackOff {
+					baseSleepTime = SendTimeoutMaxBackOff
 				}
 			} else {
 				// All other error types are fatal

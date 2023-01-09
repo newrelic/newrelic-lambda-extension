@@ -89,6 +89,9 @@ jobs:
     docker:
       - image: cimg/go:1.19
     steps:
+      - add_ssh_keys:
+          fingerprints:
+            - "4a:17:fb:a1:35:77:e8:0d:85:94:97:53:f1:ae:20:0b"
       - attach_workspace:
           at: /tmp/workspace
       - run:
@@ -108,6 +111,9 @@ jobs:
     docker:
       - image: cimg/go:1.19
     steps:
+      - add_ssh_keys:
+          fingerprints:
+            - "4a:17:fb:a1:35:77:e8:0d:85:94:97:53:f1:ae:20:0b"
       - attach_workspace:
           at: /tmp/workspace
       - run:

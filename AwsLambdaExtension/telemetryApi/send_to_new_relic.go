@@ -4,12 +4,18 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"os"
 	"path"
 	"reflect"
 	"strings"
 	"time"
+
+        "github.com/aws/aws-sdk-go/aws/session"
+        "github.com/aws/aws-sdk-go/service/secretsmanager"
+        "github.com/aws/aws-sdk-go/service/secretsmanager/secretsmanageriface"
+
 	"github.com/google/uuid"
 )
 
@@ -28,6 +34,49 @@ const (
 	TracesEndpointEU string = "https://trace-api.eu.newrelic.com/trace/v1"
 	TracesEndpointUS string = "https://trace-api.newrelic.com/trace/v1"
 )
+
+var (
+        sess = session.Must(session.NewSessionWithOptions(session.Options{
+                SharedConfigState: session.SharedConfigEnable,
+        }))
+        secrets secretsmanageriface.SecretsManagerAPI
+)
+
+type licenseKeySecret struct {
+        LicenseKey string
+}
+
+func init() {
+        secrets = secretsmanager.New(sess)
+}
+
+func decodeLicenseKey(rawJson *string) (string, error) {
+        var lks licenseKeySecret
+
+        err := json.Unmarshal([]byte(*rawJson), &lks)
+        if err != nil {
+                return "", err
+        }
+	if lks.LicenseKey == "" {
+                return "", fmt.Errorf("malformed license key secret; missing \"LicenseKey\" attribute")
+        }
+
+        return lks.LicenseKey, nil
+}
+
+func getNewRelicLicenseKey(ctx context.Context) (string, error) {
+	sId := "NEW_RELIC_LICENSE_KEY"
+	v := os.Getenv("NEW_RELIC_LICENSE_KEY_SECRET")
+	if len(v) > 0 {
+		sId = v
+	}
+        secretValueInput := secretsmanager.GetSecretValueInput{SecretId: &sId}
+        secretValueOutput, err := secrets.GetSecretValueWithContext(ctx, &secretValueInput)
+        if err != nil {
+		return "", err
+        }
+        return decodeLicenseKey(secretValueOutput.SecretString)
+}
 
 func getEndpointURL(licenseKey string, typ string, EndpointOverride string) string {
 	if EndpointOverride != "" {

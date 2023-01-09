@@ -19,8 +19,12 @@ type Dispatcher struct {
 	functionName string
 }
 
-func NewDispatcher(functionName string) *Dispatcher {
-	licenseKey := os.Getenv("NEW_RELIC_LICENSE_KEY")
+func NewDispatcher(functionName string, ctx context.Context) *Dispatcher {
+	var licenseKey string
+	licenseKey = os.Getenv("NEW_RELIC_LICENSE_KEY")
+        if len(licenseKey) == 0 {
+	        licenseKey, _ = getNewRelicLicenseKey(ctx)
+	}
 	if len(licenseKey) == 0 {
 		panic("NEW_RELIC_LICENSE_KEY undefined")
 	}

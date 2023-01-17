@@ -95,30 +95,6 @@ func main() {
 	// Set up the telemetry buffer
 	batch := telemetry.NewBatch(int64(conf.RipeMillis), int64(conf.RotMillis), conf.CollectTraceID)
 
-	// Start the Logs API server, and register it
-	logServer, err := logserver.Start(conf)
-	if err != nil {
-		err2 := invocationClient.InitError(ctx, "logServer.start", err)
-		if err2 != nil {
-			util.Logln(err2)
-		}
-		util.Panic("Failed to start logs HTTP server", err)
-	}
-
-	eventTypes := []api.LogEventType{api.Platform}
-	if conf.SendFunctionLogs {
-		eventTypes = append(eventTypes, api.Function)
-	}
-	subscriptionRequest := api.DefaultLogSubscription(eventTypes, logServer.Port())
-	err = invocationClient.LogRegister(ctx, subscriptionRequest)
-	if err != nil {
-		err2 := invocationClient.InitError(ctx, "logServer.register", err)
-		if err2 != nil {
-			util.Logln(err2)
-		}
-		util.Panic("Failed to register with Logs API", err)
-	}
-
 	// Init the telemetry sending client
 	telemetryClient := telemetry.New(registrationResponse.FunctionName, licenseKey, conf.TelemetryEndpoint, conf.LogEndpoint, batch, conf.CollectTraceID, conf.ClientTimeout)
 	telemetryChan, err := telemetry.InitTelemetryChannel()
@@ -135,26 +111,58 @@ func main() {
 		checks.RunChecks(ctx, conf, registrationResponse, telemetryClient)
 	}()
 
-	// Send function logs as they arrive. When disabled, function logs aren't delivered to the extension.
 	backgroundTasks := &sync.WaitGroup{}
-	backgroundTasks.Add(1)
+	var logServer *logserver.LogServer
 
-	go func() {
-		defer backgroundTasks.Done()
-		logShipLoop(ctx, logServer, telemetryClient)
-	}()
+	// When telemetry API is enabled, do not subscribe to log API events or run the log server
+	if !conf.TelemetryAPIEnabled {
+		// Start the Logs API server, and register it
+		logServer, err = logserver.Start(conf)
+		if err != nil {
+			err2 := invocationClient.InitError(ctx, "logServer.start", err)
+			if err2 != nil {
+				util.Logln(err2)
+			}
+			util.Panic("Failed to start logs HTTP server", err)
+		}
+
+		eventTypes := []api.LogEventType{api.Platform}
+		if conf.SendFunctionLogs {
+			eventTypes = append(eventTypes, api.Function)
+		}
+		subscriptionRequest := api.DefaultLogSubscription(eventTypes, logServer.Port())
+		err = invocationClient.LogRegister(ctx, subscriptionRequest)
+		if err != nil {
+			err2 := invocationClient.InitError(ctx, "logServer.register", err)
+			if err2 != nil {
+				util.Logln(err2)
+			}
+			util.Panic("Failed to register with Logs API", err)
+		}
+
+		// Send function logs as they arrive. When disabled, function logs aren't delivered to the extension.
+		backgroundTasks.Add(1)
+
+		go func() {
+			defer backgroundTasks.Done()
+			logShipLoop(ctx, logServer, telemetryClient)
+		}()
+	}
 
 	// Call next, and process telemetry, until we're shut down
 	eventCounter := mainLoop(ctx, invocationClient, batch, telemetryChan, logServer, telemetryClient)
 
 	util.Logf("New Relic Extension shutting down after %v events\n", eventCounter)
 
-	err = logServer.Close()
-	if err != nil {
-		util.Logln("Error shutting down Log API server", err)
+	if !conf.TelemetryAPIEnabled {
+		err = logServer.Close()
+		if err != nil {
+			util.Logln("Error shutting down Log API server", err)
+		}
+
+		pollLogServer(logServer, batch)
 	}
 
-	pollLogServer(logServer, batch)
 	finalHarvest := batch.Close()
 	shipHarvest(ctx, finalHarvest, telemetryClient)
 
@@ -300,6 +308,10 @@ func mainLoop(ctx context.Context, invocationClient *client.InvocationClient, ba
 
 // pollLogServer polls for platform logs, and annotates telemetry
 func pollLogServer(logServer *logserver.LogServer, batch *telemetry.Batch) {
+	if logServer == nil {
+		return
+	}
+
 	for _, platformLog := range logServer.PollPlatformChannel() {
 		inv := batch.AddTelemetry(platformLog.RequestID, platformLog.Content)
 		if inv == nil {

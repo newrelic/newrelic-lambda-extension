@@ -19,20 +19,21 @@ const (
 var EmptyNRWrapper = "Undefined"
 
 type Configuration struct {
-	ExtensionEnabled   bool
-	LogsEnabled        bool
-	SendFunctionLogs   bool
-	CollectTraceID     bool
-	RipeMillis         uint32
-	RotMillis          uint32
-	LicenseKey         string
-	LicenseKeySecretId string
-	NRHandler          string
-	TelemetryEndpoint  string
-	LogEndpoint        string
-	LogLevel           string
-	LogServerHost      string
-	ClientTimeout      time.Duration
+	ExtensionEnabled    bool
+	LogsEnabled         bool
+	SendFunctionLogs    bool
+	CollectTraceID      bool
+	TelemetryAPIEnabled bool
+	RipeMillis          uint32
+	RotMillis           uint32
+	LicenseKey          string
+	LicenseKeySecretId  string
+	NRHandler           string
+	TelemetryEndpoint   string
+	LogEndpoint         string
+	LogLevel            string
+	LogServerHost       string
+	ClientTimeout       time.Duration
 }
 
 func ConfigurationFromEnvironment() *Configuration {
@@ -50,6 +51,7 @@ func ConfigurationFromEnvironment() *Configuration {
 	sendFunctionLogsStr, sendFunctionLogsOverride := os.LookupEnv("NEW_RELIC_EXTENSION_SEND_FUNCTION_LOGS")
 	logServerHostStr, logServerHostOverride := os.LookupEnv("NEW_RELIC_LOG_SERVER_HOST")
 	collectTraceIDStr, collectTraceIDOverride := os.LookupEnv("NEW_RELIC_COLLECT_TRACE_ID")
+	telemetryAPIEnabledStr, telemetryAPIOverride := os.LookupEnv("NEW_RELIC_TELEMETRY_API_EXTENSION_ENABLED")
 
 	extensionEnabled := true
 	if extensionEnabledOverride && strings.ToLower(enabledStr) == "false" {
@@ -125,11 +127,18 @@ func ConfigurationFromEnvironment() *Configuration {
 		ret.LogServerHost = defaultLogServerHost
 	}
 
-	if sendFunctionLogsOverride && sendFunctionLogsStr == "true" {
+	if telemetryAPIOverride && strings.ToLower(telemetryAPIEnabledStr) == "true" {
+		ret.TelemetryAPIEnabled = true
+	}
+
+	// if telemetry API is enabled, disable logAPI to avoid duplicating log data
+	// telemetry API replaces and improves on logs api
+	// https://aws.amazon.com/blogs/compute/introducing-the-aws-lambda-telemetry-api/
+	if !telemetryAPIOverride && sendFunctionLogsOverride && strings.ToLower(sendFunctionLogsStr) == "true" {
 		ret.SendFunctionLogs = true
 	}
 
-	if collectTraceIDOverride && collectTraceIDStr == "true" {
+	if collectTraceIDOverride && strings.ToLower(collectTraceIDStr) == "true" {
 		ret.CollectTraceID = true
 	}
 

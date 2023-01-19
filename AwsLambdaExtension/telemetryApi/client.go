@@ -8,7 +8,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 
 	"net/http"
 	"os"
@@ -161,7 +161,7 @@ func (c *Client) Subscribe(ctx context.Context, extensionId string, listenerUri 
 		l.Error("[client:Subscribe] Subscription failed. Logs API is not supported! Is this extension running in a local sandbox?")
 	} else if resp.StatusCode != http.StatusOK {
 		l.Error("[client:Subscribe] Subscription failed")
-		body, err := ioutil.ReadAll(resp.Body)
+		body, err := io.ReadAll(resp.Body)
 		if err != nil {
 			return nil, errors.Errorf("%s failed: %d[%s]", c.baseUrl, resp.StatusCode, resp.Status)
 		}
@@ -169,7 +169,7 @@ func (c *Client) Subscribe(ctx context.Context, extensionId string, listenerUri 
 		return nil, errors.Errorf("%s failed: %d[%s] %s", c.baseUrl, resp.StatusCode, resp.Status, string(body))
 	}
 
-	body, _ := ioutil.ReadAll(resp.Body)
+	body, _ := io.ReadAll(resp.Body)
 	l.Info("[client:Subscribe] Subscription success:", string(body))
 
 	return &SubscribeResponse{string(body)}, nil

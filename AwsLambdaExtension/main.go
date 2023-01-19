@@ -14,11 +14,12 @@ package main
 
 import (
 	"context"
+	"encoding/base64"
+	"newrelic-lambda-extension/AwsLambdaExtension/agentTelemetry"
 	"newrelic-lambda-extension/AwsLambdaExtension/extensionApi"
 	"newrelic-lambda-extension/AwsLambdaExtension/telemetryApi"
 	"os"
 	"os/signal"
-	"path"
 	"syscall"
 
 	log "github.com/sirupsen/logrus"
@@ -28,7 +29,7 @@ var l = log.WithFields(log.Fields{"pkg": "main"})
 
 func main() {
 	l.Info("[main] Starting the Telemetry API extension")
-	extensionName := path.Base(os.Args[0])
+	conf := agentTelemetry.GetConfig()
 
 	ctx, cancel := context.WithCancel(context.Background())
 	sigs := make(chan os.Signal, 1)
@@ -43,9 +44,9 @@ func main() {
 	// Step 1 - Register the extension with Extensions API
 	l.Info("[main] Registering extension")
 	extensionApiClient := extensionApi.NewClient()
-	extensionId, err := extensionApiClient.Register(ctx, extensionName)
+	extensionId, err := extensionApiClient.Register(ctx, conf.ExtensionName)
 	if err != nil {
-		panic(err)
+		l.Fatal(err)
 	}
 	l.Info("[main] Registation success with extensionId", extensionId)
 
@@ -54,7 +55,7 @@ func main() {
 	telemetryListener := telemetryApi.NewTelemetryApiListener()
 	telemetryListenerUri, err := telemetryListener.Start()
 	if err != nil {
-		panic(err)
+		l.Fatal(err)
 	}
 
 	// Step 3 - Subscribe the listener to Telemetry API
@@ -62,10 +63,18 @@ func main() {
 	telemetryApiClient := telemetryApi.NewClient()
 	_, err = telemetryApiClient.Subscribe(ctx, extensionId, telemetryListenerUri)
 	if err != nil {
-		panic(err)
+		l.Fatal(err)
 	}
 	l.Info("[main] Subscription success")
-	dispatcher := telemetryApi.NewDispatcher(extensionApiClient.GetFunctionName(), ctx)
+	dispatcher := telemetryApi.NewDispatcher(extensionApiClient.GetFunctionName(), &conf, ctx)
+
+	// Optional - set 	up new relic telemetry client
+	batch := agentTelemetry.NewBatch(agentTelemetry.DefaultBatchSize, true)
+	telemetryClient := agentTelemetry.New(conf, batch, true)
+	telemetryChan, err := agentTelemetry.InitTelemetryChannel()
+	if err != nil {
+		l.Panic("telemetry pipe init failed: ", err)
+	}
 
 	// Will block until invoke or shutdown event is received or cancelled via the context.
 	for {
@@ -82,6 +91,17 @@ func main() {
 				return
 			}
 
+			select {
+			case telemetryBytes := <-telemetryChan:
+				l.Debug("[main] Got Agent Telemetry %s", base64.URLEncoding.EncodeToString(telemetryBytes))
+				batch.AddTelemetry(res.RequestID, telemetryBytes)
+			default:
+			}
+
+			if batch.ReadyToHarvest() {
+				harvestAgentTelemetry(ctx, batch.Harvest(false), telemetryClient, res.InvokedFunctionArn)
+			}
+
 			// Dispatching log events from previous invocations
 			dispatcher.Dispatch(ctx, telemetryListener.LogEventsQueue, false)
 
@@ -92,6 +112,10 @@ func main() {
 			} else if res.EventType == extensionApi.Shutdown {
 				// Dispatch all remaining telemetry, handle shutdown
 				dispatcher.Dispatch(ctx, telemetryListener.LogEventsQueue, true)
+
+				// Close the batch and dump all remaining telemetry into harvest
+				harvestAgentTelemetry(ctx, batch.Close(), telemetryClient, res.InvokedFunctionArn)
+
 				handleShutdown(res)
 				return
 			}
@@ -105,4 +129,19 @@ func handleInvoke(r *extensionApi.NextEventResponse) {
 
 func handleShutdown(r *extensionApi.NextEventResponse) {
 	l.Info("[handleShutdown]")
+}
+
+func harvestAgentTelemetry(ctx context.Context, harvested []*agentTelemetry.Invocation, telemetryClient *agentTelemetry.Client, functionARN string) {
+	l.Debugf("[main] sending agent harvest with %d invocations", len(harvested))
+	if len(harvested) > 0 {
+		telemetrySlice := make([][]byte, 0, 2*len(harvested))
+		for _, inv := range harvested {
+			telemetrySlice = append(telemetrySlice, inv.Telemetry...)
+		}
+
+		err, numSuccessful := telemetryClient.SendTelemetry(ctx, functionARN, telemetrySlice)
+		if err != nil {
+			l.Infof("[main] failed to send harvested telemetry for %d invocations %v", len(harvested)-numSuccessful, err)
+		}
+	}
 }

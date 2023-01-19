@@ -6,6 +6,7 @@ package telemetryApi
 import (
 	"context"
 	"net/http"
+	"newrelic-lambda-extension/AwsLambdaExtension/agentTelemetry"
 	"os"
 	"strconv"
 
@@ -19,20 +20,23 @@ type Dispatcher struct {
 	functionName string
 }
 
-func NewDispatcher(functionName string, ctx context.Context) *Dispatcher {
+func NewDispatcher(functionName string, config *agentTelemetry.Config, ctx context.Context) *Dispatcher {
 	var licenseKey string
 	licenseKey = os.Getenv("NEW_RELIC_LICENSE_KEY")
-        if len(licenseKey) == 0 {
-	        licenseKey, _ = getNewRelicLicenseKey(ctx)
+	if len(licenseKey) == 0 {
+		licenseKey, _ = getNewRelicLicenseKey(ctx)
 	}
 	if len(licenseKey) == 0 {
-		panic("NEW_RELIC_LICENSE_KEY undefined")
+		l.Fatal("NEW_RELIC_LICENSE_KEY undefined")
 	}
 
 	dispatchMinBatchSize, err := strconv.ParseInt(os.Getenv("DISPATCH_MIN_BATCH_SIZE"), 0, 16)
 	if err != nil {
 		dispatchMinBatchSize = 1
 	}
+
+	config.LicenseKey = licenseKey
+	config.ExtensionName = functionName
 
 	return &Dispatcher{
 		httpClient:   &http.Client{},
@@ -45,7 +49,7 @@ func NewDispatcher(functionName string, ctx context.Context) *Dispatcher {
 
 func (d *Dispatcher) Dispatch(ctx context.Context, logEventsQueue *queue.Queue, force bool) {
 	if !logEventsQueue.Empty() && (force || logEventsQueue.Len() >= d.minBatchSize) {
-		l.Info("[dispatcher:Dispatch] Dispatching", logEventsQueue.Len(), "log events")
+		l.Info("[dispatcher:Dispatch] Dispatching ", logEventsQueue.Len(), " log events")
 		logEntries, _ := logEventsQueue.Get(logEventsQueue.Len())
 
 		err := sendDataToNR(ctx, logEntries, d)

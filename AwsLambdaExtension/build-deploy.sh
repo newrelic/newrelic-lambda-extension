@@ -1,15 +1,14 @@
-if [ ! -d "bin" ]; then
-    mkdir bin
+#!/bin/bash
+
+if [ ! -d "./extensions" ]; then
+    mkdir ./extensions
 fi
-if [ ! -d "bin/extensions" ]; then
-    mkdir bin/extensions
-fi
-GOOS=linux GOARCH=amd64 go build -o bin/extensions/AwsLambdaExtension main.go
-chmod +x bin/extensions/AwsLambdaExtension
-cd bin
-zip -r extension.zip extensions/
-aws lambda publish-layer-version \
-    --layer-name "AwsLambdaExtension" \
-    --description "New Relic Lambda Extension" \
-    --compatible-architectures "x86_64" \
-    --zip-file  "fileb://extension.zip"
+
+GOOS=linux GOARCH=arm64 go build -o ./extensions/AwsLambdaExtension main.go
+chmod +x ./extensions/AwsLambdaExtension
+
+#aws lambda publish-layer-version \
+#    --layer-name "AwsLambdaExtension" \
+#    --description "New Relic Telemetry API Extension" \
+#    --compatible-architectures "arm64" \
+#    --zip-file  "fileb://extension.zip"

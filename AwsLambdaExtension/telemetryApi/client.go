@@ -1,6 +1,3 @@
-// Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
-// SPDX-License-Identifier: MIT-0
-
 package telemetryApi
 
 import (
@@ -14,6 +11,7 @@ import (
 	"os"
 
 	"github.com/pkg/errors"
+
 	log "github.com/sirupsen/logrus"
 )
 
@@ -27,7 +25,8 @@ type Client struct {
 	baseUrl    string
 }
 
-func NewClient() *Client {
+func NewClient(logLevel log.Level) *Client {
+	log.SetLevel(logLevel)
 	baseUrl := fmt.Sprintf("http://%s/2022-07-01/telemetry", os.Getenv("AWS_LAMBDA_RUNTIME_API"))
 	return &Client{
 		httpClient: &http.Client{},

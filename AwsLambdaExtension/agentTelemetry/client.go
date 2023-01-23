@@ -36,7 +36,7 @@ type Client struct {
 // New creates a telemetry client with sensible defaults
 func New(conf Config, batch *Batch, collectTraceID bool) *Client {
 	httpClient := &http.Client{
-		Timeout: 2400 * time.Millisecond,
+		Timeout: 2400 * time.Millisecond, //TODO: make this much lower once collector repaired
 	}
 
 	// Create random seed for timeout to avoid instances created at the same time
@@ -44,7 +44,7 @@ func New(conf Config, batch *Batch, collectTraceID bool) *Client {
 	var b [8]byte
 	_, err := crypto_rand.Read(b[:])
 	if err != nil {
-		log.Fatal("cannot seed math/rand package with cryptographically secure random number generator")
+		log.Fatal("[New Client] cannot seed math/rand package with cryptographically secure random number generator")
 	}
 	math_rand.Seed(int64(binary.LittleEndian.Uint64(b[:])))
 
@@ -79,7 +79,7 @@ func getInfraEndpointURL(licenseKey string, telemetryEndpointOverride string) st
 }
 
 // SendTelemetry attempts to send telemetry data to new relic and returns an error and a succesful payload count
-func (c *Client) SendTelemetry(ctx context.Context, invokedFunctionARN string, telemetry [][]byte) (error, int) {
+func (c *Client) SendTelemetry(ctx context.Context, invokedFunctionARN string, telemetry [][]byte) (int, error) {
 	start := time.Now()
 	logEvents := make([]LogsEvent, 0, len(telemetry))
 	for _, payload := range telemetry {
@@ -89,7 +89,7 @@ func (c *Client) SendTelemetry(ctx context.Context, invokedFunctionARN string, t
 
 	compressedPayloads, err := CompressedPayloadsForLogEvents(logEvents, c.functionName, invokedFunctionARN)
 	if err != nil {
-		return err, 0
+		return 0, err
 	}
 
 	var builder requestBuilder = func(buffer *bytes.Buffer) (*http.Request, error) {
@@ -102,7 +102,7 @@ func (c *Client) SendTelemetry(ctx context.Context, invokedFunctionARN string, t
 	totalTime := end.Sub(start)
 	transmissionTime := end.Sub(transmitStart)
 	l.Infof(
-		"Sent %d/%d New Relic payload batches with %d log events successfully in %.3fms (%dms to transmit %.1fkB).\n",
+		"[SendTelemetry] Sent %d/%d New Relic payload batches with %d log events successfully in %.3fms (%dms to transmit %.1fkB).\n",
 		successCount,
 		len(compressedPayloads),
 		len(telemetry),
@@ -111,7 +111,7 @@ func (c *Client) SendTelemetry(ctx context.Context, invokedFunctionARN string, t
 		float64(sentBytes)/1024.0,
 	)
 
-	return nil, successCount
+	return successCount, nil
 }
 
 type requestBuilder func(buffer *bytes.Buffer) (*http.Request, error)
@@ -133,17 +133,17 @@ func (c *Client) sendPayloads(compressedPayloads []*bytes.Buffer, builder reques
 
 		select {
 		case <-timer.C:
-			response.Error = fmt.Errorf("failed to send data within user defined timeout period: %s", c.timeout.String())
+			response.Error = fmt.Errorf("[sendPayloads] failed to send data within user defined timeout period: %s", c.timeout.String())
 			quit <- true
 		case response = <-data:
 			timer.Stop()
 		}
 
 		if response.Error != nil {
-			l.Infof("Telemetry client error: %s", response.Error)
+			l.Infof("[sendPayloads] Telemetry client error: %s", response.Error)
 			sentBytes -= p.Len()
 		} else if response.Response.StatusCode >= 300 {
-			l.Infof("Telemetry client response: [%s] %s", response.Response.Status, response.ResponseBody)
+			l.Infof("[sendPayloads] Telemetry client response: [%s] %s", response.Response.Status, response.ResponseBody)
 		} else {
 			successCount += 1
 		}
@@ -201,7 +201,7 @@ func (c *Client) attemptSend(currentPayloadBytes []byte, builder requestBuilder,
 
 			// if error is http timeout, retry
 			if err, ok := err.(net.Error); ok && err.Timeout() {
-				l.Debug("Retrying after timeout", err)
+				l.Debug("[attemptSend] Retrying after timeout", err)
 				time.Sleep(baseSleepTime + time.Duration(math_rand.Intn(400)))
 
 				// double wait time after 3 timed out attempts

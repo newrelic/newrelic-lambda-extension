@@ -1,6 +1,3 @@
-// Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
-// SPDX-License-Identifier: MIT-0
-
 package extensionApi
 
 import (
@@ -72,7 +69,8 @@ func (e *Client) GetFunctionName() string {
 var l = log.WithFields(log.Fields{"pkg": "extensionApi"})
 
 // Returns a Lambda Extensions API client
-func NewClient() *Client {
+func NewClient(level log.Level) *Client {
+	log.SetLevel(level)
 	baseUrl := fmt.Sprintf("http://%s/2020-01-01/extension", os.Getenv("AWS_LAMBDA_RUNTIME_API"))
 	return &Client{
 		baseUrl:    baseUrl,
@@ -82,7 +80,6 @@ func NewClient() *Client {
 
 // Registers the extension with Extensions API
 func (e *Client) Register(ctx context.Context, extensionName string) (string, error) {
-
 	const action = "/register"
 	url := e.baseUrl + action
 

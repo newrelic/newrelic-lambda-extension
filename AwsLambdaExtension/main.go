@@ -1,6 +1,3 @@
-// Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
-// SPDX-License-Identifier: MIT-0
-
 /**
 
 Notes:
@@ -14,23 +11,30 @@ package main
 
 import (
 	"context"
-	"encoding/base64"
 	"newrelic-lambda-extension/AwsLambdaExtension/agentTelemetry"
 	"newrelic-lambda-extension/AwsLambdaExtension/extensionApi"
 	"newrelic-lambda-extension/AwsLambdaExtension/telemetryApi"
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
 	log "github.com/sirupsen/logrus"
 )
 
-var l = log.WithFields(log.Fields{"pkg": "main"})
+var (
+	collectAgentData bool
+
+	l = log.WithFields(log.Fields{"pkg": "main"})
+)
 
 func main() {
-	l.Info("[main] Starting the Telemetry API extension")
+	// Handle User Configured Settings
 	conf := agentTelemetry.GetConfig()
+	log.SetLevel(conf.LogLevel)
+	collectAgentData = conf.CollectAgentData
 
+	l.Info("[main] Starting the Telemetry API extension")
 	ctx, cancel := context.WithCancel(context.Background())
 	sigs := make(chan os.Signal, 1)
 	signal.Notify(sigs, syscall.SIGTERM, syscall.SIGINT)
@@ -43,7 +47,7 @@ func main() {
 
 	// Step 1 - Register the extension with Extensions API
 	l.Info("[main] Registering extension")
-	extensionApiClient := extensionApi.NewClient()
+	extensionApiClient := extensionApi.NewClient(conf.LogLevel)
 	extensionId, err := extensionApiClient.Register(ctx, conf.ExtensionName)
 	if err != nil {
 		l.Fatal(err)
@@ -60,16 +64,17 @@ func main() {
 
 	// Step 3 - Subscribe the listener to Telemetry API
 	l.Info("[main] Subscribing to the Telemetry API")
-	telemetryApiClient := telemetryApi.NewClient()
+	telemetryApiClient := telemetryApi.NewClient(conf.LogLevel)
 	_, err = telemetryApiClient.Subscribe(ctx, extensionId, telemetryListenerUri)
 	if err != nil {
 		l.Fatal(err)
 	}
 	l.Info("[main] Subscription success")
-	dispatcher := telemetryApi.NewDispatcher(extensionApiClient.GetFunctionName(), &conf, ctx)
+	dispatcher := telemetryApi.NewDispatcher(extensionApiClient.GetFunctionName(), &conf, ctx, conf.TelemetryAPIBatchSize)
 
 	// Optional - set 	up new relic telemetry client
-	batch := agentTelemetry.NewBatch(agentTelemetry.DefaultBatchSize, true)
+	// Disable extract trace ID because it is bugged
+	batch := agentTelemetry.NewBatch(conf.AgentTelemetryBatchSize, false, conf.LogLevel)
 	telemetryClient := agentTelemetry.New(conf, batch, true)
 	telemetryChan, err := agentTelemetry.InitTelemetryChannel()
 	if err != nil {
@@ -91,17 +96,9 @@ func main() {
 				return
 			}
 
-			select {
-			case telemetryBytes := <-telemetryChan:
-				l.Debug("[main] Got Agent Telemetry %s", base64.URLEncoding.EncodeToString(telemetryBytes))
-				batch.AddTelemetry(res.RequestID, telemetryBytes)
-			default:
-			}
-
-			if batch.ReadyToHarvest() {
-				harvestAgentTelemetry(ctx, batch.Harvest(false), telemetryClient, res.InvokedFunctionArn)
-			}
-
+			// Fetches agent telemetry from channel then harvests only if ready
+			batch.AddInvocation(res.RequestID, time.Now())
+			dispatchAgentTelemetry(ctx, telemetryChan, batch, telemetryClient, res, false)
 			// Dispatching log events from previous invocations
 			dispatcher.Dispatch(ctx, telemetryListener.LogEventsQueue, false)
 
@@ -114,8 +111,8 @@ func main() {
 				dispatcher.Dispatch(ctx, telemetryListener.LogEventsQueue, true)
 
 				// Close the batch and dump all remaining telemetry into harvest
-				harvestAgentTelemetry(ctx, batch.Close(), telemetryClient, res.InvokedFunctionArn)
-
+				// this harvest will be forced, dumping telemtry that may not be ready
+				dispatchAgentTelemetry(ctx, telemetryChan, batch, telemetryClient, res, true)
 				handleShutdown(res)
 				return
 			}
@@ -131,17 +128,44 @@ func handleShutdown(r *extensionApi.NextEventResponse) {
 	l.Info("[handleShutdown]")
 }
 
+// Collect agent data and attempt to send it if appropriate
+// If force = true, collect and send data no matter what
+func dispatchAgentTelemetry(ctx context.Context, telemetryChan chan []byte, batch *agentTelemetry.Batch, telemetryClient *agentTelemetry.Client, res *extensionApi.NextEventResponse, force bool) {
+	if !collectAgentData {
+		return
+	}
+
+	// Fetch and Batch latest agent telemetry if possible
+	select {
+	case telemetryBytes := <-telemetryChan:
+		l.Debugf("[main] Got %d bytes of Agent Telemetry", len(telemetryBytes))
+		batch.AddTelemetry(res.RequestID, telemetryBytes)
+	default:
+	}
+
+	// Harvest and Send agent Data to New Relic
+	if force {
+		harvestAgentTelemetry(ctx, batch.Harvest(force), telemetryClient, res.InvokedFunctionArn)
+	} else {
+		if batch.ReadyToHarvest() {
+			harvestData := batch.Harvest(false)
+			harvestAgentTelemetry(ctx, harvestData, telemetryClient, res.InvokedFunctionArn)
+		}
+	}
+}
+
+// harvests and sends agent telemetry to New Relic
 func harvestAgentTelemetry(ctx context.Context, harvested []*agentTelemetry.Invocation, telemetryClient *agentTelemetry.Client, functionARN string) {
-	l.Debugf("[main] sending agent harvest with %d invocations", len(harvested))
 	if len(harvested) > 0 {
+		l.Debugf("[main] sending agent harvest with %d invocations", len(harvested))
 		telemetrySlice := make([][]byte, 0, 2*len(harvested))
 		for _, inv := range harvested {
 			telemetrySlice = append(telemetrySlice, inv.Telemetry...)
 		}
 
-		err, numSuccessful := telemetryClient.SendTelemetry(ctx, functionARN, telemetrySlice)
+		numSuccessful, err := telemetryClient.SendTelemetry(ctx, functionARN, telemetrySlice)
 		if err != nil {
-			l.Infof("[main] failed to send harvested telemetry for %d invocations %v", len(harvested)-numSuccessful, err)
+			l.Errorf("[main] failed to send harvested telemetry for %d invocations %v", len(harvested)-numSuccessful, err)
 		}
 	}
 }

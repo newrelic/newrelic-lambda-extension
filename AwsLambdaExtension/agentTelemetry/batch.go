@@ -7,7 +7,6 @@ import (
 )
 
 const (
-	DefaultBatchSize = 3
 	MustHarvestError = "telemetry can not be added until batch is harvested"
 )
 
@@ -21,7 +20,8 @@ type Batch struct {
 }
 
 // NewBatch constructs a new batch.
-func NewBatch(size int, extractTraceID bool) *Batch {
+func NewBatch(size int, extractTraceID bool, logLevel log.Level) *Batch {
+	log.SetLevel(logLevel)
 	return &Batch{
 		invocations:    make(map[string]*Invocation),
 		harvestSize:    size,
@@ -30,6 +30,7 @@ func NewBatch(size int, extractTraceID bool) *Batch {
 }
 
 func (b *Batch) ReadyToHarvest() bool {
+	l.Debugf("[agentTelemetry] Have %d / %d invocations needed to do a harvest", len(b.invocations), b.harvestSize)
 	return len(b.invocations) >= b.harvestSize
 }
 
@@ -47,7 +48,7 @@ func (b *Batch) AddTelemetry(requestId string, telemetry []byte) *Invocation {
 		if b.extractTraceID {
 			traceId, err := ExtractTraceID(telemetry)
 			if err != nil {
-				l.Debug(err)
+				l.Errorf("[agent telemtry: ExtractTraceID] %v", err)
 			}
 			// We don't want to unset a previously set trace ID
 			if traceId != "" {
@@ -64,7 +65,7 @@ func (b *Batch) Close() []*Invocation {
 	return b.Harvest(true)
 }
 
-// aggressiveHarvest harvests all invocations, ripe or not. It removes harvested invocations from the batch and updates the lastHarvest timestamp.
+// Harvest all ready invocations. It removes harvested invocations from the batch and updates the lastHarvest timestamp.
 func (b *Batch) Harvest(force bool) []*Invocation {
 	ret := make([]*Invocation, 0, len(b.invocations))
 	for k, v := range b.invocations {
@@ -81,7 +82,7 @@ func (b *Batch) Harvest(force bool) []*Invocation {
 		}
 	}
 
-	l.Debug("[agent telemetry] harvesting %d invocations\n", len(ret))
+	l.Debugf("[agentTelemetry] harvesting %d invocations\n", len(ret))
 	return ret
 }
 
@@ -105,7 +106,7 @@ func NewInvocation(requestId string, start time.Time) Invocation {
 
 // IsRipe indicates that an Invocation has all the telemetry it's likely to get. Sending a ripe invocation won't omit data.
 func (inv *Invocation) IsRipe() bool {
-	return len(inv.Telemetry) >= 2
+	return len(inv.Telemetry) >= 1
 }
 
 // IsEmpty is true when the invocation has no telemetry. The invocation has begun, but has received no agent payload, nor platform logs.

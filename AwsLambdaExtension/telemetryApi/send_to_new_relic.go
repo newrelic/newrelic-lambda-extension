@@ -128,7 +128,7 @@ func sendBatch(ctx context.Context, d *Dispatcher, uri string, bodyBytes []byte)
 	return err
 }
 
-func sendDataToNR(ctx context.Context, logEntries []interface{}, d *Dispatcher) error {
+func sendDataToNR(ctx context.Context, logEntries []interface{}, d *Dispatcher, accountID string) error {
 
 	var lambda_name = d.functionName
 	var agent_name = path.Base(os.Args[0])
@@ -251,15 +251,14 @@ func sendDataToNR(ctx context.Context, logEntries []interface{}, d *Dispatcher) 
 		}
 		// send events
 		if len(data["events"]) > 0 {
-			ACCOUNT_ID := os.Getenv("NEW_RELIC_ACCOUNT_ID")
-			if len(ACCOUNT_ID) > 0 {
+			if len(accountID) > 0 {
 				bodyBytes, _ := json.Marshal(data["events"])
-				er := sendBatch(ctx, d, getEndpointURL(d.licenseKey, "events", "")+ACCOUNT_ID+"/events", bodyBytes)
+				er := sendBatch(ctx, d, getEndpointURL(d.licenseKey, "events", "")+accountID+"/events", bodyBytes)
 				if er != nil {
 					return er
 				}
 			} else {
-				l.Info("NEW_RELIC_ACCOUNT_ID is not set, therefore no events data sent")
+				l.Warn("[telemtetryApi:sendDataToNR] NEW_RELIC_ACCOUNT_ID is not set, therefore no events data sent")
 			}
 		}
 		// send traces

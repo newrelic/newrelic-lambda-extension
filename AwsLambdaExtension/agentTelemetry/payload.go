@@ -74,7 +74,7 @@ func ExtractTraceID(data []byte) (string, error) {
 
 	dataSegment, ok := segments["data"]
 	if !ok {
-		return "", errors.New("No trace ID found in payload")
+		return "", errors.New("no trace ID found in payload")
 	}
 
 	analyticEvents, ok := dataSegment["analytic_event_data"]
@@ -119,5 +119,5 @@ func ExtractTraceID(data []byte) (string, error) {
 		}
 	}
 
-	return "", errors.New("No trace ID found in payload")
+	return "", errors.New("no trace ID found in payload")
 }

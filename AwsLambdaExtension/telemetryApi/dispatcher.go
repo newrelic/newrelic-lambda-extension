@@ -1,6 +1,3 @@
-// Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
-// SPDX-License-Identifier: MIT-0
-
 package telemetryApi
 
 import (
@@ -8,7 +5,6 @@ import (
 	"net/http"
 	"newrelic-lambda-extension/AwsLambdaExtension/agentTelemetry"
 	"os"
-	"strconv"
 
 	"github.com/golang-collections/go-datastructures/queue"
 )
@@ -16,11 +12,12 @@ import (
 type Dispatcher struct {
 	httpClient   *http.Client
 	licenseKey   string
+	accountID    string
 	minBatchSize int64
 	functionName string
 }
 
-func NewDispatcher(functionName string, config *agentTelemetry.Config, ctx context.Context) *Dispatcher {
+func NewDispatcher(functionName string, config *agentTelemetry.Config, ctx context.Context, batchSize int64) *Dispatcher {
 	var licenseKey string
 	licenseKey = os.Getenv("NEW_RELIC_LICENSE_KEY")
 	if len(licenseKey) == 0 {
@@ -30,18 +27,14 @@ func NewDispatcher(functionName string, config *agentTelemetry.Config, ctx conte
 		l.Fatal("NEW_RELIC_LICENSE_KEY undefined")
 	}
 
-	dispatchMinBatchSize, err := strconv.ParseInt(os.Getenv("DISPATCH_MIN_BATCH_SIZE"), 0, 16)
-	if err != nil {
-		dispatchMinBatchSize = 1
-	}
-
 	config.LicenseKey = licenseKey
 	config.ExtensionName = functionName
 
 	return &Dispatcher{
 		httpClient:   &http.Client{},
 		licenseKey:   licenseKey,
-		minBatchSize: dispatchMinBatchSize,
+		minBatchSize: batchSize,
+		accountID:    config.AccountID,
 		functionName: functionName,
 	}
 
@@ -52,7 +45,7 @@ func (d *Dispatcher) Dispatch(ctx context.Context, logEventsQueue *queue.Queue, 
 		l.Info("[dispatcher:Dispatch] Dispatching ", logEventsQueue.Len(), " log events")
 		logEntries, _ := logEventsQueue.Get(logEventsQueue.Len())
 
-		err := sendDataToNR(ctx, logEntries, d)
+		err := sendDataToNR(ctx, logEntries, d, d.accountID)
 		if err != nil {
 			l.Error("[dispatcher:Dispatch] Failed to dispatch, returning to queue:", err)
 			for logEntry := range logEntries {

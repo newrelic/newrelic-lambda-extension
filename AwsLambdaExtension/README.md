@@ -1,72 +1,17 @@
-# New Relic Telemetry API Extension in Go
+# New Relic Telemetry API Extension
 
-The provided code demonstrates how to get a basic Telemetry API extension written in Go up and running.
+The New Relic Telemetry API Extension collects telemetry data from both Lambda Telemetry API and New Relic Agents and sends it to New Relic.
+The following environment variables can be used to configre it:
 
-This extension: 
-1. Registers the extension with Lambda Extensions API (see `extensionApi/client.go`)
-2. Starts a local HTTP server to receive incoming telemetry events from the Telemetry API (see `telemetryApi/listener.go`)
-3. Subscribes to the Telemetry API to start receiving incoming telemetry events (see `telemetryApi/client.go`)
-4. Receives telemetry events, batches them, and dispatches to New Relic via POST requests (see `telemetryApi/dispatcher.go`).
-Requires the license key set up as the environment variable.
-
-Note that step 4 is asynchronous in nature. The functions is thawed to process the incoming event, and new telemetry might arrive either 
-before or after dispatching existing telemetry. In case of the latter, the newly arrived telemetry will be kept in the telemetry queue and 
-dispatched when processing next event. Depending on buffering configuration you pass to the Telemetry API during subscription, you might get 
-either zero, one, or multiple requests from Telemetry API to the telemetry listener in a single function invocation. 
-
-The code is heavily instrumented with logs so you'll be able to see the Telemetry API extension lifecycle messages as you're learning to 
-implement one. 
-
-## Build package and dependencies
-
-To run this example, you will need to ensure that your build architecture matches that of the Lambda execution environment by compiling with 
-`GOOS=linux` and `GOARCH=amd64` if you are not running in a Linux environment.
-
-Building and saving package into a `bin/extensions` directory:
-```bash
-$ cd AwsLambdaExtension
-$ GOOS=linux GOARCH=amd64 go build -o bin/extensions/AwsLambdaExtension main.go
-$ chmod +x bin/extensions/AwsLambdaExtension
-```
-
-## Layer Setup Process
-The extensions .zip file should contain a root directory called `extensions/`, where the extension executables are located.
-You must include the `AwsLambdaExtension` binary.
-
-Creating zip package for the extension:
-```bash
-$ cd bin
-$ zip -r extension.zip extensions/
-```
-
-Publish a new layer using the `extension.zip` using below command. The output should provide you with a layer ARN. 
-
-```bash
-aws lambda publish-layer-version \
-    --layer-name "AwsLambdaExtension" \
-    --zip-file  "fileb://extension.zip"
-```
-
-Note the `LayerVersionArn` that is produced in the output. eg. 
-
-```
-LayerVersionArn: arn:aws:lambda:<region>:533243300146:layer:<layerName>:<layerVersion>
-```
-
-Or use `build.sh` script to build and deploy the extension.
-
-Add the newly created layer version to a Lambda function.
-
-```bash
-aws lambda update-function-configuration 
-    --function-name <your function name> 
-    --layers <layer arn>
-```
-
-## Function Invocation and Extension Execution
-
-Configure the extension by setting below environment variables
-
-* `LICENSE_KEY` - the key issueed to you when you registered an account with New Relic
-* `DISPATCH_MIN_BATCH_SIZE` - optimize dispatching telemetry by telling the dispatcher how many log events you want it to batch. On function invoke the telemetry will be dispatched to `DISPATCH_POST_URI` only if number of log events collected so far is greater than `DISPATCH_MIN_BATCH_SIZE`. On function shutdown the telemetry will be dispatched to `DISPATCH_POST_URI` regardless of how many log events were collected so far. 
-
+| Environment Variable | Required | Description |
+| --- | --- | --- |
+| NEW_RELIC_ACCOUNT_ID | **always** | The account ID of the New Relic account you want to send data to |
+| NEW_RELIC_LICENSE_KEY | *conditional* | A plaintext New Relic license key. Either this or the value retrieved from NEW_RELIC_LICENSE_KEY_SECRET must contain a valid New Relic license key or the application will exit. If a plaintext license key is provided, it will override the license key retrieved from an AWS Secret. |
+| NEW_RELIC_LICENSE_KEY_SECRET | *conditional* | The name of an AWS Secrets Manager Secret containing a New Relic license key. If no plaintext license key is provided, the value of this variable must be set to the name of an AWS Secret containing a valid New Relic license key. |
+| NEW_RELIC_TELEMETRY_API_EXTENSION_ENABLED | optional | Setting this to "false" will disable the New Relic Telemetry API Extension from running. |
+| NEW_RELIC_EXTENSION_AGENT_DATA_COLLECTION_ENABLED | optional | Setting this to "false" will prevent the extension from collecting data from New Relic Agents. This will not prevent the agent from running. |
+| NEW_RELIC_EXTENSION_AGENT_DATA_BATCH_SIZE | optional | The number of invocations to store before sending Agent Data to New Relic. If your lamba function gets invoked at a high frequency, increasing this number will improve the performance of the extension and avoid dropped data and improve performance. Default: 1 |
+| NEW_RELIC_EXTENSION_TELEMETRY_API_BATCH_SIZE | optional | The number of Telemetry API events and logs to batch before sending them to New Relic. If your application invokes frequently, increase this number to avoid data getting dropped and to improve performance. Default: 1 | 
+| NEW_RELIC_EXTENSION_DATA_COLLECTION_TIMEOUT |  optional | A valid time.Duration string for how long the extension should wait to attempt to send agent data to New Relic in the event of a timeout/retry loop scenario. Example: 1s, 1500ms; Default: 10s |
+| NEW_RELIC_EXTENSION_COLLECTOR_OVERRIDE | optional | An override for the New Relic collection endpoint you want to send data to. By default, this will be detected based on the region of your New Relic license key. |
+| NEW_RELIC_EXTENSION_LOG_LEVEL | optional | The log level of the New Relic Telemetry API Extension. For more verbose logs, set to "debug" |

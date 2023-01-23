@@ -31,7 +31,7 @@ func pollForTelemetry() []byte {
 	// Opening a pipe will block, until the write side has been opened as well
 	telemetryPipe, err := os.OpenFile(telemetryNamedPipePath, os.O_RDONLY, 0)
 	if err != nil {
-		l.Panic("failed to open telemetry pipe", err)
+		l.Fatal("[pollForTelemetry] failed to open telemetry pipe", err)
 	}
 
 	defer func(telemetryPipe *os.File) {
@@ -44,7 +44,7 @@ func pollForTelemetry() []byte {
 	// When the write side closes, we get an EOF.
 	bytes, err := io.ReadAll(telemetryPipe)
 	if err != nil {
-		l.Panic("failed to read telemetry pipe", err)
+		l.Fatal("[pollForTelemetry] failed to read telemetry pipe", err)
 	}
 
 	return bytes

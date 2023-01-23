@@ -46,16 +46,16 @@ func main() {
 	}()
 
 	// Step 1 - Register the extension with Extensions API
-	l.Info("[main] Registering extension")
+	l.Debug("[main] Registering extension")
 	extensionApiClient := extensionApi.NewClient(conf.LogLevel)
 	extensionId, err := extensionApiClient.Register(ctx, conf.ExtensionName)
 	if err != nil {
 		l.Fatal(err)
 	}
-	l.Info("[main] Registation success with extensionId", extensionId)
+	l.Debug("[main] Registation success with extensionId", extensionId)
 
 	// Step 2 - Start the local http listener which will receive data from Telemetry API
-	l.Info("[main] Starting the Telemetry listener")
+	l.Debug("[main] Starting the Telemetry listener")
 	telemetryListener := telemetryApi.NewTelemetryApiListener()
 	telemetryListenerUri, err := telemetryListener.Start()
 	if err != nil {
@@ -63,13 +63,13 @@ func main() {
 	}
 
 	// Step 3 - Subscribe the listener to Telemetry API
-	l.Info("[main] Subscribing to the Telemetry API")
+	l.Debug("[main] Subscribing to the Telemetry API")
 	telemetryApiClient := telemetryApi.NewClient(conf.LogLevel)
 	_, err = telemetryApiClient.Subscribe(ctx, extensionId, telemetryListenerUri)
 	if err != nil {
 		l.Fatal(err)
 	}
-	l.Info("[main] Subscription success")
+	l.Debug("[main] Subscription success")
 	dispatcher := telemetryApi.NewDispatcher(extensionApiClient.GetFunctionName(), &conf, ctx, conf.TelemetryAPIBatchSize)
 
 	// Optional - set 	up new relic telemetry client
@@ -78,8 +78,10 @@ func main() {
 	telemetryClient := agentTelemetry.New(conf, batch, true)
 	telemetryChan, err := agentTelemetry.InitTelemetryChannel()
 	if err != nil {
-		l.Panic("telemetry pipe init failed: ", err)
+		l.Fatalf("telemetry pipe init failed: %v", err)
 	}
+
+	l.Info("[main] New Relic Telemetry API Extension registered and subscribed for Lambda event streams succesfully")
 
 	// Will block until invoke or shutdown event is received or cancelled via the context.
 	for {
@@ -87,12 +89,12 @@ func main() {
 		case <-ctx.Done():
 			return
 		default:
-			l.Info("[main] Waiting for next event...")
+			l.Debug("[main] Waiting for next event...")
 
 			// This is a blocking action
 			res, err := extensionApiClient.NextEvent(ctx)
 			if err != nil {
-				l.Error("[main] Exiting. Error:", err)
+				l.Errorf("[main] Exiting. Error: %v", err)
 				return
 			}
 
@@ -102,7 +104,7 @@ func main() {
 			// Dispatching log events from previous invocations
 			dispatcher.Dispatch(ctx, telemetryListener.LogEventsQueue, false)
 
-			l.Info("[main] Received event")
+			l.Debug("[main] Received event")
 
 			if res.EventType == extensionApi.Invoke {
 				handleInvoke(res)

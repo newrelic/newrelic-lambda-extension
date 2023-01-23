@@ -148,7 +148,7 @@ func (c *Client) Subscribe(ctx context.Context, extensionId string, listenerUri 
 	headers := make(map[string]string)
 	headers[lambdaAgentIdentifierHeaderKey] = extensionId
 
-	l.Info("[client:Subscribe] Subscribing using baseUrl:", c.baseUrl)
+	l.Debug("[client:Subscribe] Subscribing using baseUrl:", c.baseUrl)
 	resp, err := httpPutWithHeaders(ctx, c.httpClient, c.baseUrl, data, &headers)
 	if err != nil {
 		l.Error("[client:Subscribe] Subscription failed:", err)
@@ -169,7 +169,7 @@ func (c *Client) Subscribe(ctx context.Context, extensionId string, listenerUri 
 	}
 
 	body, _ := io.ReadAll(resp.Body)
-	l.Info("[client:Subscribe] Subscription success:", string(body))
+	l.Debug("[client:Subscribe] Subscription success:", string(body))
 
 	return &SubscribeResponse{string(body)}, nil
 }

@@ -44,7 +44,7 @@ func listenOnAddress() string {
 // Starts the server in a goroutine where the log events will be sent
 func (s *TelemetryApiListener) Start() (string, error) {
 	address := listenOnAddress()
-	l.Info("[listener:Start] Starting on address", address)
+	l.Debug("[listener:Start] Starting on address", address)
 	s.httpServer = &http.Server{Addr: address}
 	http.HandleFunc("/", s.http_handler)
 	go func() {
@@ -53,7 +53,7 @@ func (s *TelemetryApiListener) Start() (string, error) {
 			l.Error("[listener:goroutine] Unexpected stop on Http Server:", err)
 			s.Shutdown()
 		} else {
-			l.Info("[listener:goroutine] Http Server closed:", err)
+			l.Debug("[listener:goroutine] Http Server closed:", err)
 		}
 	}()
 	return fmt.Sprintf("http://%s/", address), nil
@@ -79,7 +79,7 @@ func (s *TelemetryApiListener) http_handler(w http.ResponseWriter, r *http.Reque
 		s.LogEventsQueue.Put(el)
 	}
 
-	l.Info("[listener:http_handler] logEvents received:", len(slice), " LogEventsQueue length:", s.LogEventsQueue.Len())
+	l.Debug("[listener:http_handler] logEvents received:", len(slice), " LogEventsQueue length:", s.LogEventsQueue.Len())
 	slice = nil
 }
 

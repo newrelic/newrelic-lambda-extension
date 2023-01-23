@@ -42,7 +42,7 @@ func NewDispatcher(functionName string, config *agentTelemetry.Config, ctx conte
 
 func (d *Dispatcher) Dispatch(ctx context.Context, logEventsQueue *queue.Queue, force bool) {
 	if !logEventsQueue.Empty() && (force || logEventsQueue.Len() >= d.minBatchSize) {
-		l.Info("[dispatcher:Dispatch] Dispatching ", logEventsQueue.Len(), " log events")
+		l.Debug("[dispatcher:Dispatch] Dispatching ", logEventsQueue.Len(), " log events")
 		logEntries, _ := logEventsQueue.Get(logEventsQueue.Len())
 
 		err := sendDataToNR(ctx, logEntries, d, d.accountID)

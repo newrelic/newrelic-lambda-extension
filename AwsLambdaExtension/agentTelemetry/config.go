@@ -28,7 +28,6 @@ const (
 	defaultTelemtryAPIBatchSize   = 1
 
 	// Optional Environment variables that can be used to talior the user experience to your needs
-	telemetryApiEnabledVariable  = "NEW_RELIC_TELEMETRY_API_EXTENSION_ENABLED"
 	agentDataEnabledVariable     = "NEW_RELIC_EXTENSION_AGENT_DATA_COLLECTION_ENABLED"
 	agentDataBatchSizeVariable   = "NEW_RELIC_EXTENSION_AGENT_DATA_BATCH_SIZE"
 	clientRetryTimeoutVariable   = "NEW_RELIC_EXTENSION_DATA_COLLECTION_TIMEOUT"
@@ -39,14 +38,6 @@ const (
 )
 
 func GetConfig() Config {
-	// Check if extension is disabled
-	// Default: true
-	enabled := os.Getenv(telemetryApiEnabledVariable)
-	if strings.ToLower(enabled) == "false" {
-		l.Warnf("[config] Lambda Extension is disabled")
-		os.Exit(0) // exits if disabled in env
-	}
-
 	// Set Defaults
 	conf := Config{
 		CollectAgentData:        true,
@@ -94,9 +85,11 @@ func GetConfig() Config {
 		}
 	}
 
-	logLevel := os.Getenv(extensionLogLevelVariable)
-	if strings.ToLower(logLevel) == "debug" {
+	logLevel := strings.ToLower(os.Getenv(extensionLogLevelVariable))
+	if logLevel == "debug" {
 		conf.LogLevel = log.DebugLevel
+	} else if logLevel == "error" {
+		conf.LogLevel = log.ErrorLevel
 	}
 
 	return conf

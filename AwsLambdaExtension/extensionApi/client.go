@@ -83,7 +83,7 @@ func (e *Client) Register(ctx context.Context, extensionName string) (string, er
 	const action = "/register"
 	url := e.baseUrl + action
 
-	l.Info("[client:Register] Registering using baseURL", e.baseUrl)
+	l.Debug("[client:Register] Registering using baseURL", e.baseUrl)
 	reqBody, err := json.Marshal(map[string]interface{}{
 		"events": []EventType{Invoke, Shutdown},
 	})
@@ -122,7 +122,7 @@ func (e *Client) Register(ctx context.Context, extensionName string) (string, er
 
 	e.functionName = res.FunctionName
 	e.ExtensionID = httpRes.Header.Get(extensionIdentiferHeader)
-	l.Info("[client:Register] Registration success with extensionId ", e.ExtensionID)
+	l.Debug("[client:Register] Registration success with extensionId ", e.ExtensionID)
 	return e.ExtensionID, nil
 }
 

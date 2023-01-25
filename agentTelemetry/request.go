@@ -1,4 +1,4 @@
-package telemetry
+package agentTelemetry
 
 import (
 	"bytes"
@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/newrelic/newrelic-lambda-extension/util"
+	"newrelic-lambda-extension/util"
 )
 
 const (

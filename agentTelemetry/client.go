@@ -1,11 +1,11 @@
-package telemetry
+package agentTelemetry
 
 import (
 	"bytes"
 	"context"
 	"encoding/binary"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"log"
 	"net"
 	"net/http"
@@ -15,16 +15,13 @@ import (
 	crypto_rand "crypto/rand"
 	math_rand "math/rand"
 
-	"github.com/newrelic/newrelic-lambda-extension/lambda/logserver"
-
-	"github.com/newrelic/newrelic-lambda-extension/util"
+	"newrelic-lambda-extension/config"
+	"newrelic-lambda-extension/util"
 )
 
 const (
 	InfraEndpointEU string = "https://cloud-collector.eu01.nr-data.net/aws/lambda/v1"
 	InfraEndpointUS string = "https://cloud-collector.newrelic.com/aws/lambda/v1"
-	LogEndpointEU   string = "https://log-api.eu.newrelic.com/log/v1"
-	LogEndpointUS   string = "https://log-api.newrelic.com/log/v1"
 
 	// WIP (configuration options?)
 	SendTimeoutRetryBase  time.Duration = 200 * time.Millisecond
@@ -38,15 +35,14 @@ type Client struct {
 	timeout           time.Duration
 	licenseKey        string
 	telemetryEndpoint string
-	logEndpoint       string
 	functionName      string
 	collectTraceID    bool
 }
 
 // New creates a telemetry client with sensible defaults
-func New(functionName string, licenseKey string, telemetryEndpointOverride string, logEndpointOverride string, batch *Batch, collectTraceID bool, clientTimeout time.Duration) *Client {
+func New(conf config.Config, batch *Batch, collectTraceID bool) *Client {
 	httpClient := &http.Client{
-		Timeout: 2400 * time.Millisecond,
+		Timeout: 2400 * time.Millisecond, //TODO: make this much lower once collector repaired
 	}
 
 	// Create random seed for timeout to avoid instances created at the same time
@@ -54,22 +50,20 @@ func New(functionName string, licenseKey string, telemetryEndpointOverride strin
 	var b [8]byte
 	_, err := crypto_rand.Read(b[:])
 	if err != nil {
-		log.Fatal("cannot seed math/rand package with cryptographically secure random number generator")
+		log.Fatal("[New Client] cannot seed math/rand package with cryptographically secure random number generator")
 	}
 	math_rand.Seed(int64(binary.LittleEndian.Uint64(b[:])))
 
-	return NewWithHTTPClient(httpClient, functionName, licenseKey, telemetryEndpointOverride, logEndpointOverride, batch, collectTraceID, clientTimeout)
+	return NewWithHTTPClient(httpClient, conf.ExtensionName, conf.LicenseKey, conf.AgentTelemetryRegion, batch, collectTraceID, conf.DataCollectionTimeout)
 }
 
 // NewWithHTTPClient is just like New, but the HTTP client can be overridden
-func NewWithHTTPClient(httpClient *http.Client, functionName string, licenseKey string, telemetryEndpointOverride string, logEndpointOverride string, batch *Batch, collectTraceID bool, clientTimeout time.Duration) *Client {
+func NewWithHTTPClient(httpClient *http.Client, functionName string, licenseKey string, telemetryEndpointOverride string, batch *Batch, collectTraceID bool, clientTimeout time.Duration) *Client {
 	telemetryEndpoint := getInfraEndpointURL(licenseKey, telemetryEndpointOverride)
-	logEndpoint := getLogEndpointURL(licenseKey, logEndpointOverride)
 	return &Client{
 		httpClient:        httpClient,
 		licenseKey:        licenseKey,
 		telemetryEndpoint: telemetryEndpoint,
-		logEndpoint:       logEndpoint,
 		functionName:      functionName,
 		batch:             batch,
 		collectTraceID:    collectTraceID,
@@ -90,20 +84,8 @@ func getInfraEndpointURL(licenseKey string, telemetryEndpointOverride string) st
 	return InfraEndpointUS
 }
 
-// getLogEndpointURL returns the Vortex endpoint for the provided license key
-func getLogEndpointURL(licenseKey string, logEndpointOverride string) string {
-	if logEndpointOverride != "" {
-		return logEndpointOverride
-	}
-
-	if strings.HasPrefix(licenseKey, "eu") {
-		return LogEndpointEU
-	}
-
-	return LogEndpointUS
-}
-
-func (c *Client) SendTelemetry(ctx context.Context, invokedFunctionARN string, telemetry [][]byte) (error, int) {
+// SendTelemetry attempts to send telemetry data to new relic and returns an error and a succesful payload count
+func (c *Client) SendTelemetry(ctx context.Context, invokedFunctionARN string, telemetry [][]byte) (int, error) {
 	start := time.Now()
 	logEvents := make([]LogsEvent, 0, len(telemetry))
 	for _, payload := range telemetry {
@@ -113,7 +95,7 @@ func (c *Client) SendTelemetry(ctx context.Context, invokedFunctionARN string, t
 
 	compressedPayloads, err := CompressedPayloadsForLogEvents(logEvents, c.functionName, invokedFunctionARN)
 	if err != nil {
-		return err, 0
+		return 0, err
 	}
 
 	var builder requestBuilder = func(buffer *bytes.Buffer) (*http.Request, error) {
@@ -125,8 +107,8 @@ func (c *Client) SendTelemetry(ctx context.Context, invokedFunctionARN string, t
 	end := time.Now()
 	totalTime := end.Sub(start)
 	transmissionTime := end.Sub(transmitStart)
-	util.Logf(
-		"Sent %d/%d New Relic payload batches with %d log events successfully in %.3fms (%dms to transmit %.1fkB).\n",
+	l.Infof(
+		"[SendTelemetry] Sent %d/%d New Relic payload batches with %d log events successfully in %.3fms (%dms to transmit %.1fkB).\n",
 		successCount,
 		len(compressedPayloads),
 		len(telemetry),
@@ -135,7 +117,7 @@ func (c *Client) SendTelemetry(ctx context.Context, invokedFunctionARN string, t
 		float64(sentBytes)/1024.0,
 	)
 
-	return nil, successCount
+	return successCount, nil
 }
 
 type requestBuilder func(buffer *bytes.Buffer) (*http.Request, error)
@@ -157,17 +139,17 @@ func (c *Client) sendPayloads(compressedPayloads []*bytes.Buffer, builder reques
 
 		select {
 		case <-timer.C:
-			response.Error = fmt.Errorf("failed to send data within user defined timeout period: %s", c.timeout.String())
+			response.Error = fmt.Errorf("[sendPayloads] failed to send data within user defined timeout period: %s", c.timeout.String())
 			quit <- true
 		case response = <-data:
 			timer.Stop()
 		}
 
 		if response.Error != nil {
-			util.Logf("Telemetry client error: %s", response.Error)
+			l.Infof("[sendPayloads] Telemetry client error: %s", response.Error)
 			sentBytes -= p.Len()
 		} else if response.Response.StatusCode >= 300 {
-			util.Logf("Telemetry client response: [%s] %s", response.Response.Status, response.ResponseBody)
+			l.Infof("[sendPayloads] Telemetry client response: [%s] %s", response.Response.Status, response.ResponseBody)
 		} else {
 			successCount += 1
 		}
@@ -206,7 +188,7 @@ func (c *Client) attemptSend(currentPayloadBytes []byte, builder requestBuilder,
 				// Success. Process response and exit retry loop
 				defer util.Close(res.Body)
 
-				bodyBytes, err := ioutil.ReadAll(res.Body)
+				bodyBytes, err := io.ReadAll(res.Body)
 				if err != nil {
 					dataChan <- AttemptData{
 						Error: err,
@@ -225,7 +207,7 @@ func (c *Client) attemptSend(currentPayloadBytes []byte, builder requestBuilder,
 
 			// if error is http timeout, retry
 			if err, ok := err.(net.Error); ok && err.Timeout() {
-				util.Debugln("Retrying after timeout", err)
+				l.Debug("[attemptSend] Retrying after timeout", err)
 				time.Sleep(baseSleepTime + time.Duration(math_rand.Intn(400)))
 
 				// double wait time after 3 timed out attempts
@@ -244,64 +226,4 @@ func (c *Client) attemptSend(currentPayloadBytes []byte, builder requestBuilder,
 			}
 		}
 	}
-}
-
-func (c *Client) SendFunctionLogs(ctx context.Context, invokedFunctionARN string, lines []logserver.LogLine) error {
-	start := time.Now()
-
-	common := map[string]interface{}{
-		"plugin":    util.Id,
-		"faas.arn":  invokedFunctionARN,
-		"faas.name": c.functionName,
-	}
-
-	logMessages := make([]FunctionLogMessage, 0, len(lines))
-	for _, l := range lines {
-		// Unix time in ms
-		ts := l.Time.UnixNano() / 1e6
-		var traceId string
-		if c.batch != nil && c.collectTraceID {
-			// There is a race condition here. Telemetry batch may be late, so the trace
-			// ID would be blank. This would require a lock to handle, which would delay
-			// logs being sent. Not sure if worth the performance hit yet.
-			traceId = c.batch.RetrieveTraceID(l.RequestID)
-		}
-		logMessages = append(logMessages, NewFunctionLogMessage(ts, l.RequestID, traceId, string(l.Content)))
-		util.Debugf("Sending function logs for request %s", l.RequestID)
-	}
-	// The Log API expects an array
-	logData := []DetailedFunctionLog{NewDetailedFunctionLog(common, logMessages)}
-
-	// Since the Log API won't send us more than 1MB, we shouldn't have any issues with payload size.
-	compressedPayload, err := CompressedJsonPayload(logData)
-	if err != nil {
-		return err
-	}
-	compressedPayloads := []*bytes.Buffer{compressedPayload}
-
-	var builder requestBuilder = func(buffer *bytes.Buffer) (*http.Request, error) {
-		req, err := BuildVortexRequest(ctx, c.logEndpoint, buffer, util.Name, c.licenseKey)
-		if err != nil {
-			return nil, err
-		}
-
-		req.Header.Add("X-Event-Source", "logs")
-		return req, err
-	}
-
-	transmitStart := time.Now()
-	successCount, sentBytes := c.sendPayloads(compressedPayloads, builder)
-	end := time.Now()
-	totalTime := end.Sub(start)
-	transmissionTime := end.Sub(transmitStart)
-	util.Logf(
-		"Sent %d/%d New Relic function log batches successfully in %.3fms (%dms to transmit %.1fkB).\n",
-		successCount,
-		len(compressedPayloads),
-		float64(totalTime.Microseconds())/1000.0,
-		transmissionTime.Milliseconds(),
-		float64(sentBytes)/1024.0,
-	)
-
-	return nil
 }

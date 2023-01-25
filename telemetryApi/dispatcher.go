@@ -3,10 +3,11 @@ package telemetryApi
 import (
 	"context"
 	"net/http"
-	"newrelic-lambda-extension/AwsLambdaExtension/agentTelemetry"
 	"os"
 
 	"github.com/golang-collections/go-datastructures/queue"
+
+	"newrelic-lambda-extension/config"
 )
 
 type Dispatcher struct {
@@ -17,7 +18,7 @@ type Dispatcher struct {
 	functionName string
 }
 
-func NewDispatcher(functionName string, config *agentTelemetry.Config, ctx context.Context, batchSize int64) *Dispatcher {
+func NewDispatcher(functionName string, config *config.Config, ctx context.Context, batchSize int64) *Dispatcher {
 	var licenseKey string
 	licenseKey = os.Getenv("NEW_RELIC_LICENSE_KEY")
 	if len(licenseKey) == 0 {

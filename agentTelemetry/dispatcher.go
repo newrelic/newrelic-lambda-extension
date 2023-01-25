@@ -2,7 +2,8 @@ package agentTelemetry
 
 import (
 	"context"
-	"newrelic-lambda-extension/AwsLambdaExtension/extensionApi"
+	"newrelic-lambda-extension/extensionApi"
+	"newrelic-lambda-extension/config"
 	"time"
 )
 
@@ -14,7 +15,7 @@ type AgentTelemetryDispatcher struct {
 }
 
 // NewDispatcher creates a new dispatcher object to manage the collection and sending of New Relic Agent data
-func NewDispatcher(conf Config) *AgentTelemetryDispatcher {
+func NewDispatcher(conf config.Config) *AgentTelemetryDispatcher {
 	batch := NewBatch(conf.AgentTelemetryBatchSize, false, conf.LogLevel)
 	telemetryClient := New(conf, batch, true)
 	telemetryChan, err := InitTelemetryChannel()
@@ -30,8 +31,8 @@ func NewDispatcher(conf Config) *AgentTelemetryDispatcher {
 	}
 }
 
-// AddInvocation creats a place to store agent telemetry data for the current invocation
-func (disp *AgentTelemetryDispatcher) AddRequest(res *extensionApi.NextEventResponse) {
+// AddEvent creats a place to store agent telemetry data for the current AWS Event
+func (disp *AgentTelemetryDispatcher) AddEvent(res *extensionApi.NextEventResponse) {
 	disp.batch.AddInvocation(res.RequestID, time.Now())
 }
 

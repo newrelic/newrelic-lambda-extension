@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+
 	"github.com/newrelic/go-agent/v3/integrations/nrlambda"
 	"github.com/newrelic/go-agent/v3/newrelic"
 )

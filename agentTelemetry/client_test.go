@@ -10,7 +10,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/newrelic/newrelic-lambda-extension/util"
+	"newrelic-lambda-extension/config"
+	"newrelic-lambda-extension/util"
+
 	"github.com/stretchr/testify/assert"
 )
 
@@ -29,7 +31,7 @@ func TestClientSend(t *testing.T) {
 
 		reqBytes, err := io.ReadAll(r.Body)
 		assert.NoError(t, err)
-		defer util.Close(r.Body)
+		defer Close(r.Body)
 		assert.NotEmpty(t, reqBytes)
 
 		reqBody, err := util.Uncompress(reqBytes)
@@ -55,7 +57,7 @@ func TestClientSend(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, 1, successCount)
 
-	conf := Config{
+	conf := config.Config{
 		DataCollectionTimeout: clientTestingTimeout,
 		ExtensionName:         "",
 		LicenseKey:            "mock license key",
@@ -83,7 +85,7 @@ func TestClientSendRetry(t *testing.T) {
 
 			reqBytes, err := io.ReadAll(r.Body)
 			assert.NoError(t, err)
-			defer util.Close(r.Body)
+			defer Close(r.Body)
 			assert.NotEmpty(t, reqBytes)
 
 			reqBody, err := util.Uncompress(reqBytes)

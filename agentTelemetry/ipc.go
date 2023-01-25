@@ -1,12 +1,9 @@
-package telemetry
+package agentTelemetry
 
 import (
-	"io/ioutil"
-	"log"
+	"io"
 	"os"
 	"syscall"
-
-	"github.com/newrelic/newrelic-lambda-extension/util"
 )
 
 const telemetryNamedPipePath = "/tmp/newrelic-telemetry"
@@ -19,7 +16,8 @@ func InitTelemetryChannel() (chan []byte, error) {
 		return nil, err
 	}
 
-	telemetryChan := make(chan []byte)
+	// buffer channel to avoid deadlocks
+	telemetryChan := make(chan []byte, 5)
 
 	go func() {
 		for {
@@ -34,15 +32,20 @@ func pollForTelemetry() []byte {
 	// Opening a pipe will block, until the write side has been opened as well
 	telemetryPipe, err := os.OpenFile(telemetryNamedPipePath, os.O_RDONLY, 0)
 	if err != nil {
-		log.Panic("failed to open telemetry pipe", err)
+		l.Fatal("[pollForTelemetry] failed to open telemetry pipe", err)
 	}
 
-	defer util.Close(telemetryPipe)
+	defer func(telemetryPipe *os.File) {
+		err := telemetryPipe.Close()
+		if err != nil {
+			l.Warn(err)
+		}
+	}(telemetryPipe)
 
 	// When the write side closes, we get an EOF.
-	bytes, err := ioutil.ReadAll(telemetryPipe)
+	bytes, err := io.ReadAll(telemetryPipe)
 	if err != nil {
-		log.Panic("failed to read telemetry pipe", err)
+		l.Fatal("[pollForTelemetry] failed to read telemetry pipe", err)
 	}
 
 	return bytes

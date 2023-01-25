@@ -1,4 +1,4 @@
-package telemetry
+package agentTelemetry
 
 import (
 	"encoding/base64"
@@ -73,7 +73,7 @@ func TestExtractTraceIDInvalid(t *testing.T) {
 	assert.Empty(t, traceId)
 
 	payload2 := []byte("[foobar]")
-	payload2 = []byte(base64.StdEncoding.EncodeToString(payload))
+	payload2 = []byte(base64.StdEncoding.EncodeToString(payload2))
 
 	traceId, err = ExtractTraceID(payload2)
 

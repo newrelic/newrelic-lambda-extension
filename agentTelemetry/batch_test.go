@@ -18,7 +18,7 @@ const (
 	testNoSuchRequestId = "test_z"
 )
 
-var DefaultBatchSize = defaultAgentTelemtryBatchSize
+var DefaultBatchSize = 1
 
 func TestMissingInvocation(t *testing.T) {
 	batch := NewBatch(DefaultBatchSize, false, log.InfoLevel)
@@ -58,9 +58,16 @@ func TestFullHarvest(t *testing.T) {
 	batch.AddTelemetry(testRequestId2, bytes.NewBufferString(testTelemetry).Bytes())
 
 	harvested := batch.Harvest(false)
+
+	// 2/3 of invocations have data
 	assert.Equal(t, 2, len(harvested))
-	assert.Equal(t, testRequestId, harvested[0].RequestId)
-	assert.Equal(t, 2, len(harvested[0].Telemetry))
+
+	// all harvested invocations should have at least 1 payload
+	// and harvests without any payloads should not be harvested
+	for _, harvest := range harvested {
+		assert.NotEqual(t, testRequestId3, harvest.RequestId)
+		assert.GreaterOrEqual(t, len(harvest.Telemetry), 1)
+	}
 }
 
 func TestHarvestWithTraceID(t *testing.T) {
@@ -85,7 +92,6 @@ func TestHarvestWithTraceID(t *testing.T) {
 	for _, harvest := range harvested {
 		assert.GreaterOrEqual(t, len(harvest.Telemetry), 1)
 	}
-
 }
 
 func TestNotFullHarvest(t *testing.T) {

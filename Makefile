@@ -1,15 +1,15 @@
 build: clean
 	go build -o ./extensions/newrelic-lambda-extension
 
-build-arm: clean
+build-arm64: clean
 	mkdir extensions
-	env GOARCH=amd64 GOOS=linux go build -ldflags="-s -w" -o ./extensions/newrelic-lambda-extension
+	env GOARCH=arm64 GOOS=linux go build -ldflags="-s -w" -o ./extensions/newrelic-lambda-extension
 	chmod +x ./extensions/newrelic-lambda-extension
 	zip -r ./extensions/extension.zip ./extensions/
 
-build-amd64: clean
+build-x86_64: clean
 	mkdir extensions
-	env GOARCH=arm64 GOOS=linux go build -ldflags="-s -w" -o ./extensions/newrelic-lambda-extension
+	env GOARCH=amd64 GOOS=linux go build -ldflags="-s -w" -o ./extensions/newrelic-lambda-extension
 	chmod +x ./extensions/newrelic-lambda-extension
 	zip -r ./extensions/extension.zip ./extensions/
 

@@ -12,7 +12,7 @@ The New Relic Telemetry API Extension collects telemetry data from both AWS Lamb
 | NEW_RELIC_EXTENSION_TELEMETRY_API_BATCH_SIZE | optional | The number of Telemetry API events and logs to batch before sending them to New Relic. If your application invokes frequently, increase this number to avoid data getting dropped and to improve performance. Default: 1 | 
 | NEW_RELIC_EXTENSION_DATA_COLLECTION_TIMEOUT |  optional | A valid time.Duration string for how long the extension should wait to attempt to send agent data to New Relic in the event of a timeout/retry loop scenario. Example: 1s, 1500ms; Default: 10s |
 | NEW_RELIC_EXTENSION_COLLECTOR_OVERRIDE | optional | An override for the New Relic collection endpoint you want to send data to. By default, this will be detected based on the region of your New Relic license key. |
-| NEW_RELIC_EXTENSION_LOG_LEVEL | optional | The log level of the New Relic Telemetry API Extension. For more verbose logs, set to "debug". For error logs only, set to "error". |
+| NEW_RELIC_EXTENSION_LOG_LEVEL | optional | The log level of the New Relic Telemetry API Extension. For more verbose logs, set to "debug". To log only warnings and errors, set it to "warn". For Advanced troubleshooting, set to "trace". Note that debug and trace log levels will cause a significant increase in log lines to print and be saved to cloudwatch. |
 
 ## Installation
 

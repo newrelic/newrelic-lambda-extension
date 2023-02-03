@@ -2,8 +2,9 @@ package agentTelemetry
 
 import (
 	"context"
-	"newrelic-lambda-extension/extensionApi"
+	"encoding/base64"
 	"newrelic-lambda-extension/config"
+	"newrelic-lambda-extension/extensionApi"
 	"time"
 )
 
@@ -20,7 +21,7 @@ func NewDispatcher(conf config.Config) *AgentTelemetryDispatcher {
 	telemetryClient := New(conf, batch, true)
 	telemetryChan, err := InitTelemetryChannel()
 	if err != nil {
-		l.Fatalf("[main] agent telemetry dispatcher failed to create telemetry channel: %v", err)
+		l.Fatalf("[agentTelemetry] agent telemetry dispatcher failed to create telemetry channel: %v", err)
 	}
 
 	return &AgentTelemetryDispatcher{
@@ -31,26 +32,25 @@ func NewDispatcher(conf config.Config) *AgentTelemetryDispatcher {
 	}
 }
 
-// AddEvent creats a place to store agent telemetry data for the current AWS Event
-func (disp *AgentTelemetryDispatcher) AddEvent(res *extensionApi.NextEventResponse) {
-	disp.batch.AddInvocation(res.RequestID, time.Now())
-}
-
 // Dispatch collects agent data and attempts to send it if appropriate
 // If force = true, collect and send data no matter what
 func (disp *AgentTelemetryDispatcher) Dispatch(ctx context.Context, res *extensionApi.NextEventResponse, force bool) {
-
 	// Fetch and Batch latest agent telemetry if possible
 	select {
 	case telemetryBytes := <-disp.telemetryChan:
-		// empty channel to avoid deadlocks but drop data
 		if !disp.collectData {
 			return
 		}
 
-		l.Debugf("[main] Got %d bytes of Agent Telemetry", len(telemetryBytes))
+		l.Debugf("[agentTelemetry] Agent telemetry bytes: %s", base64.URLEncoding.EncodeToString(telemetryBytes))
+		if !disp.batch.HasInvocation(res.RequestID) {
+			disp.batch.AddInvocation(res.RequestID, time.Now())
+		}
 		disp.batch.AddTelemetry(res.RequestID, telemetryBytes)
 	default:
+		if !disp.collectData {
+			return
+		}
 	}
 
 	// Harvest and Send agent Data to New Relic
@@ -67,7 +67,7 @@ func (disp *AgentTelemetryDispatcher) Dispatch(ctx context.Context, res *extensi
 // harvests and sends agent telemetry to New Relic
 func harvestAgentTelemetry(ctx context.Context, harvested []*Invocation, telemetryClient *Client, functionARN string) {
 	if len(harvested) > 0 {
-		l.Debugf("[main] sending agent harvest with %d invocations", len(harvested))
+		l.Debugf("[agentTelemetry] sending agent harvest with %d invocations", len(harvested))
 		telemetrySlice := make([][]byte, 0, 2*len(harvested))
 		for _, inv := range harvested {
 			telemetrySlice = append(telemetrySlice, inv.Telemetry...)
@@ -75,7 +75,7 @@ func harvestAgentTelemetry(ctx context.Context, harvested []*Invocation, telemet
 
 		numSuccessful, err := telemetryClient.SendTelemetry(ctx, functionARN, telemetrySlice)
 		if err != nil {
-			l.Errorf("[main] failed to send harvested telemetry for %d invocations %v", len(harvested)-numSuccessful, err)
+			l.Errorf("[agentTelemetry] failed to send harvested telemetry for %d invocations %v", len(harvested)-numSuccessful, err)
 		}
 	}
 }

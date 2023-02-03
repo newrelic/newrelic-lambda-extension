@@ -17,7 +17,7 @@ func InitTelemetryChannel() (chan []byte, error) {
 	}
 
 	// buffer channel to avoid deadlocks
-	telemetryChan := make(chan []byte, 5)
+	telemetryChan := make(chan []byte)
 
 	go func() {
 		for {

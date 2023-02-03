@@ -40,6 +40,12 @@ func (b *Batch) AddInvocation(requestID string, start time.Time) {
 	b.invocations[requestID] = &invocation
 }
 
+// HasInvocation checks if an invocation has been created for this request ID
+func (b *Batch) HasInvocation(requestID string) bool {
+	_, ok := b.invocations[requestID]
+	return ok
+}
+
 // AddTelemetry attaches telemetry to an existing Invocation, identified by requestId
 func (b *Batch) AddTelemetry(requestId string, telemetry []byte) *Invocation {
 	inv, ok := b.invocations[requestId]

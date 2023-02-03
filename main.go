@@ -13,6 +13,7 @@ import (
 	"newrelic-lambda-extension/config"
 	"newrelic-lambda-extension/extensionApi"
 	"newrelic-lambda-extension/telemetryApi"
+	"newrelic-lambda-extension/util"
 
 	"os"
 	"os/signal"
@@ -33,7 +34,7 @@ func main() {
 		DisableTimestamp: true,
 	})
 
-	l.Info("[main] Starting the New Relic Telemetry API extension")
+	l.Infof("[main] Starting the New Relic Telemetry API extension version %s", util.Version)
 	ctx, cancel := context.WithCancel(context.Background())
 	sigs := make(chan os.Signal, 1)
 	signal.Notify(sigs, syscall.SIGTERM, syscall.SIGINT)
@@ -79,6 +80,7 @@ func main() {
 
 	// Set up new relic agent telemetry dispatcher
 	agentDispatcher := agentTelemetry.NewDispatcher(conf)
+	//	entityManager := util.NewLambdaEntityManager(conf.AccountID)
 
 	l.Info("[main] New Relic Telemetry API Extension succesfully registered and subscribed")
 
@@ -97,11 +99,11 @@ func main() {
 				return
 			}
 			l.Debugf("[main] Received event %+v", res)
+			//entityGUID := entityManager.GenerateGUID(res.InvokedFunctionArn)
 
 			// Dispatching log events from previous invocations
-			agentDispatcher.AddEvent(res)
-			dispatcher.Dispatch(ctx, telemetryListener.LogEventsQueue, false)
 			agentDispatcher.Dispatch(ctx, res, false)
+			dispatcher.Dispatch(ctx, telemetryListener.LogEventsQueue, res, conf.AccountID, false)
 
 			if res.EventType == extensionApi.Invoke {
 				l.Debug("[handleInvoke]")
@@ -109,7 +111,7 @@ func main() {
 			} else if res.EventType == extensionApi.Shutdown {
 				// force dispatch all remaining telemetry, handle shutdown
 				l.Debug("[handleShutdown]")
-				dispatcher.Dispatch(ctx, telemetryListener.LogEventsQueue, true)
+				dispatcher.Dispatch(ctx, telemetryListener.LogEventsQueue, res, conf.AccountID, true)
 				agentDispatcher.Dispatch(ctx, res, true)
 				l.Info("[main] New Relic Telemetry API Extension successfully shut down")
 				return

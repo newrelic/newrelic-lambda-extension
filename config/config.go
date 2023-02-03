@@ -35,7 +35,9 @@ const (
 	agentTelemetryRegionVariable = "NEW_RELIC_EXTENSION_COLLECTOR_OVERRIDE"
 	extensionLogLevelVariable    = "NEW_RELIC_EXTENSION_LOG_LEVEL"
 	telAPIBatchSizeVariable      = "NEW_RELIC_EXTENSION_TELEMETRY_API_BATCH_SIZE"
-	NrAccountIDVariable          = "NEW_RELIC_ACCOUNT_ID"
+
+	// Required environment variable
+	nrAccountIDVariable = "NEW_RELIC_ACCOUNT_ID"
 )
 
 var l = log.WithFields(log.Fields{"pkg": "config"})
@@ -54,8 +56,11 @@ func defaultConfig() Config {
 
 func GetConfig() Config {
 	conf := defaultConfig()
+	conf.AccountID = os.Getenv(nrAccountIDVariable)
+	if conf.AccountID == "" {
+		l.Errorf("environment variable \"%s\" must be set to the ID of the New Relic account matching your license key", nrAccountIDVariable)
+	}
 
-	conf.AccountID = os.Getenv("NEW_RELIC_ACCOUNT_ID")
 	conf.AgentTelemetryRegion = os.Getenv(agentTelemetryRegionVariable)
 
 	// Enable or disable collection of agent telemetry data
@@ -79,12 +84,15 @@ func GetConfig() Config {
 		}
 	}
 
-	telApiBatchSize, err := strconv.ParseInt(os.Getenv(telAPIBatchSizeVariable), 0, 16)
-	if err != nil {
-		environmentVariableError(telAPIBatchSizeVariable, err)
-		l.Warnf("telemetry api batch size will be set to default value: %d", telApiBatchSize)
-	} else {
-		conf.TelemetryAPIBatchSize = telApiBatchSize
+	telApiBatchSizeStr := os.Getenv(telAPIBatchSizeVariable)
+	if telApiBatchSizeStr != "" {
+		telApiBatchSize, err := strconv.ParseInt(telApiBatchSizeStr, 0, 16)
+		if err != nil {
+			environmentVariableError(telAPIBatchSizeVariable, err)
+			l.Warnf("telemetry api batch size will be set to default value: %d", defaultTelemtryAPIBatchSize)
+		} else {
+			conf.TelemetryAPIBatchSize = telApiBatchSize
+		}
 	}
 
 	buffer := os.Getenv(agentDataBatchSizeVariable)
@@ -100,12 +108,14 @@ func GetConfig() Config {
 
 	logLevel := strings.ToLower(os.Getenv(extensionLogLevelVariable))
 	switch logLevel {
+	case "trace":
+		conf.LogLevel = log.TraceLevel
 	case "debug":
 		conf.LogLevel = log.DebugLevel
-	case "warn":
-		conf.LogLevel = log.WarnLevel
 	case "info":
 		conf.LogLevel = log.InfoLevel
+	case "warn":
+		conf.LogLevel = log.WarnLevel
 	}
 
 	return conf

@@ -17,9 +17,9 @@ import (
 	"github.com/aws/aws-sdk-go/service/secretsmanager/secretsmanageriface"
 
 	"github.com/google/uuid"
-)
 
-const EXTENSION_LAMBDA_VERSION = "1.0"
+	"newrelic-lambda-extension/util"
+)
 
 const (
 	LogEndpointEU string = "https://log-api.eu.newrelic.com/log/v1"
@@ -70,6 +70,7 @@ func getNewRelicLicenseKey(ctx context.Context) (string, error) {
 	if len(v) > 0 {
 		sId = v
 	}
+	l.Debugf("fetching secret with name or ARN: %s", sId)
 	secretValueInput := secretsmanager.GetSecretValueInput{SecretId: &sId}
 	secretValueOutput, err := secrets.GetSecretValueWithContext(ctx, &secretValueInput)
 	if err != nil {
@@ -128,10 +129,10 @@ func sendBatch(ctx context.Context, d *Dispatcher, uri string, bodyBytes []byte)
 	return err
 }
 
-func sendDataToNR(ctx context.Context, logEntries []interface{}, d *Dispatcher, accountID string) error {
-
+func sendDataToNR(ctx context.Context, logEntries []interface{}, d *Dispatcher, RequestID string) error {
+	startBuild := time.Now()
 	var lambda_name = d.functionName
-	var agent_name = path.Base(os.Args[0])
+	var extension_name = path.Base(os.Args[0])
 
 	// NB "." is not allowed in NR eventType
 	var replacer = strings.NewReplacer(".", "_")
@@ -150,11 +151,18 @@ func sendDataToNR(ctx context.Context, logEntries []interface{}, d *Dispatcher, 
 		}
 		// events
 		data["events"] = append(data["events"], map[string]interface{}{
-			"timestamp":            msInt.UnixMilli(),
-			"eventType":            "AwsLambdaExtension",
-			"extension.name":       agent_name,
-			"extension.version":    EXTENSION_LAMBDA_VERSION,
+			"timestamp": msInt.UnixMilli(),
+			"plugin":    util.Id,
+			"faas": map[string]string{
+				"arn":  d.arn,
+				"name": d.functionName,
+			},
+			"entity.name":          lambda_name,
+			"extension.name":       extension_name,
+			"extension.version":    util.Version,
 			"lambda.name":          lambda_name,
+			"aws.lambda.arn":       d.arn,
+			"aws.requestId":        RequestID,
 			"lambda.logevent.type": replacer.Replace(event.(LambdaTelemetryEvent).Type),
 		})
 		// logs
@@ -162,13 +170,22 @@ func sendDataToNR(ctx context.Context, logEntries []interface{}, d *Dispatcher, 
 			data["logging"] = append(data["logging"], map[string]interface{}{
 				"timestamp": msInt.UnixMilli(),
 				"message":   event.(LambdaTelemetryEvent).Record,
-				"attributes": map[string]map[string]string{
-					"plugin": {"type": "lambda extension"},
-					"aws": {
+				"attributes": map[string]interface{}{
+					"plugin": util.Id,
+					"faas": map[string]string{
+						"arn":  d.arn,
+						"name": d.functionName,
+					},
+					"aws": map[string]string{
 						"lambda.logevent.type": event.(LambdaTelemetryEvent).Type,
-						"extension.name":       agent_name,
-						"extension.version":    EXTENSION_LAMBDA_VERSION,
+						"extension.name":       extension_name,
+						"extension.version":    util.Version,
 						"lambda.name":          lambda_name,
+						"lambda.arn":           d.arn,
+						"requestId":            RequestID,
+					},
+					"entity": map[string]string{
+						"name": lambda_name,
 					},
 				},
 			})
@@ -187,11 +204,19 @@ func sendDataToNR(ctx context.Context, logEntries []interface{}, d *Dispatcher, 
 							"value":     val[key],
 							"timestamp": msInt.UnixMilli(),
 							"attributes": map[string]interface{}{
+								"plugin": util.Id,
+								"faas": map[string]string{
+									"arn":  d.arn,
+									"name": d.functionName,
+								},
 								"lambda.logevent.type": event.(LambdaTelemetryEvent).Type,
 								"requestId":            rid,
-								"extension.name":       agent_name,
-								"extension.version":    EXTENSION_LAMBDA_VERSION,
+								"extension.name":       extension_name,
+								"extension.version":    util.Version,
 								"lambda.name":          lambda_name,
+								"aws.lambda.arn":       d.arn,
+								"aws.requestId":        RequestID,
+								"entity.name":          lambda_name,
 							},
 						})
 					}
@@ -201,7 +226,7 @@ func sendDataToNR(ctx context.Context, logEntries []interface{}, d *Dispatcher, 
 					for _, span := range val {
 						attributes := make(map[string]interface{})
 						attributes["event"] = event.(LambdaTelemetryEvent).Type
-						attributes["service.name"] = agent_name
+						attributes["service.name"] = extension_name
 						var start time.Time
 						for key, v := range span.(map[string]interface{}) {
 							if key == "durationMs" {
@@ -227,18 +252,27 @@ func sendDataToNR(ctx context.Context, logEntries []interface{}, d *Dispatcher, 
 			}
 		}
 	}
+
+	l.Debugf("[send to new relic] telemetry api payloads marshalled in: %s", time.Since(startBuild).String())
 	// data ready
 	if len(data) > 0 {
 		// send logs
 		if len(data["logging"]) > 0 {
+			l.Tracef("[send to new relic] sending %d logs", len(data["logging"]))
+			startMarshal := time.Now()
 			bodyBytes, _ := json.Marshal(data["logging"])
+			l.Tracef("[send to new relic] took %s to build logging json", time.Since(startMarshal).String())
+
+			startSend := time.Now()
 			er := sendBatch(ctx, d, getEndpointURL(d.licenseKey, "logging", ""), bodyBytes)
+			l.Tracef("[send to new relic] took %s to send logging json", time.Since(startSend).String())
 			if er != nil {
 				return er
 			}
 		}
 		// send metrics
 		if len(data["metrics"]) > 0 {
+			l.Tracef("[send to new relic] sending %d metrics", len(data["metrics"]))
 			var dataMet []map[string][]map[string]interface{}
 			dataMet = append(dataMet, map[string][]map[string]interface{}{
 				"metrics": data["metrics"],
@@ -251,9 +285,10 @@ func sendDataToNR(ctx context.Context, logEntries []interface{}, d *Dispatcher, 
 		}
 		// send events
 		if len(data["events"]) > 0 {
-			if len(accountID) > 0 {
+			if len(d.accountID) > 0 {
+				l.Tracef("[send to new relic] sending %d events", len(data["events"]))
 				bodyBytes, _ := json.Marshal(data["events"])
-				er := sendBatch(ctx, d, getEndpointURL(d.licenseKey, "events", "")+accountID+"/events", bodyBytes)
+				er := sendBatch(ctx, d, getEndpointURL(d.licenseKey, "events", "")+d.accountID+"/events", bodyBytes)
 				if er != nil {
 					return er
 				}
@@ -263,6 +298,7 @@ func sendDataToNR(ctx context.Context, logEntries []interface{}, d *Dispatcher, 
 		}
 		// send traces
 		if len(data["traces"]) > 0 {
+			l.Tracef("[send to new relic] sending %d traces", len(data["traces"]))
 			var dataTraces []map[string]interface{}
 			dataTraces = append(dataTraces, map[string]interface{}{
 				"common": map[string]map[string]string{

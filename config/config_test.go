@@ -100,6 +100,54 @@ func TestGetConfig(t *testing.T) {
 				acctId:     "12",
 			},
 		},
+		{
+			name: "invalid agent telemetry batch size",
+			want: func() Config {
+				return Config{
+					CollectAgentData:        false,
+					DataCollectionTimeout:   600 * time.Millisecond,
+					AgentTelemetryBatchSize: defaultAgentTelemtryBatchSize,
+					TelemetryAPIBatchSize:   8,
+					LogLevel:                log.WarnLevel,
+					AgentTelemetryRegion:    "test",
+					AccountID:               "12",
+					ExtensionName:           path.Base(os.Args[0]),
+				}
+			}(),
+			vars: envVariables{
+				agentData:  "false",
+				agentBatch: "invalid",
+				telemBatch: "8",
+				timeout:    "300ms",
+				region:     "test",
+				logLevel:   "warn",
+				acctId:     "12",
+			},
+		},
+		{
+			name: "invalid telemetry api batch size",
+			want: func() Config {
+				return Config{
+					CollectAgentData:        false,
+					DataCollectionTimeout:   600 * time.Millisecond,
+					AgentTelemetryBatchSize: 5,
+					TelemetryAPIBatchSize:   defaultTelemtryAPIBatchSize,
+					LogLevel:                log.WarnLevel,
+					AgentTelemetryRegion:    "test",
+					AccountID:               "12",
+					ExtensionName:           path.Base(os.Args[0]),
+				}
+			}(),
+			vars: envVariables{
+				agentData:  "false",
+				agentBatch: "5",
+				telemBatch: "invalid",
+				timeout:    "300ms",
+				region:     "test",
+				logLevel:   "warn",
+				acctId:     "12",
+			},
+		},
 	}
 	for _, tt := range tests {
 		os.Setenv(agentDataEnabledVariable, tt.vars.agentData)
@@ -108,7 +156,7 @@ func TestGetConfig(t *testing.T) {
 		os.Setenv(agentTelemetryRegionVariable, tt.vars.region)
 		os.Setenv(extensionLogLevelVariable, tt.vars.logLevel)
 		os.Setenv(telAPIBatchSizeVariable, tt.vars.telemBatch)
-		os.Setenv(NrAccountIDVariable, tt.vars.acctId)
+		os.Setenv(nrAccountIDVariable, tt.vars.acctId)
 
 		t.Run(tt.name, func(t *testing.T) {
 			if got := GetConfig(); !reflect.DeepEqual(got, tt.want) {
@@ -122,6 +170,6 @@ func TestGetConfig(t *testing.T) {
 		os.Unsetenv(agentTelemetryRegionVariable)
 		os.Unsetenv(extensionLogLevelVariable)
 		os.Unsetenv(telAPIBatchSizeVariable)
-		os.Unsetenv(NrAccountIDVariable)
+		os.Unsetenv(nrAccountIDVariable)
 	}
 }

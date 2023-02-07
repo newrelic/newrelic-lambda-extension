@@ -9,10 +9,12 @@ import (
 
 	"newrelic-lambda-extension/config"
 	"newrelic-lambda-extension/extensionApi"
+	"newrelic-lambda-extension/util"
 )
 
 type Dispatcher struct {
 	httpClient   *http.Client
+	compressTool *util.CompressTool
 	licenseKey   string
 	accountID    string
 	arn          string
@@ -20,10 +22,10 @@ type Dispatcher struct {
 	minBatchSize int64
 }
 
-func NewDispatcher(functionName string, config *config.Config, ctx context.Context, batchSize int64) *Dispatcher {
-	var licenseKey string
+func GetNewRelicLicenseKey(ctx context.Context) string {
+	licenseKey := os.Getenv("NEW_RELIC_LICENSE_KEY")
+
 	var err error
-	licenseKey = os.Getenv("NEW_RELIC_LICENSE_KEY")
 	if len(licenseKey) == 0 {
 		licenseKey, err = getNewRelicLicenseKey(ctx)
 		if err != nil {
@@ -34,26 +36,34 @@ func NewDispatcher(functionName string, config *config.Config, ctx context.Conte
 		l.Fatal("NEW_RELIC_LICENSE_KEY undefined or unavailable")
 	}
 
-	config.LicenseKey = licenseKey
-	config.ExtensionName = functionName
-
-	return &Dispatcher{
-		httpClient:   &http.Client{},
-		licenseKey:   licenseKey,
-		minBatchSize: batchSize,
-		accountID:    config.AccountID,
-		functionName: functionName,
-	}
-
+	return licenseKey
 }
 
-func (d *Dispatcher) Dispatch(ctx context.Context, logEventsQueue *queue.Queue, lambdaEvent *extensionApi.NextEventResponse, accountID string, force bool) {
+func NewDispatcher(config *config.Config, ctx context.Context, batchSize int64) *Dispatcher {
+	disp := &Dispatcher{
+		httpClient:   &http.Client{},
+		licenseKey:   config.LicenseKey,
+		minBatchSize: batchSize,
+		accountID:    config.AccountID,
+		functionName: config.ExtensionName,
+		compressTool: util.NewCompressTool(),
+	}
+
+	l.Tracef("Dispatcher: %+v", disp)
+	return disp
+}
+
+func (d *Dispatcher) Dispatch(ctx context.Context, logEventsQueue *queue.Queue, lambdaEvent *extensionApi.NextEventResponse, force bool) {
 	if !logEventsQueue.Empty() && (force || logEventsQueue.Len() >= d.minBatchSize) {
 		l.Debug("[dispatcher:Dispatch] Dispatching ", logEventsQueue.Len(), " log events")
 		logEntries, _ := logEventsQueue.Get(logEventsQueue.Len())
 
-		if lambdaEvent.InvokedFunctionArn != "" {
-			d.arn = lambdaEvent.InvokedFunctionArn
+		if lambdaEvent.InvokedFunctionArn != "" && lambdaEvent.InvokedFunctionArn != d.arn {
+			if len(lambdaEvent.InvokedFunctionArn) > MaxAttributeValueLen {
+				d.arn = lambdaEvent.InvokedFunctionArn[:MaxAttributeValueLen]
+			} else {
+				d.arn = lambdaEvent.InvokedFunctionArn
+			}
 		}
 
 		err := sendDataToNR(ctx, logEntries, d, lambdaEvent.RequestID)

@@ -24,6 +24,8 @@ func NewDispatcher(conf config.Config) *AgentTelemetryDispatcher {
 		l.Fatalf("[agentTelemetry] agent telemetry dispatcher failed to create telemetry channel: %v", err)
 	}
 
+	l.Tracef("[agentTelemtry] client: %+v", telemetryClient)
+
 	return &AgentTelemetryDispatcher{
 		collectData:     conf.CollectAgentData,
 		telemetryChan:   telemetryChan,
@@ -42,7 +44,7 @@ func (disp *AgentTelemetryDispatcher) Dispatch(ctx context.Context, res *extensi
 			return
 		}
 
-		l.Debugf("[agentTelemetry] Agent telemetry bytes: %s", base64.URLEncoding.EncodeToString(telemetryBytes))
+		l.Tracef("[agentTelemetry] Agent telemetry bytes: %s", base64.URLEncoding.EncodeToString(telemetryBytes))
 		if !disp.batch.HasInvocation(res.RequestID) {
 			disp.batch.AddInvocation(res.RequestID, time.Now())
 		}

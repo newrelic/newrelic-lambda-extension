@@ -32,6 +32,7 @@ const (
 type Client struct {
 	httpClient        *http.Client
 	batch             *Batch
+	compressTool      *util.CompressTool
 	timeout           time.Duration
 	licenseKey        string
 	telemetryEndpoint string
@@ -42,7 +43,7 @@ type Client struct {
 // New creates a telemetry client with sensible defaults
 func New(conf config.Config, batch *Batch, collectTraceID bool) *Client {
 	httpClient := &http.Client{
-		Timeout: 2400 * time.Millisecond, //TODO: make this much lower once collector repaired
+		Timeout: util.SendToNewRelicTimeout,
 	}
 
 	// Create random seed for timeout to avoid instances created at the same time
@@ -66,6 +67,7 @@ func NewWithHTTPClient(httpClient *http.Client, functionName string, licenseKey 
 		telemetryEndpoint: telemetryEndpoint,
 		functionName:      functionName,
 		batch:             batch,
+		compressTool:      util.NewCompressTool(),
 		collectTraceID:    collectTraceID,
 		timeout:           clientTimeout,
 	}
@@ -93,7 +95,7 @@ func (c *Client) SendTelemetry(ctx context.Context, invokedFunctionARN string, t
 		logEvents = append(logEvents, logEvent)
 	}
 
-	compressedPayloads, err := CompressedPayloadsForLogEvents(logEvents, c.functionName, invokedFunctionARN)
+	compressedPayloads, err := CompressedPayloadsForLogEvents(c.compressTool, logEvents, c.functionName, invokedFunctionARN)
 	if err != nil {
 		return 0, err
 	}
@@ -108,7 +110,7 @@ func (c *Client) SendTelemetry(ctx context.Context, invokedFunctionARN string, t
 	totalTime := end.Sub(start)
 	transmissionTime := end.Sub(transmitStart)
 	l.Infof(
-		"[SendTelemetry] Sent %d/%d New Relic payload batches successfully in %.3fms (%dms to transmit %.1fkB)",
+		"[agentTelemetry:sendTelemetry] Sent %d/%d New Relic payload batches successfully in %.3fms (%dms to transmit %.1fkB)",
 		successCount,
 		len(compressedPayloads),
 		float64(totalTime.Microseconds())/1000.0,
@@ -138,17 +140,17 @@ func (c *Client) sendPayloads(compressedPayloads []*bytes.Buffer, builder reques
 
 		select {
 		case <-timer.C:
-			response.Error = fmt.Errorf("[sendPayloads] failed to send data within user defined timeout period: %s", c.timeout.String())
+			response.Error = fmt.Errorf("[agentTelemetry:sendPayloads] failed to send data within user defined timeout period: %s", c.timeout.String())
 			quit <- true
 		case response = <-data:
 			timer.Stop()
 		}
 
 		if response.Error != nil {
-			l.Infof("[sendPayloads] Telemetry client error: %s", response.Error)
+			l.Warnf("[agentTelemetry:sendPayloads] Telemetry client error: %s", response.Error)
 			sentBytes -= p.Len()
 		} else if response.Response.StatusCode >= 300 {
-			l.Infof("[sendPayloads] Telemetry client response: [%s] %s", response.Response.Status, response.ResponseBody)
+			l.Warnf("[agentTelemetry:sendPayloads] Telemetry client response: [%s] %s", response.Response.Status, response.ResponseBody)
 		} else {
 			successCount += 1
 		}

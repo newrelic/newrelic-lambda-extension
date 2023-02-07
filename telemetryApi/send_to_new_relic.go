@@ -5,16 +5,18 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"os"
-	"path"
 	"reflect"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/secretsmanager"
 	"github.com/aws/aws-sdk-go/service/secretsmanager/secretsmanageriface"
+	"github.com/pkg/errors"
 
 	"github.com/google/uuid"
 
@@ -33,6 +35,10 @@ const (
 
 	TracesEndpointEU string = "https://trace-api.eu.newrelic.com/trace/v1"
 	TracesEndpointUS string = "https://trace-api.newrelic.com/trace/v1"
+
+	maxLogMsgLen         = 4094 + 10000 // maximum blob size
+	maxPayloadSizeBytes  = 1000000
+	MaxAttributeValueLen = 4094
 )
 
 var (
@@ -112,27 +118,9 @@ func getEndpointURL(licenseKey string, typ string, EndpointOverride string) stri
 	return ""
 }
 
-func sendBatch(ctx context.Context, d *Dispatcher, uri string, bodyBytes []byte) error {
-	req, err := http.NewRequestWithContext(ctx, "POST", uri, bytes.NewBuffer(bodyBytes))
-	if err != nil {
-		return err
-	}
-	// the headers might be different for different endpoints
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Api-Key", d.licenseKey)
-	if strings.Contains(uri, "trace") {
-		req.Header.Set("Data-Format", "newrelic")
-		req.Header.Set("Data-Format-Version", "1")
-	}
-	_, err = d.httpClient.Do(req)
-
-	return err
-}
-
-func sendDataToNR(ctx context.Context, logEntries []interface{}, d *Dispatcher, RequestID string) error {
+func buildPayloads(ctx context.Context, logEntries []interface{}, d *Dispatcher, RequestID string) (map[string][]map[string]interface{}, error) {
 	startBuild := time.Now()
-	var lambda_name = d.functionName
-	var extension_name = path.Base(os.Args[0])
+	extension_name := util.Name
 
 	// NB "." is not allowed in NR eventType
 	var replacer = strings.NewReplacer(".", "_")
@@ -147,31 +135,34 @@ func sendDataToNR(ctx context.Context, logEntries []interface{}, d *Dispatcher, 
 	for _, event := range logEntries {
 		msInt, err := time.Parse(time.RFC3339, event.(LambdaTelemetryEvent).Time)
 		if err != nil {
-			return err
+			return nil, err
 		}
 		// events
 		data["events"] = append(data["events"], map[string]interface{}{
 			"timestamp": msInt.UnixMilli(),
-			"plugin":    util.Id,
-			"faas": map[string]string{
-				"arn":  d.arn,
-				"name": d.functionName,
-			},
-			"entity.name":          lambda_name,
+			/*"plugin":               util.Id,
+			"faas.arn":             d.arn,
+			"faas.name":            d.functionName, */
+			"eventType":            "TelemetryApiEvent",
 			"extension.name":       extension_name,
 			"extension.version":    util.Version,
-			"lambda.name":          lambda_name,
-			"aws.lambda.arn":       d.arn,
-			"aws.requestId":        RequestID,
+			"lambda.name":          d.functionName,
 			"lambda.logevent.type": replacer.Replace(event.(LambdaTelemetryEvent).Type),
 		})
 		// logs
 		if event.(LambdaTelemetryEvent).Record != nil {
+			msg := fmt.Sprint(event.(LambdaTelemetryEvent).Record)
+			if len(msg) > maxLogMsgLen {
+				msg = msg[:maxLogMsgLen]
+			}
 			data["logging"] = append(data["logging"], map[string]interface{}{
 				"timestamp": msInt.UnixMilli(),
-				"message":   event.(LambdaTelemetryEvent).Record,
+				"message":   msg,
 				"attributes": map[string]interface{}{
 					"plugin": util.Id,
+					"entity": map[string]string{
+						"name": d.functionName,
+					},
 					"faas": map[string]string{
 						"arn":  d.arn,
 						"name": d.functionName,
@@ -180,12 +171,9 @@ func sendDataToNR(ctx context.Context, logEntries []interface{}, d *Dispatcher, 
 						"lambda.logevent.type": event.(LambdaTelemetryEvent).Type,
 						"extension.name":       extension_name,
 						"extension.version":    util.Version,
-						"lambda.name":          lambda_name,
+						"lambda.name":          d.functionName,
 						"lambda.arn":           d.arn,
 						"requestId":            RequestID,
-					},
-					"entity": map[string]string{
-						"name": lambda_name,
 					},
 				},
 			})
@@ -204,19 +192,14 @@ func sendDataToNR(ctx context.Context, logEntries []interface{}, d *Dispatcher, 
 							"value":     val[key],
 							"timestamp": msInt.UnixMilli(),
 							"attributes": map[string]interface{}{
-								"plugin": util.Id,
-								"faas": map[string]string{
-									"arn":  d.arn,
-									"name": d.functionName,
-								},
+								"plugin":               util.Id,
+								"faas.arn":             d.arn,
+								"faas.name":            d.functionName,
 								"lambda.logevent.type": event.(LambdaTelemetryEvent).Type,
 								"requestId":            rid,
-								"extension.name":       extension_name,
+								"extension.name":       d.functionName,
 								"extension.version":    util.Version,
-								"lambda.name":          lambda_name,
-								"aws.lambda.arn":       d.arn,
-								"aws.requestId":        RequestID,
-								"entity.name":          lambda_name,
+								"lambda.name":          d.functionName,
 							},
 						})
 					}
@@ -234,7 +217,7 @@ func sendDataToNR(ctx context.Context, logEntries []interface{}, d *Dispatcher, 
 							} else if key == "start" {
 								start, err = time.Parse(time.RFC3339, v.(string))
 								if err != nil {
-									return err
+									return nil, err
 								}
 							} else {
 								attributes[key] = v.(string)
@@ -252,68 +235,199 @@ func sendDataToNR(ctx context.Context, logEntries []interface{}, d *Dispatcher, 
 			}
 		}
 	}
+	l.Debugf("[telemetryApi:buildPayloads] telemetry api payload objects built in: %s", time.Since(startBuild).String())
+	return data, nil
+}
 
-	l.Debugf("[send to new relic] telemetry api payloads marshalled in: %s", time.Since(startBuild).String())
-	// data ready
+func marshalAndCompressData(d *Dispatcher, data []map[string]interface{}, dataType string) ([]*bytes.Buffer, error) {
+	bodyBytes, _ := json.Marshal(data)
+
+	compressed, err := d.compressTool.Compress(bodyBytes)
+	if err != nil {
+		return nil, err
+	}
+
+	if compressed.Len() > maxPayloadSizeBytes {
+		// Payload is too large, split in half, recursively
+		split := len(data) / 2
+		leftRet, err := marshalAndCompressData(d, data[0:split], dataType)
+		if err != nil {
+			return nil, err
+		}
+
+		rightRet, err := marshalAndCompressData(d, data[split:], dataType)
+		if err != nil {
+			return nil, err
+		}
+
+		return append(leftRet, rightRet...), nil
+	}
+
+	return []*bytes.Buffer{compressed}, nil
+}
+
+// please send compressed data
+func sendData(ctx context.Context, d *Dispatcher, uri, dataType string, body *bytes.Buffer) error {
+	startSend := time.Now()
+	timeoutCtx, cancel := context.WithTimeout(ctx, util.SendToNewRelicTimeout)
+	defer cancel()
+
+	req, err := http.NewRequestWithContext(timeoutCtx, "POST", uri, body)
+	if err != nil {
+		return err
+	}
+	// the headers might be different for different endpoints
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Api-Key", d.licenseKey)
+	req.Header.Set("Content-Encoding", "GZIP")
+	if strings.Contains(uri, "trace") {
+		req.Header.Set("Data-Format", "newrelic")
+		req.Header.Set("Data-Format-Version", "1")
+	}
+
+	res, err := d.httpClient.Do(req)
+	err = detecteErrorSendingBatch(res, err)
+	if err != nil {
+		l.Debugf("[telemetryApi:sendBatch] error occured while sending batch after %s", time.Since(startSend).String())
+		return err
+	}
+
+	l.Debugf("[telemetryApi:sendBatch] took %s to send %s json", time.Since(startSend).String(), dataType)
+	return err
+}
+
+func detecteErrorSendingBatch(response *http.Response, err error) error {
+	if err != nil {
+		return fmt.Errorf("[telemetryApi:sendBatch] Telemetry client error: %s", err)
+	} else if response.StatusCode >= 300 {
+		bytes, err := io.ReadAll(response.Body)
+		if err != nil {
+			return err
+		}
+		return fmt.Errorf("[telemtryApi:sendBatch] Telemetry client response: [%s] %s", response.Status, fmt.Sprint(bytes))
+	}
+	return nil
+}
+
+func sendDataToNR(ctx context.Context, logEntries []interface{}, d *Dispatcher, RequestID string) error {
+	data, err := buildPayloads(ctx, logEntries, d, RequestID)
+	if err != nil {
+		return err
+	}
+
 	if len(data) > 0 {
+		waitForSend := sync.WaitGroup{}
+		errChan := make(chan error, 4)
+		startAggregateSend := time.Now()
+
 		// send logs
 		if len(data["logging"]) > 0 {
-			l.Tracef("[send to new relic] sending %d logs", len(data["logging"]))
-			startMarshal := time.Now()
-			bodyBytes, _ := json.Marshal(data["logging"])
-			l.Tracef("[send to new relic] took %s to build logging json", time.Since(startMarshal).String())
+			logPayloads, err := marshalAndCompressData(d, data["logging"], "logging")
+			if err != nil {
+				return err
+			}
 
-			startSend := time.Now()
-			er := sendBatch(ctx, d, getEndpointURL(d.licenseKey, "logging", ""), bodyBytes)
-			l.Tracef("[send to new relic] took %s to send logging json", time.Since(startSend).String())
-			if er != nil {
-				return er
+			for _, logPayload := range logPayloads {
+				l.Debugf("[telemetryApi:sendDataToNR] sending %d compressed log payloads to new relic", len(logPayloads))
+				waitForSend.Add(len(logPayloads))
+				go func(logPayload *bytes.Buffer) {
+					defer waitForSend.Done()
+					err := sendData(ctx, d, getEndpointURL(d.licenseKey, "logging", ""), "logging", logPayload)
+					if err != nil {
+						errChan <- err
+					}
+				}(logPayload)
 			}
 		}
 		// send metrics
 		if len(data["metrics"]) > 0 {
-			l.Tracef("[send to new relic] sending %d metrics", len(data["metrics"]))
+			waitForSend.Add(1)
+			startMarshal := time.Now()
 			var dataMet []map[string][]map[string]interface{}
 			dataMet = append(dataMet, map[string][]map[string]interface{}{
 				"metrics": data["metrics"],
 			})
 			bodyBytes, _ := json.Marshal(dataMet)
-			er := sendBatch(ctx, d, getEndpointURL(d.licenseKey, "metrics", ""), bodyBytes)
-			if er != nil {
-				return er
+			l.Debugf("[telemetryApi:sendDataToNR] took %s to marshal metrics json with %d metrics", time.Since(startMarshal).String(), len(data["metrics"]))
+			l.Tracef("[telemetryApi:sendDataToNR] Metrics JSON: %s", string(bodyBytes))
+
+			metricsPayload, err := d.compressTool.Compress(bodyBytes)
+			if err != nil {
+				return err
 			}
+
+			go func() {
+				defer waitForSend.Done()
+				err := sendData(ctx, d, getEndpointURL(d.licenseKey, "metrics", ""), "metrics", metricsPayload)
+				if err != nil {
+					errChan <- err
+				}
+			}()
 		}
 		// send events
 		if len(data["events"]) > 0 {
 			if len(d.accountID) > 0 {
-				l.Tracef("[send to new relic] sending %d events", len(data["events"]))
-				bodyBytes, _ := json.Marshal(data["events"])
-				er := sendBatch(ctx, d, getEndpointURL(d.licenseKey, "events", "")+d.accountID+"/events", bodyBytes)
-				if er != nil {
-					return er
+				eventPayloads, err := marshalAndCompressData(d, data["events"], "logging")
+				if err != nil {
+					return err
+				}
+
+				l.Debugf("[telemetryApi:sendDataToNR] sending %d compressed log payloads to new relic", len(eventPayloads))
+				waitForSend.Add(len(eventPayloads))
+				for _, eventPayload := range eventPayloads {
+					go func(eventPayload *bytes.Buffer) {
+						defer waitForSend.Done()
+						err := sendData(ctx, d, getEndpointURL(d.licenseKey, "events", "")+d.accountID+"/events", "events", eventPayload)
+						if err != nil {
+							errChan <- err
+						}
+					}(eventPayload)
 				}
 			} else {
-				l.Warn("[telemtetryApi:sendDataToNR] NEW_RELIC_ACCOUNT_ID is not set, therefore no events data sent")
+				l.Warn("[telemetryApi:sendDataToNR] NEW_RELIC_ACCOUNT_ID is not set, therefore no events data sent")
 			}
 		}
 		// send traces
 		if len(data["traces"]) > 0 {
-			l.Tracef("[send to new relic] sending %d traces", len(data["traces"]))
+			waitForSend.Add(1)
 			var dataTraces []map[string]interface{}
 			dataTraces = append(dataTraces, map[string]interface{}{
 				"common": map[string]map[string]string{
 					"attributes": {
 						"host":         "aws.amazon.com",
-						"service.name": lambda_name,
+						"service.name": d.functionName,
 					},
 				},
 				"spans": data["traces"],
 			})
+			startMarshal := time.Now()
 			bodyBytes, _ := json.Marshal(dataTraces)
-			er := sendBatch(ctx, d, getEndpointURL(d.licenseKey, "traces", ""), bodyBytes)
-			if er != nil {
-				return er
+			l.Debugf("[telemetryApi:sendDataToNR] took %s to marshal traces json with %d traces", time.Since(startMarshal).String(), len(data["traces"]))
+			l.Tracef("[telemetryApi:sendDataToNR] Traces JSON: %s", string(bodyBytes))
+
+			tracePayload, err := d.compressTool.Compress(bodyBytes)
+
+			go func() {
+				defer waitForSend.Done()
+				er := sendData(ctx, d, getEndpointURL(d.licenseKey, "traces", ""), "traces", tracePayload)
+				if er != nil {
+					errChan <- err
+				}
+			}()
+
+		}
+
+		l.Debugf("[telemetryApi:sendDataToNR] waiting for all payloads to send to new relic...")
+		waitForSend.Wait()
+		l.Debugf("[telemetryApi:sendDataToNR] waited %s for all Telemetry API payloads to concurrently send to new relic", time.Since(startAggregateSend).String())
+
+		if len(errChan) > 0 {
+			err = fmt.Errorf("%d errors occured while sending telemetry API payloads to New Relic", len(errChan))
+			for i := 0; i < len(errChan); i++ {
+				sendError := <-errChan
+				errors.Wrap(err, sendError.Error())
 			}
+			return err
 		}
 	}
 

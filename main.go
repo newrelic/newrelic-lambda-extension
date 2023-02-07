@@ -14,11 +14,14 @@ import (
 	"newrelic-lambda-extension/extensionApi"
 	"newrelic-lambda-extension/telemetryApi"
 	"newrelic-lambda-extension/util"
+	"sync"
+	"time"
 
 	"os"
 	"os/signal"
 	"syscall"
 
+	"github.com/golang-collections/go-datastructures/queue"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -27,6 +30,9 @@ var (
 )
 
 func main() {
+	l.Infof("[main] Starting the New Relic Telemetry API extension version %s", util.Version)
+	ctx, cancel := context.WithCancel(context.Background())
+
 	// Handle User Configured Settings
 	conf := config.GetConfig()
 	log.SetLevel(conf.LogLevel)
@@ -34,8 +40,6 @@ func main() {
 		DisableTimestamp: true,
 	})
 
-	l.Infof("[main] Starting the New Relic Telemetry API extension version %s", util.Version)
-	ctx, cancel := context.WithCancel(context.Background())
 	sigs := make(chan os.Signal, 1)
 	signal.Notify(sigs, syscall.SIGTERM, syscall.SIGINT)
 	go func() {
@@ -55,6 +59,15 @@ func main() {
 	}
 	l.Debug("[main] Registation success with extensionId", extensionId)
 
+	// Get New Relic License Key and Lambda Function Name
+	conf.ExtensionName = extensionApiClient.GetFunctionName()
+	if len(conf.ExtensionName) > telemetryApi.MaxAttributeValueLen {
+		conf.ExtensionName = conf.ExtensionName[:telemetryApi.MaxAttributeValueLen]
+	}
+
+	conf.LicenseKey = telemetryApi.GetNewRelicLicenseKey(ctx)
+	l.Tracef("Final Config: %+v", conf)
+
 	// Step 2 - Start the local http listener which will receive data from Telemetry API
 	l.Debug("[main] Starting the Telemetry listener")
 	telemetryListener := telemetryApi.NewTelemetryApiListener()
@@ -71,16 +84,13 @@ func main() {
 		l.Fatal(err)
 	}
 	l.Debug("[main] Subscription success")
-	dispatcher := telemetryApi.NewDispatcher(
-		extensionApiClient.GetFunctionName(),
+
+	// Create Dispatch Manager
+	dispatcher := NewDispatcher(agentTelemetry.NewDispatcher(conf), telemetryApi.NewDispatcher(
 		&conf,
 		ctx,
 		conf.TelemetryAPIBatchSize,
-	)
-
-	// Set up new relic agent telemetry dispatcher
-	agentDispatcher := agentTelemetry.NewDispatcher(conf)
-	//	entityManager := util.NewLambdaEntityManager(conf.AccountID)
+	))
 
 	l.Info("[main] New Relic Telemetry API Extension succesfully registered and subscribed")
 
@@ -99,23 +109,51 @@ func main() {
 				return
 			}
 			l.Debugf("[main] Received event %+v", res)
-			//entityGUID := entityManager.GenerateGUID(res.InvokedFunctionArn)
 
 			// Dispatching log events from previous invocations
-			agentDispatcher.Dispatch(ctx, res, false)
-			dispatcher.Dispatch(ctx, telemetryListener.LogEventsQueue, res, conf.AccountID, false)
+			dispatcher.Dispatch(ctx, telemetryListener.LogEventsQueue, res, false)
 
 			if res.EventType == extensionApi.Invoke {
 				l.Debug("[handleInvoke]")
 				// we no longer care about this but keep it here just in case
 			} else if res.EventType == extensionApi.Shutdown {
 				// force dispatch all remaining telemetry, handle shutdown
-				l.Debug("[handleShutdown]")
-				dispatcher.Dispatch(ctx, telemetryListener.LogEventsQueue, res, conf.AccountID, true)
-				agentDispatcher.Dispatch(ctx, res, true)
+				l.Debug("[handleShutdown] a shutdown event has occured")
+				dispatcher.Dispatch(ctx, telemetryListener.LogEventsQueue, res, true)
 				l.Info("[main] New Relic Telemetry API Extension successfully shut down")
 				return
 			}
 		}
 	}
+}
+
+type Dispatcher struct {
+	agentDispatcher        *agentTelemetry.AgentTelemetryDispatcher
+	TelemetryApiDispatcher *telemetryApi.Dispatcher
+}
+
+func NewDispatcher(agentDispatcher *agentTelemetry.AgentTelemetryDispatcher, telemtryApiDispacther *telemetryApi.Dispatcher) *Dispatcher {
+	return &Dispatcher{
+		agentDispatcher:        agentDispatcher,
+		TelemetryApiDispatcher: telemtryApiDispacther,
+	}
+}
+
+func (d *Dispatcher) Dispatch(ctx context.Context, logQueue *queue.Queue, eventResponse *extensionApi.NextEventResponse, force bool) {
+	startDispatch := time.Now()
+	wg := sync.WaitGroup{}
+	wg.Add(2)
+
+	go func() {
+		defer wg.Done()
+		d.agentDispatcher.Dispatch(ctx, eventResponse, force)
+	}()
+	go func() {
+		defer wg.Done()
+		d.TelemetryApiDispatcher.Dispatch(ctx, logQueue, eventResponse, force)
+	}()
+
+	l.Debug("[main: Dispatch] waiting for all telemetry to dispatch...")
+	wg.Wait()
+	l.Debugf("[main: Dispatch] dispatching all telemetry took %s", time.Since(startDispatch).String())
 }

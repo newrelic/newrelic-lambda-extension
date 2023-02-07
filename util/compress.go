@@ -4,19 +4,38 @@ import (
 	"bytes"
 	"compress/gzip"
 	"io"
+	"sync"
 )
 
+type CompressTool struct {
+	writers *sync.Pool
+}
+
+func NewCompressTool() *CompressTool {
+	return &CompressTool{
+		writers: &sync.Pool{
+			New: func() any {
+				return gzip.NewWriter(io.Discard)
+			},
+		},
+	}
+}
+
 // Compress gzips the given input.
-func Compress(b []byte) (*bytes.Buffer, error) {
+func (ct *CompressTool) Compress(b []byte) (*bytes.Buffer, error) {
 	var buf bytes.Buffer
 
-	w := gzip.NewWriter(&buf)
+	w := ct.writers.Get().(*gzip.Writer)
+	defer func() {
+		Close(w)
+		ct.writers.Put(w)
+	}()
+
+	w.Reset(&buf)
 	_, err := w.Write(b)
 	if err != nil {
 		return nil, err
 	}
-
-	defer Close(w)
 
 	return &buf, nil
 }

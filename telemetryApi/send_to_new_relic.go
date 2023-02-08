@@ -37,7 +37,7 @@ const (
 	TracesEndpointUS string = "https://trace-api.newrelic.com/trace/v1"
 
 	maxLogMsgLen         = 4094 + 10000 // maximum blob size
-	maxPayloadSizeBytes  = 1000000
+	maxPayloadSizeBytes  = 1000000      // 1 Mb
 	MaxAttributeValueLen = 4094
 )
 
@@ -249,7 +249,7 @@ func marshalAndCompressData(d *Dispatcher, data []map[string]interface{}, dataTy
 
 	if compressed.Len() > maxPayloadSizeBytes {
 		// Payload is too large, split in half, recursively
-		split := len(data) / 2
+		split := (len(data) / 2)
 		leftRet, err := marshalAndCompressData(d, data[0:split], dataType)
 		if err != nil {
 			return nil, err

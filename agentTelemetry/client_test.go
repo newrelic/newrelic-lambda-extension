@@ -1,16 +1,18 @@
-package telemetry
+package agentTelemetry
 
 import (
 	"context"
 	"encoding/json"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"sync/atomic"
 	"testing"
 	"time"
 
-	"github.com/newrelic/newrelic-lambda-extension/util"
+	"newrelic-lambda-extension/config"
+	"newrelic-lambda-extension/util"
+
 	"github.com/stretchr/testify/assert"
 )
 
@@ -27,9 +29,9 @@ func TestClientSend(t *testing.T) {
 		assert.Equal(t, r.Header.Get("User-Agent"), "newrelic-lambda-extension")
 		assert.Equal(t, r.Header.Get("X-License-Key"), "a mock license key")
 
-		reqBytes, err := ioutil.ReadAll(r.Body)
+		reqBytes, err := io.ReadAll(r.Body)
 		assert.NoError(t, err)
-		defer util.Close(r.Body)
+		defer Close(r.Body)
 		assert.NotEmpty(t, reqBytes)
 
 		reqBody, err := util.Uncompress(reqBytes)
@@ -46,16 +48,23 @@ func TestClientSend(t *testing.T) {
 
 	defer srv.Close()
 
-	client := NewWithHTTPClient(srv.Client(), "", "a mock license key", srv.URL, srv.URL, &Batch{}, false, clientTestingTimeout)
+	client := NewWithHTTPClient(srv.Client(), "", "a mock license key", srv.URL, &Batch{}, false, clientTestingTimeout)
 
 	ctx := context.Background()
 	bytes := []byte("foobar")
-	err, successCount := client.SendTelemetry(ctx, "arn:aws:lambda:us-east-1:1234:function:newrelic-example-go", [][]byte{bytes})
+	successCount, err := client.SendTelemetry(ctx, "arn:aws:lambda:us-east-1:1234:function:newrelic-example-go", [][]byte{bytes})
 
 	assert.NoError(t, err)
 	assert.Equal(t, 1, successCount)
 
-	client = New("", "mock license key", srv.URL, srv.URL, &Batch{}, false, clientTestingTimeout)
+	conf := config.Config{
+		DataCollectionTimeout: clientTestingTimeout,
+		ExtensionName:         "",
+		LicenseKey:            "mock license key",
+		AgentTelemetryRegion:  srv.URL,
+	}
+
+	client = New(conf, &Batch{}, false)
 	assert.NotNil(t, client)
 }
 
@@ -74,9 +83,9 @@ func TestClientSendRetry(t *testing.T) {
 			assert.Equal(t, r.Header.Get("User-Agent"), "newrelic-lambda-extension")
 			assert.Equal(t, r.Header.Get("X-License-Key"), "a mock license key")
 
-			reqBytes, err := ioutil.ReadAll(r.Body)
+			reqBytes, err := io.ReadAll(r.Body)
 			assert.NoError(t, err)
-			defer util.Close(r.Body)
+			defer Close(r.Body)
 			assert.NotEmpty(t, reqBytes)
 
 			reqBody, err := util.Uncompress(reqBytes)
@@ -97,11 +106,12 @@ func TestClientSendRetry(t *testing.T) {
 
 	httpClient := srv.Client()
 	httpClient.Timeout = 50 * time.Millisecond
-	client := NewWithHTTPClient(httpClient, "", "a mock license key", srv.URL, srv.URL, &Batch{}, false, clientTestingTimeout)
+
+	client := NewWithHTTPClient(httpClient, "", "a mock license key", srv.URL, &Batch{}, false, clientTestingTimeout)
 
 	ctx := context.Background()
 	bytes := []byte("foobar")
-	err, successCount := client.SendTelemetry(ctx, "arn:aws:lambda:us-east-1:1234:function:newrelic-example-go", [][]byte{bytes})
+	successCount, err := client.SendTelemetry(ctx, "arn:aws:lambda:us-east-1:1234:function:newrelic-example-go", [][]byte{bytes})
 
 	assert.NoError(t, err)
 	assert.Equal(t, 1, successCount)
@@ -118,11 +128,11 @@ func TestClientReachesDataTimeout(t *testing.T) {
 
 	httpClient := srv.Client()
 	httpClient.Timeout = 100 * time.Millisecond
-	client := NewWithHTTPClient(httpClient, "", "a mock license key", srv.URL, srv.URL, &Batch{}, false, clientTestingTimeout)
+	client := NewWithHTTPClient(httpClient, "", "a mock license key", srv.URL, &Batch{}, false, clientTestingTimeout)
 
 	ctx := context.Background()
 	bytes := []byte("foobar")
-	err, successCount := client.SendTelemetry(ctx, "arn:aws:lambda:us-east-1:1234:function:newrelic-example-go", [][]byte{bytes})
+	successCount, err := client.SendTelemetry(ctx, "arn:aws:lambda:us-east-1:1234:function:newrelic-example-go", [][]byte{bytes})
 	assert.LessOrEqual(t, int(time.Since(startTime)), int(clientTestingTimeout+250*time.Millisecond))
 	assert.NoError(t, err)
 	assert.Equal(t, 0, successCount)
@@ -133,11 +143,11 @@ func TestClientUnreachableEndpoint(t *testing.T) {
 		Timeout: time.Millisecond * 1,
 	}
 
-	client := NewWithHTTPClient(httpClient, "", "a mock license key", "http://10.123.123.123:12345", "http://10.123.123.123:12345", &Batch{}, false, clientTestingTimeout)
+	client := NewWithHTTPClient(httpClient, "", "a mock license key", "http://10.123.123.123:12345", &Batch{}, false, clientTestingTimeout)
 
 	ctx := context.Background()
 	bytes := []byte("foobar")
-	err, successCount := client.SendTelemetry(ctx, "arn:aws:lambda:us-east-1:1234:function:newrelic-example-go", [][]byte{bytes})
+	successCount, err := client.SendTelemetry(ctx, "arn:aws:lambda:us-east-1:1234:function:newrelic-example-go", [][]byte{bytes})
 
 	assert.Nil(t, err)
 	assert.Equal(t, 0, successCount)
@@ -153,11 +163,11 @@ func TestClientGetsHTTPError(t *testing.T) {
 
 	httpClient := srv.Client()
 	httpClient.Timeout = 100 * time.Millisecond
-	client := NewWithHTTPClient(httpClient, "", "a mock license key", srv.URL, srv.URL, &Batch{}, false, clientTestingTimeout)
+	client := NewWithHTTPClient(httpClient, "", "a mock license key", srv.URL, &Batch{}, false, clientTestingTimeout)
 
 	ctx := context.Background()
 	bytes := []byte("foobar")
-	err, successCount := client.SendTelemetry(ctx, "arn:aws:lambda:us-east-1:1234:function:newrelic-example-go", [][]byte{bytes})
+	successCount, err := client.SendTelemetry(ctx, "arn:aws:lambda:us-east-1:1234:function:newrelic-example-go", [][]byte{bytes})
 	assert.Less(t, int(time.Since(startTime)), int(clientTestingTimeout)) // should exit as soon as a non-timeout error occurs without retrying
 	assert.NoError(t, err)
 	assert.Equal(t, 0, successCount)
@@ -167,10 +177,4 @@ func TestGetInfraEndpointURL(t *testing.T) {
 	assert.Equal(t, "barbaz", getInfraEndpointURL("foobar", "barbaz"))
 	assert.Equal(t, InfraEndpointUS, getInfraEndpointURL("us license key", ""))
 	assert.Equal(t, InfraEndpointEU, getInfraEndpointURL("eu license key", ""))
-}
-
-func TestGetLogEndpointURL(t *testing.T) {
-	assert.Equal(t, "barbaz", getLogEndpointURL("foobar", "barbaz"))
-	assert.Equal(t, LogEndpointUS, getLogEndpointURL("us mock license key", ""))
-	assert.Equal(t, LogEndpointEU, getLogEndpointURL("eu mock license key", ""))
 }

@@ -2,136 +2,125 @@ package config
 
 import (
 	"os"
+	"path"
 	"strconv"
 	"strings"
 	"time"
+
+	log "github.com/sirupsen/logrus"
 )
 
-const (
-	DefaultRipeMillis    = 7_000
-	DefaultRotMillis     = 12_000
-	DefaultLogLevel      = "INFO"
-	DebugLogLevel        = "DEBUG"
-	defaultLogServerHost = "sandbox.localdomain"
-	DefaultClientTimeout = 10 * time.Second
-)
-
-var EmptyNRWrapper = "Undefined"
-
-type Configuration struct {
-	ExtensionEnabled   bool
-	LogsEnabled        bool
-	SendFunctionLogs   bool
-	CollectTraceID     bool
-	RipeMillis         uint32
-	RotMillis          uint32
-	LicenseKey         string
-	LicenseKeySecretId string
-	NRHandler          string
-	TelemetryEndpoint  string
-	LogEndpoint        string
-	LogLevel           string
-	LogServerHost      string
-	ClientTimeout      time.Duration
+type Config struct {
+	DataCollectionTimeout   time.Duration
+	LogLevel                log.Level
+	AgentTelemetryBatchSize int
+	TelemetryAPIBatchSize   int64
+	AgentTelemetryRegion    string
+	LicenseKey              string
+	AccountID               string
+	ExtensionName           string
+	CollectAgentData        bool
 }
 
-func ConfigurationFromEnvironment() *Configuration {
-	enabledStr, extensionEnabledOverride := os.LookupEnv("NEW_RELIC_LAMBDA_EXTENSION_ENABLED")
-	licenseKey, lkOverride := os.LookupEnv("NEW_RELIC_LICENSE_KEY")
-	licenseKeySecretId, lkSecretOverride := os.LookupEnv("NEW_RELIC_LICENSE_KEY_SECRET")
-	nrHandler, nrOverride := os.LookupEnv("NEW_RELIC_LAMBDA_HANDLER")
-	telemetryEndpoint, teOverride := os.LookupEnv("NEW_RELIC_TELEMETRY_ENDPOINT")
-	logEndpoint, leOverride := os.LookupEnv("NEW_RELIC_LOG_ENDPOINT")
-	clientTimeout, ctOverride := os.LookupEnv("NEW_RELIC_DATA_COLLECTION_TIMEOUT")
-	ripeMillisStr, ripeMillisOverride := os.LookupEnv("NEW_RELIC_HARVEST_RIPE_MILLIS")
-	rotMillisStr, rotMillisOverride := os.LookupEnv("NEW_RELIC_HARVEST_ROT_MILLIS")
-	logLevelStr, logLevelOverride := os.LookupEnv("NEW_RELIC_EXTENSION_LOG_LEVEL")
-	logsEnabledStr, logsEnabledOverride := os.LookupEnv("NEW_RELIC_EXTENSION_LOGS_ENABLED")
-	sendFunctionLogsStr, sendFunctionLogsOverride := os.LookupEnv("NEW_RELIC_EXTENSION_SEND_FUNCTION_LOGS")
-	logServerHostStr, logServerHostOverride := os.LookupEnv("NEW_RELIC_LOG_SERVER_HOST")
-	collectTraceIDStr, collectTraceIDOverride := os.LookupEnv("NEW_RELIC_COLLECT_TRACE_ID")
+const (
+	defaultCollectionTimeout      = 10 * time.Second
+	minimumCollectionTimeout      = 600 * time.Millisecond
+	defaultAgentTelemtryBatchSize = 1
+	defaultTelemtryAPIBatchSize   = 1
 
-	extensionEnabled := true
-	if extensionEnabledOverride && strings.ToLower(enabledStr) == "false" {
-		extensionEnabled = false
+	// Optional Environment variables that can be used to talior the user experience to your needs
+	agentDataEnabledVariable     = "NEW_RELIC_EXTENSION_AGENT_DATA_COLLECTION_ENABLED"
+	agentDataBatchSizeVariable   = "NEW_RELIC_EXTENSION_AGENT_DATA_BATCH_SIZE"
+	clientRetryTimeoutVariable   = "NEW_RELIC_EXTENSION_DATA_COLLECTION_TIMEOUT"
+	agentTelemetryRegionVariable = "NEW_RELIC_EXTENSION_COLLECTOR_OVERRIDE"
+	extensionLogLevelVariable    = "NEW_RELIC_EXTENSION_LOG_LEVEL"
+	telAPIBatchSizeVariable      = "NEW_RELIC_EXTENSION_TELEMETRY_API_BATCH_SIZE"
+
+	// Required environment variable
+	nrAccountIDVariable = "NEW_RELIC_ACCOUNT_ID"
+)
+
+var l = log.WithFields(log.Fields{"pkg": "config"})
+
+// simplifies testing
+func defaultConfig() Config {
+	return Config{
+		CollectAgentData:        true,
+		DataCollectionTimeout:   defaultCollectionTimeout,
+		AgentTelemetryBatchSize: defaultAgentTelemtryBatchSize,
+		TelemetryAPIBatchSize:   defaultTelemtryAPIBatchSize,
+		LogLevel:                log.InfoLevel,
+		ExtensionName:           path.Base(os.Args[0]),
+	}
+}
+
+func GetConfig() Config {
+	conf := defaultConfig()
+	conf.AccountID = os.Getenv(nrAccountIDVariable)
+	if conf.AccountID == "" {
+		l.Errorf("environment variable \"%s\" must be set to the ID of the New Relic account matching your license key", nrAccountIDVariable)
 	}
 
-	logsEnabled := true
-	if logsEnabledOverride && strings.ToLower(logsEnabledStr) == "false" {
-		logsEnabled = false
+	conf.AgentTelemetryRegion = os.Getenv(agentTelemetryRegionVariable)
+
+	// Enable or disable collection of agent telemetry data
+	enableAgent := os.Getenv(agentDataEnabledVariable)
+	if strings.ToLower(enableAgent) == "false" {
+		conf.CollectAgentData = false
 	}
-
-	ret := &Configuration{ExtensionEnabled: extensionEnabled, LogsEnabled: logsEnabled}
-
-	ret.ClientTimeout = DefaultClientTimeout
-	if ctOverride && clientTimeout != "" {
-		clientTimeout, err := time.ParseDuration(clientTimeout)
-		if err == nil {
-			ret.ClientTimeout = clientTimeout
+	// How long agent will try to resend
+	clientTimeout := os.Getenv(clientRetryTimeoutVariable)
+	if clientTimeout != "" {
+		dur, err := time.ParseDuration(clientTimeout)
+		if err != nil {
+			environmentVariableError(clientRetryTimeoutVariable, err)
+			l.Warnf("client retry timeout will be set to default value: %s", defaultCollectionTimeout.String())
+		}
+		if dur >= minimumCollectionTimeout {
+			conf.DataCollectionTimeout = dur
+		} else {
+			l.Warnf("configured client retry duration is too short, setting it to minimum value: %s", minimumCollectionTimeout.String())
+			conf.DataCollectionTimeout = minimumCollectionTimeout
 		}
 	}
 
-	if lkOverride {
-		ret.LicenseKey = licenseKey
-	} else if lkSecretOverride {
-		ret.LicenseKeySecretId = licenseKeySecretId
-	}
-
-	if nrOverride {
-		ret.NRHandler = nrHandler
-	} else {
-		ret.NRHandler = EmptyNRWrapper
-	}
-
-	if teOverride {
-		ret.TelemetryEndpoint = telemetryEndpoint
-	}
-
-	if leOverride {
-		ret.LogEndpoint = logEndpoint
-	}
-
-	if ripeMillisOverride {
-		ripeMillis, err := strconv.ParseUint(ripeMillisStr, 10, 32)
-		if err == nil {
-			ret.RipeMillis = uint32(ripeMillis)
+	telApiBatchSizeStr := os.Getenv(telAPIBatchSizeVariable)
+	if telApiBatchSizeStr != "" {
+		telApiBatchSize, err := strconv.ParseInt(telApiBatchSizeStr, 0, 16)
+		if err != nil {
+			environmentVariableError(telAPIBatchSizeVariable, err)
+			l.Warnf("telemetry api batch size will be set to default value: %d", defaultTelemtryAPIBatchSize)
+		} else {
+			conf.TelemetryAPIBatchSize = telApiBatchSize
 		}
 	}
 
-	if ret.RipeMillis == 0 {
-		ret.RipeMillis = DefaultRipeMillis
-	}
-
-	if rotMillisOverride {
-		rotMillis, err := strconv.ParseUint(rotMillisStr, 10, 32)
-		if err == nil {
-			ret.RotMillis = uint32(rotMillis)
+	buffer := os.Getenv(agentDataBatchSizeVariable)
+	if buffer != "" {
+		val, err := strconv.Atoi(buffer)
+		if err != nil {
+			environmentVariableError(agentDataBatchSizeVariable, err)
+			l.Warnf("agent data batch size will be set to default value: %d", defaultAgentTelemtryBatchSize)
+		} else {
+			conf.AgentTelemetryBatchSize = val
 		}
 	}
 
-	if ret.RotMillis == 0 {
-		ret.RotMillis = DefaultRotMillis
+	logLevel := strings.ToLower(os.Getenv(extensionLogLevelVariable))
+	switch logLevel {
+	case "trace":
+		conf.LogLevel = log.TraceLevel
+	case "debug":
+		conf.LogLevel = log.DebugLevel
+	case "info":
+		conf.LogLevel = log.InfoLevel
+	case "warn":
+		conf.LogLevel = log.WarnLevel
 	}
 
-	if logLevelOverride && logLevelStr == DebugLogLevel {
-		ret.LogLevel = DebugLogLevel
-	} else {
-		ret.LogLevel = DefaultLogLevel
-	}
+	return conf
+}
 
-	if logServerHostOverride {
-		ret.LogServerHost = logServerHostStr
-	} else {
-		ret.LogServerHost = defaultLogServerHost
-	}
-
-	if sendFunctionLogsOverride && sendFunctionLogsStr == "true" {
-		ret.SendFunctionLogs = true
-	}
-
-	if collectTraceIDOverride && collectTraceIDStr == "true" {
-		ret.CollectTraceID = true
-	}
-
-	return ret
+func environmentVariableError(variable string, err error) {
+	l.Warnf("[config] error parsing environment variable \"%s\": %v", variable, err)
 }

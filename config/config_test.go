@@ -2,89 +2,174 @@ package config
 
 import (
 	"os"
+	"path"
+	"reflect"
 	"testing"
+	"time"
 
-	"github.com/stretchr/testify/assert"
+	log "github.com/sirupsen/logrus"
 )
 
-func TestConfigurationFromEnvironmentZero(t *testing.T) {
-	conf := ConfigurationFromEnvironment()
-	expected := &Configuration{
-		ExtensionEnabled: true,
-		RipeMillis:       DefaultRipeMillis,
-		RotMillis:        DefaultRotMillis,
-		LogLevel:         DefaultLogLevel,
-		LogsEnabled:      true,
-		NRHandler:        EmptyNRWrapper,
-		LogServerHost:    defaultLogServerHost,
-		ClientTimeout:    DefaultClientTimeout,
+type envVariables struct {
+	agentData  string
+	agentBatch string
+	telemBatch string
+	timeout    string
+	region     string
+	logLevel   string
+	acctId     string
+}
+
+func TestGetConfig(t *testing.T) {
+	tests := []struct {
+		name string
+		want Config
+		vars envVariables
+	}{
+		{
+			name: "default",
+			want: defaultConfig(),
+			vars: envVariables{
+				agentData:  "",
+				agentBatch: "",
+				telemBatch: "",
+				timeout:    "",
+				region:     "",
+				logLevel:   "",
+				acctId:     "",
+			},
+		},
+		{
+			name: "default env vars",
+			want: defaultConfig(),
+			vars: envVariables{
+				agentData:  "true",
+				agentBatch: "1",
+				telemBatch: "1",
+				timeout:    "10s",
+				region:     "",
+				logLevel:   "info",
+				acctId:     "",
+			},
+		},
+		{
+			name: "override all defaults",
+			want: func() Config {
+				return Config{
+					CollectAgentData:        false,
+					DataCollectionTimeout:   600 * time.Millisecond,
+					AgentTelemetryBatchSize: 5,
+					TelemetryAPIBatchSize:   8,
+					LogLevel:                log.WarnLevel,
+					AgentTelemetryRegion:    "test",
+					AccountID:               "12",
+					ExtensionName:           path.Base(os.Args[0]),
+				}
+			}(),
+			vars: envVariables{
+				agentData:  "false",
+				agentBatch: "5",
+				telemBatch: "8",
+				timeout:    "600ms",
+				region:     "test",
+				logLevel:   "warn",
+				acctId:     "12",
+			},
+		},
+		{
+			name: "timeout too low",
+			want: func() Config {
+				return Config{
+					CollectAgentData:        false,
+					DataCollectionTimeout:   600 * time.Millisecond,
+					AgentTelemetryBatchSize: 5,
+					TelemetryAPIBatchSize:   8,
+					LogLevel:                log.WarnLevel,
+					AgentTelemetryRegion:    "test",
+					AccountID:               "12",
+					ExtensionName:           path.Base(os.Args[0]),
+				}
+			}(),
+			vars: envVariables{
+				agentData:  "false",
+				agentBatch: "5",
+				telemBatch: "8",
+				timeout:    "300ms",
+				region:     "test",
+				logLevel:   "warn",
+				acctId:     "12",
+			},
+		},
+		{
+			name: "invalid agent telemetry batch size",
+			want: func() Config {
+				return Config{
+					CollectAgentData:        false,
+					DataCollectionTimeout:   600 * time.Millisecond,
+					AgentTelemetryBatchSize: defaultAgentTelemtryBatchSize,
+					TelemetryAPIBatchSize:   8,
+					LogLevel:                log.WarnLevel,
+					AgentTelemetryRegion:    "test",
+					AccountID:               "12",
+					ExtensionName:           path.Base(os.Args[0]),
+				}
+			}(),
+			vars: envVariables{
+				agentData:  "false",
+				agentBatch: "invalid",
+				telemBatch: "8",
+				timeout:    "300ms",
+				region:     "test",
+				logLevel:   "warn",
+				acctId:     "12",
+			},
+		},
+		{
+			name: "invalid telemetry api batch size",
+			want: func() Config {
+				return Config{
+					CollectAgentData:        false,
+					DataCollectionTimeout:   600 * time.Millisecond,
+					AgentTelemetryBatchSize: 5,
+					TelemetryAPIBatchSize:   defaultTelemtryAPIBatchSize,
+					LogLevel:                log.WarnLevel,
+					AgentTelemetryRegion:    "test",
+					AccountID:               "12",
+					ExtensionName:           path.Base(os.Args[0]),
+				}
+			}(),
+			vars: envVariables{
+				agentData:  "false",
+				agentBatch: "5",
+				telemBatch: "invalid",
+				timeout:    "300ms",
+				region:     "test",
+				logLevel:   "warn",
+				acctId:     "12",
+			},
+		},
 	}
-	assert.Equal(t, expected, conf)
-}
+	for _, tt := range tests {
+		os.Setenv(agentDataEnabledVariable, tt.vars.agentData)
+		os.Setenv(agentDataBatchSizeVariable, tt.vars.agentBatch)
+		os.Setenv(clientRetryTimeoutVariable, tt.vars.timeout)
+		os.Setenv(agentTelemetryRegionVariable, tt.vars.region)
+		os.Setenv(extensionLogLevelVariable, tt.vars.logLevel)
+		os.Setenv(telAPIBatchSizeVariable, tt.vars.telemBatch)
+		os.Setenv(nrAccountIDVariable, tt.vars.acctId)
 
-func TestConfigurationFromEnvironment(t *testing.T) {
-	os.Unsetenv("NEW_RELIC_LAMBDA_EXTENSION_ENABLED")
+		t.Run(tt.name, func(t *testing.T) {
+			if got := GetConfig(); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("GetConfig() = %v, want %v", got, tt.want)
+			}
+		})
 
-	conf := ConfigurationFromEnvironment()
-
-	assert.Equal(t, conf.ExtensionEnabled, true)
-	assert.Equal(t, conf.LogsEnabled, true)
-
-	os.Setenv("NEW_RELIC_LAMBDA_EXTENSION_ENABLED", "false")
-	os.Setenv("NEW_RELIC_LAMBDA_HANDLER", "newrelic_lambda_wrapper.handler")
-	os.Setenv("NEW_RELIC_LICENSE_KEY", "lk")
-	os.Setenv("NEW_RELIC_LICENSE_KEY_SECRET", "secretId")
-	os.Setenv("NEW_RELIC_LOG_ENDPOINT", "endpoint")
-	os.Setenv("NEW_RELIC_TELEMETRY_ENDPOINT", "endpoint")
-	os.Setenv("NEW_RELIC_HARVEST_RIPE_MILLIS", "0")
-	os.Setenv("NEW_RELIC_HARVEST_ROT_MILLIS", "0")
-	os.Setenv("NEW_RELIC_EXTENSION_LOG_LEVEL", "DEBUG")
-	os.Setenv("NEW_RELIC_EXTENSION_SEND_FUNCTION_LOGS", "true")
-	os.Setenv("NEW_RELIC_EXTENSION_LOGS_ENABLED", "false")
-	os.Setenv("NEW_RELIC_DATA_COLLECTION_TIMEOUT", "5s")
-
-	defer func() {
-		os.Unsetenv("NEW_RELIC_LAMBDA_EXTENSION_ENABLED")
-		os.Unsetenv("NEW_RELIC_LAMBDA_HANDLER")
-		os.Unsetenv("NEW_RELIC_LICENSE_KEY")
-		os.Unsetenv("NEW_RELIC_LICENSE_KEY_SECRET")
-		os.Unsetenv("NEW_RELIC_LOG_ENDPOINT")
-		os.Unsetenv("NEW_RELIC_TELEMETRY_ENDPOINT")
-		os.Unsetenv("NEW_RELIC_HARVEST_RIPE_MILLIS")
-		os.Unsetenv("NEW_RELIC_HARVEST_ROT_MILLIS")
-		os.Unsetenv("NEW_RELIC_EXTENSION_LOG_LEVEL")
-		os.Unsetenv("NEW_RELIC_EXTENSION_SEND_FUNCTION_LOGS")
-		os.Unsetenv("NEW_RELIC_EXTENSION_LOGS_ENABLED")
-		os.Unsetenv("NEW_RELIC_DATA_COLLECTION_TIMEOUT")
-	}()
-
-	conf = ConfigurationFromEnvironment()
-
-	assert.Equal(t, conf.ExtensionEnabled, false)
-	assert.Equal(t, "newrelic_lambda_wrapper.handler", conf.NRHandler)
-	assert.Equal(t, "lk", conf.LicenseKey)
-	assert.Empty(t, conf.LicenseKeySecretId)
-	assert.Equal(t, "endpoint", conf.LogEndpoint)
-	assert.Equal(t, "endpoint", conf.TelemetryEndpoint)
-	assert.Equal(t, uint32(DefaultRipeMillis), conf.RipeMillis)
-	assert.Equal(t, uint32(DefaultRotMillis), conf.RotMillis)
-	assert.Equal(t, "DEBUG", conf.LogLevel)
-	assert.Equal(t, true, conf.SendFunctionLogs)
-	assert.Equal(t, false, conf.LogsEnabled)
-}
-
-func TestConfigurationFromEnvironmentSecretId(t *testing.T) {
-	os.Setenv("NEW_RELIC_LICENSE_KEY_SECRET", "secretId")
-	defer os.Unsetenv("NEW_RELIC_LICENSE_KEY_SECRET")
-
-	conf := ConfigurationFromEnvironment()
-	assert.Equal(t, "secretId", conf.LicenseKeySecretId)
-}
-
-func TestConfigurationFromEnvironmentLogServerHost(t *testing.T) {
-	os.Setenv("NEW_RELIC_LOG_SERVER_HOST", "foobar")
-	defer os.Unsetenv("NEW_RELIC_LOG_SERVER_HOST")
-
-	conf := ConfigurationFromEnvironment()
-	assert.Equal(t, "foobar", conf.LogServerHost)
+		os.Unsetenv(agentDataEnabledVariable)
+		os.Unsetenv(agentDataBatchSizeVariable)
+		os.Unsetenv(clientRetryTimeoutVariable)
+		os.Unsetenv(agentTelemetryRegionVariable)
+		os.Unsetenv(extensionLogLevelVariable)
+		os.Unsetenv(telAPIBatchSizeVariable)
+		os.Unsetenv(nrAccountIDVariable)
+	}
 }

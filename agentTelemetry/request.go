@@ -1,4 +1,4 @@
-package telemetry
+package agentTelemetry
 
 import (
 	"bytes"
@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/newrelic/newrelic-lambda-extension/util"
+	"newrelic-lambda-extension/util"
 )
 
 const (
@@ -89,7 +89,7 @@ func LogsEventForBytes(payload []byte) LogsEvent {
 	return LogsEvent{ID: util.UUID(), Message: string(payload), Timestamp: util.Timestamp()}
 }
 
-func CompressedPayloadsForLogEvents(logsEvents []LogsEvent, functionName string, invokedFunctionARN string) ([]*bytes.Buffer, error) {
+func CompressedPayloadsForLogEvents(ct *util.CompressTool, logsEvents []LogsEvent, functionName string, invokedFunctionARN string) ([]*bytes.Buffer, error) {
 	logGroupName := fmt.Sprintf("/aws/lambda/%s", functionName)
 	logEntry := LogsEntry{
 		LogEvents: logsEvents,
@@ -109,7 +109,7 @@ func CompressedPayloadsForLogEvents(logsEvents []LogsEvent, functionName string,
 	}
 	data := RequestData{Context: context, Entry: string(entry)}
 
-	compressed, err := CompressedJsonPayload(data)
+	compressed, err := CompressedJsonPayload(ct, data)
 	if err != nil {
 		return nil, err
 	}
@@ -120,12 +120,12 @@ func CompressedPayloadsForLogEvents(logsEvents []LogsEvent, functionName string,
 	} else {
 		// Payload is too large, split in half, recursively
 		split := len(logsEvents) / 2
-		leftRet, err := CompressedPayloadsForLogEvents(logsEvents[0:split], functionName, invokedFunctionARN)
+		leftRet, err := CompressedPayloadsForLogEvents(ct, logsEvents[0:split], functionName, invokedFunctionARN)
 		if err != nil {
 			return nil, err
 		}
 
-		rightRet, err := CompressedPayloadsForLogEvents(logsEvents[split:], functionName, invokedFunctionARN)
+		rightRet, err := CompressedPayloadsForLogEvents(ct, logsEvents[split:], functionName, invokedFunctionARN)
 		if err != nil {
 			return nil, err
 		}
@@ -149,13 +149,13 @@ func BuildVortexRequest(ctx context.Context, url string, compressed *bytes.Buffe
 	return req, nil
 }
 
-func CompressedJsonPayload(payload interface{}) (*bytes.Buffer, error) {
+func CompressedJsonPayload(ct *util.CompressTool, payload interface{}) (*bytes.Buffer, error) {
 	uncompressed, err := json.Marshal(payload)
 	if err != nil {
 		return nil, err
 	}
 
-	compressed, err := util.Compress(uncompressed)
+	compressed, err := ct.Compress(uncompressed)
 	if err != nil {
 		return nil, fmt.Errorf("error compressing data: %v", err)
 	}

@@ -5,7 +5,7 @@
 An AWS Lambda extension to collect, enhance, and transport telemetry data from your AWS Lambda functions to New Relic without requiring an external transport such as CloudWatch Logs or Kinesis.
 
 This lightweight AWS Lambda Extension runs alongside your AWS Lambda functions and automatically handles the collection and transport of telemetry data from
-supported New Relic serverless agents. Note that this extension requires telemetry data from New Relic serverless agents to work.
+supported New Relic serverless agents. The extension requires a telemetry payload from a New Relic agent. Conditions that delay or prevent that payload from being written may result in longer-than-expected invocation durations.
 
 ## Installation
 

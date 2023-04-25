@@ -42,6 +42,8 @@ func (r runtimeConfig) check(h handlerConfigs) bool {
 		if util.PathExists(pJS) || util.PathExists(pMJS) {
 			return true
 		}
+	} else {
+		p = pathFormatter(p, r.fileType)
 	}
 	return util.PathExists(p)
 }

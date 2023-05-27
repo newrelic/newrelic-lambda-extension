@@ -37,9 +37,10 @@ func (r runtimeConfig) check(h handlerConfigs) bool {
 	p := removePathMethodName(functionHandler)
 	if r.language == Node {
 		pJS := pathFormatter(p, "js")
+		cJS := pathFormatter(p, "cjs")
 		pMJS := pathFormatter(p, "mjs")
 
-		if util.PathExists(pJS) || util.PathExists(pMJS) {
+		if util.PathExists(pJS) || util.PathExists(pMJS) || util.PathExists(cJS) {
 			return true
 		}
 	} else {

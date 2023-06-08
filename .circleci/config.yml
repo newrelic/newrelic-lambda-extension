@@ -93,6 +93,7 @@ jobs:
               -u ${CIRCLE_PROJECT_USERNAME} \
               -r ${CIRCLE_PROJECT_REPONAME} \
               -c ${CIRCLE_SHA1} \
+              -t ${GITHUB_TOKEN} \
               -n "New Relic Lambda Extension ${CIRCLE_TAG}" \
               -replace \
               ${CIRCLE_TAG} \
@@ -112,6 +113,7 @@ jobs:
               -u ${CIRCLE_PROJECT_USERNAME} \
               -r ${CIRCLE_PROJECT_REPONAME} \
               -c ${CIRCLE_SHA1} \
+              -t ${GITHUB_TOKEN} \
               -n "New Relic Lambda Extension ${CIRCLE_TAG}" \
               -replace \
               ${CIRCLE_TAG} \

@@ -128,7 +128,7 @@ func (c *Client) SendTelemetry(ctx context.Context, invokedFunctionARN string, t
 	totalTime := end.Sub(start)
 	transmissionTime := end.Sub(transmitStart)
 	util.Logf(
-		"Sent %d/%d New Relic payload batches with %d log events successfully in %.3fms (%dms to transmit %.1fkB).\n",
+		"Sent %d/%d New Relic payload batches with %d log events successfully with certianty in %.3fms (%dms to transmit %.1fkB).\n",
 		successCount,
 		len(compressedPayloads),
 		len(telemetry),
@@ -152,7 +152,8 @@ func (c *Client) sendPayloads(compressedPayloads []*bytes.Buffer, builder reques
 
 		var response AttemptData
 
-		data := make(chan AttemptData)
+		// buffer this chanel to allow succesful attempts to go through if possible
+		data := make(chan AttemptData, 1)
 		ctx, cancel := context.WithTimeout(context.Background(), c.timeout)
 		defer cancel()
 
@@ -190,7 +191,7 @@ func (c *Client) attemptSend(ctx context.Context, currentPayloadBytes []byte, bu
 	for attempts := 0; attempts < SendTimeoutMaxRetries; attempts++ {
 		select {
 		case <-ctx.Done():
-			util.Debugln("attemptSend thread was quit by context timeout")
+			util.Debugln("attemptSend: thread was quit by context timeout")
 			return
 		default:
 			// Construct request for this try
@@ -223,6 +224,7 @@ func (c *Client) attemptSend(ctx context.Context, currentPayloadBytes []byte, bu
 					ResponseBody: string(bodyBytes),
 					Response:     res,
 				}
+				util.Debugln("attemptSend: data sent to New Relic succesfully")
 				return
 			}
 
@@ -263,7 +265,7 @@ func (c *Client) SendFunctionLogs(ctx context.Context, invokedFunctionARN string
 	totalTime := time.Since(start)
 	transmissionTime := time.Since(transmitStart)
 	util.Logf(
-		"Sent %d/%d New Relic function log batches successfully in %.3fms (%dms to transmit %.1fkB).\n",
+		"Sent %d/%d New Relic function log batches successfully with certianty in %.3fms (%dms to transmit %.1fkB).\n",
 		successCount,
 		len(compressedPayloads),
 		float64(totalTime.Microseconds())/1000.0,

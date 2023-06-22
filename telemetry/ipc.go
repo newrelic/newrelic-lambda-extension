@@ -1,7 +1,7 @@
 package telemetry
 
 import (
-	"io/ioutil"
+	"io"
 	"log"
 	"os"
 	"syscall"
@@ -40,7 +40,7 @@ func pollForTelemetry() []byte {
 	defer util.Close(telemetryPipe)
 
 	// When the write side closes, we get an EOF.
-	bytes, err := ioutil.ReadAll(telemetryPipe)
+	bytes, err := io.ReadAll(telemetryPipe)
 	if err != nil {
 		log.Panic("failed to read telemetry pipe", err)
 	}

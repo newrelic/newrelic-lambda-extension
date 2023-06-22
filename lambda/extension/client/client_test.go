@@ -4,7 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -50,7 +50,7 @@ func TestRegistrationClient_RegisterDefault(t *testing.T) {
 		assert.Equal(t, r.Method, http.MethodPost)
 		assert.NotEmpty(t, r.Header.Get(api.ExtensionNameHeader))
 
-		reqBytes, err := ioutil.ReadAll(r.Body)
+		reqBytes, err := io.ReadAll(r.Body)
 		assert.NoError(t, err)
 		defer util.Close(r.Body)
 

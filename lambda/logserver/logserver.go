@@ -3,7 +3,7 @@ package logserver
 import (
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net"
 	"net/http"
 	"regexp"
@@ -104,7 +104,7 @@ var reportStringRegExp, _ = regexp.Compile("RequestId: ([a-fA-F0-9-]+)(.*)")
 func (ls *LogServer) handler(res http.ResponseWriter, req *http.Request) {
 	defer util.Close(req.Body)
 
-	bodyBytes, err := ioutil.ReadAll(req.Body)
+	bodyBytes, err := io.ReadAll(req.Body)
 	if err != nil {
 		util.Logf("Error processing log request: %v", err)
 	}

@@ -3,7 +3,7 @@ package util
 import (
 	"bytes"
 	"compress/gzip"
-	"io/ioutil"
+	"io"
 )
 
 // Compress gzips the given input.
@@ -32,5 +32,5 @@ func Uncompress(b []byte) ([]byte, error) {
 
 	defer Close(gz)
 
-	return ioutil.ReadAll(gz)
+	return io.ReadAll(gz)
 }

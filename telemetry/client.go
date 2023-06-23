@@ -5,7 +5,7 @@ import (
 	"context"
 	"encoding/binary"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"log"
 	"net"
 	"net/http"
@@ -29,7 +29,9 @@ const (
 	// WIP (configuration options?)
 	SendTimeoutRetryBase  time.Duration = 200 * time.Millisecond
 	SendTimeoutMaxRetries int           = 20
-	SendTimeoutMaxBackOff time.Duration = 5 * time.Second
+	SendTimeoutMaxBackOff time.Duration = 3 * time.Second
+
+	httpClientTimeout time.Duration = 2400 * time.Millisecond
 )
 
 type Client struct {
@@ -46,7 +48,7 @@ type Client struct {
 // New creates a telemetry client with sensible defaults
 func New(functionName string, licenseKey string, telemetryEndpointOverride string, logEndpointOverride string, batch *Batch, collectTraceID bool, clientTimeout time.Duration) *Client {
 	httpClient := &http.Client{
-		Timeout: 2400 * time.Millisecond,
+		Timeout: httpClientTimeout,
 	}
 
 	// Create random seed for timeout to avoid instances created at the same time
@@ -126,7 +128,7 @@ func (c *Client) SendTelemetry(ctx context.Context, invokedFunctionARN string, t
 	totalTime := end.Sub(start)
 	transmissionTime := end.Sub(transmitStart)
 	util.Logf(
-		"Sent %d/%d New Relic payload batches with %d log events successfully in %.3fms (%dms to transmit %.1fkB).\n",
+		"Sent %d/%d New Relic payload batches with %d log events successfully with certainty in %.3fms (%dms to transmit %.1fkB).\n",
 		successCount,
 		len(compressedPayloads),
 		len(telemetry),
@@ -143,24 +145,24 @@ type requestBuilder func(buffer *bytes.Buffer) (*http.Request, error)
 func (c *Client) sendPayloads(compressedPayloads []*bytes.Buffer, builder requestBuilder) (successCount int, sentBytes int) {
 	successCount = 0
 	sentBytes = 0
+	sendPayloadsStartTime := time.Now()
 	for _, p := range compressedPayloads {
 		sentBytes += p.Len()
 		currentPayloadBytes := p.Bytes()
 
 		var response AttemptData
 
-		timer := time.NewTimer(c.timeout)
+		// buffer this chanel to allow succesful attempts to go through if possible
+		data := make(chan AttemptData, 1)
+		ctx, cancel := context.WithTimeout(context.Background(), c.timeout)
+		defer cancel()
 
-		quit := make(chan bool, 1)
-		data := make(chan AttemptData)
-		go c.attemptSend(currentPayloadBytes, builder, data, quit)
+		go c.attemptSend(ctx, currentPayloadBytes, builder, data)
 
 		select {
-		case <-timer.C:
+		case <-ctx.Done():
 			response.Error = fmt.Errorf("failed to send data within user defined timeout period: %s", c.timeout.String())
-			quit <- true
 		case response = <-data:
-			timer.Stop()
 		}
 
 		if response.Error != nil {
@@ -173,6 +175,7 @@ func (c *Client) sendPayloads(compressedPayloads []*bytes.Buffer, builder reques
 		}
 	}
 
+	util.Debugf("sendPayloads: took %s to finish sending all payloads", time.Since(sendPayloadsStartTime).String())
 	return successCount, sentBytes
 }
 
@@ -182,12 +185,13 @@ type AttemptData struct {
 	Response     *http.Response
 }
 
-func (c *Client) attemptSend(currentPayloadBytes []byte, builder requestBuilder, dataChan chan AttemptData, quit chan bool) {
+func (c *Client) attemptSend(ctx context.Context, currentPayloadBytes []byte, builder requestBuilder, dataChan chan AttemptData) {
 	baseSleepTime := SendTimeoutRetryBase
 
 	for attempts := 0; attempts < SendTimeoutMaxRetries; attempts++ {
 		select {
-		case <-quit:
+		case <-ctx.Done():
+			util.Debugln("attemptSend: thread was quit by context timeout")
 			return
 		default:
 			// Construct request for this try
@@ -206,7 +210,7 @@ func (c *Client) attemptSend(currentPayloadBytes []byte, builder requestBuilder,
 				// Success. Process response and exit retry loop
 				defer util.Close(res.Body)
 
-				bodyBytes, err := ioutil.ReadAll(res.Body)
+				bodyBytes, err := io.ReadAll(res.Body)
 				if err != nil {
 					dataChan <- AttemptData{
 						Error: err,
@@ -220,16 +224,18 @@ func (c *Client) attemptSend(currentPayloadBytes []byte, builder requestBuilder,
 					ResponseBody: string(bodyBytes),
 					Response:     res,
 				}
+				util.Debugln("attemptSend: data sent to New Relic succesfully")
 				return
 			}
 
 			// if error is http timeout, retry
 			if err, ok := err.(net.Error); ok && err.Timeout() {
-				util.Debugln("Retrying after timeout", err)
-				time.Sleep(baseSleepTime + time.Duration(math_rand.Intn(400)))
+				timeout := baseSleepTime + time.Duration(math_rand.Intn(200))
+				util.Debugf("attemptSend: timeout error, retrying after %s: %v", timeout.String(), err)
+				time.Sleep(timeout)
 
-				// double wait time after 3 timed out attempts
-				if attempts%3 == 0 {
+				// double wait time after 3 time out attempts
+				if (attempts+1)%3 == 0 {
 					baseSleepTime *= 2
 				}
 				if baseSleepTime > SendTimeoutMaxBackOff {
@@ -246,9 +252,32 @@ func (c *Client) attemptSend(currentPayloadBytes []byte, builder requestBuilder,
 	}
 }
 
+// SendFunctionLogs constructs log payloads and sends them to new relic
 func (c *Client) SendFunctionLogs(ctx context.Context, invokedFunctionARN string, lines []logserver.LogLine) error {
 	start := time.Now()
+	compressedPayloads, builder, err := c.buildLogPayloads(ctx, invokedFunctionARN, lines)
+	if err != nil {
+		return err
+	}
 
+	transmitStart := time.Now()
+	successCount, sentBytes := c.sendPayloads(compressedPayloads, builder)
+	totalTime := time.Since(start)
+	transmissionTime := time.Since(transmitStart)
+	util.Logf(
+		"Sent %d/%d New Relic function log batches successfully with certainty in %.3fms (%dms to transmit %.1fkB).\n",
+		successCount,
+		len(compressedPayloads),
+		float64(totalTime.Microseconds())/1000.0,
+		transmissionTime.Milliseconds(),
+		float64(sentBytes)/1024.0,
+	)
+
+	return nil
+}
+
+// buildLogPayloads is a helper function that improves readability of the SendFunctionLogs method
+func (c *Client) buildLogPayloads(ctx context.Context, invokedFunctionARN string, lines []logserver.LogLine) ([]*bytes.Buffer, requestBuilder, error) {
 	common := map[string]interface{}{
 		"plugin":    util.Id,
 		"faas.arn":  invokedFunctionARN,
@@ -275,7 +304,7 @@ func (c *Client) SendFunctionLogs(ctx context.Context, invokedFunctionARN string
 	// Since the Log API won't send us more than 1MB, we shouldn't have any issues with payload size.
 	compressedPayload, err := CompressedJsonPayload(logData)
 	if err != nil {
-		return err
+		return nil, nil, err
 	}
 	compressedPayloads := []*bytes.Buffer{compressedPayload}
 
@@ -289,19 +318,5 @@ func (c *Client) SendFunctionLogs(ctx context.Context, invokedFunctionARN string
 		return req, err
 	}
 
-	transmitStart := time.Now()
-	successCount, sentBytes := c.sendPayloads(compressedPayloads, builder)
-	end := time.Now()
-	totalTime := end.Sub(start)
-	transmissionTime := end.Sub(transmitStart)
-	util.Logf(
-		"Sent %d/%d New Relic function log batches successfully in %.3fms (%dms to transmit %.1fkB).\n",
-		successCount,
-		len(compressedPayloads),
-		float64(totalTime.Microseconds())/1000.0,
-		transmissionTime.Milliseconds(),
-		float64(sentBytes)/1024.0,
-	)
-
-	return nil
+	return compressedPayloads, builder, nil
 }

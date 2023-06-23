@@ -9,7 +9,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -93,7 +93,7 @@ func (rc *RegistrationClient) Register(ctx context.Context, registrationRequest 
 		return nil, nil, fmt.Errorf("error occurred while making registration request: %s", res.Status)
 	}
 
-	bodyBytes, err := ioutil.ReadAll(res.Body)
+	bodyBytes, err := io.ReadAll(res.Body)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -166,7 +166,7 @@ func (ic *InvocationClient) LogRegister(ctx context.Context, subscriptionRequest
 		return fmt.Errorf("error occurred while making log subscription request: %s", res.Status)
 	}
 
-	responseBody, err := ioutil.ReadAll(res.Body)
+	responseBody, err := io.ReadAll(res.Body)
 	if err != nil {
 		return err
 	}
@@ -200,7 +200,7 @@ func (ic *InvocationClient) NextEvent(ctx context.Context) (*api.InvocationEvent
 		return nil, fmt.Errorf("error occurred when calling extension/event/next: %s", res.Status)
 	}
 
-	body, err := ioutil.ReadAll(res.Body)
+	body, err := io.ReadAll(res.Body)
 	if err != nil {
 		return nil, fmt.Errorf("error occurred while reading extension/event/next response body %s", err)
 	}

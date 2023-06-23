@@ -128,7 +128,7 @@ func (c *Client) SendTelemetry(ctx context.Context, invokedFunctionARN string, t
 	totalTime := end.Sub(start)
 	transmissionTime := end.Sub(transmitStart)
 	util.Logf(
-		"Sent %d/%d New Relic payload batches with %d log events successfully with certianty in %.3fms (%dms to transmit %.1fkB).\n",
+		"Sent %d/%d New Relic payload batches with %d log events successfully with certainty in %.3fms (%dms to transmit %.1fkB).\n",
 		successCount,
 		len(compressedPayloads),
 		len(telemetry),
@@ -265,7 +265,7 @@ func (c *Client) SendFunctionLogs(ctx context.Context, invokedFunctionARN string
 	totalTime := time.Since(start)
 	transmissionTime := time.Since(transmitStart)
 	util.Logf(
-		"Sent %d/%d New Relic function log batches successfully with certianty in %.3fms (%dms to transmit %.1fkB).\n",
+		"Sent %d/%d New Relic function log batches successfully with certainty in %.3fms (%dms to transmit %.1fkB).\n",
 		successCount,
 		len(compressedPayloads),
 		float64(totalTime.Microseconds())/1000.0,

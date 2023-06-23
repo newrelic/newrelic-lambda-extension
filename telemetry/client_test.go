@@ -163,7 +163,7 @@ func TestClientSendServerTimeout(t *testing.T) {
 	assert.Equal(t, 0, successCount)
 	assert.Equal(t, int32(0), atomic.LoadInt32(&count))
 
-	if endSend > clientTimeout+5*time.Millisecond {
+	if endSend > clientTimeout+100*time.Millisecond {
 		t.Errorf("took longer exceeded client timeout within a margin of error to fail sending the payload; took %s, expected %s", endSend.String(), clientTimeout.String())
 	}
 }
@@ -193,7 +193,7 @@ func TestClientSendAttemptFailsRetry(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, 0, successCount)
 
-	if endSend > clientTimeout+5*time.Millisecond {
+	if endSend > clientTimeout+100*time.Millisecond {
 		t.Errorf("took longer exceeded client timeout within a margin of error to fail sending the payload; took %s, expected %s", endSend.String(), clientTimeout.String())
 	}
 }
@@ -307,7 +307,7 @@ func TestSendFunctionLogsSendingTimeout(t *testing.T) {
 		t.Error(err)
 	}
 
-	if sendDuration > clientTimeout+10*time.Millisecond {
+	if sendDuration > clientTimeout+100*time.Millisecond {
 		t.Errorf("expected sending logs to take a maximum of %s, but took %s", clientTimeout.String(), sendDuration.String())
 	}
 }

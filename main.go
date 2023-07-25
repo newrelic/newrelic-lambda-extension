@@ -193,6 +193,7 @@ func mainLoop(ctx context.Context, invocationClient *client.InvocationClient, ba
 			return eventCounter
 		default:
 			// Our call to next blocks. It is likely that the container is frozen immediately after we call NextEvent.
+			util.Debugln("mainLoop: blocking while awaiting next invocation event...")
 			event, err := invocationClient.NextEvent(ctx)
 
 			// We've thawed.
@@ -310,10 +311,12 @@ func pollLogServer(logServer *logserver.LogServer, batch *telemetry.Batch) {
 
 func shipHarvest(ctx context.Context, harvested []*telemetry.Invocation, telemetryClient *telemetry.Client) {
 	if len(harvested) > 0 {
+		util.Debugf("shipHarvest: harvesting agent telemetry")
 		telemetrySlice := make([][]byte, 0, 2*len(harvested))
 		for _, inv := range harvested {
 			telemetrySlice = append(telemetrySlice, inv.Telemetry...)
 		}
+		util.Debugf("shipHarveset: %d telemetry payloads harvested", len(telemetrySlice))
 
 		err, _ := telemetryClient.SendTelemetry(ctx, invokedFunctionARN, telemetrySlice)
 		if err != nil {

@@ -115,9 +115,8 @@ func CompressedPayloadsForLogEvents(logsEvents []LogsEvent, functionName string,
 	}
 
 	if compressed.Len() <= maxCompressedPayloadLen {
-		ret := []*bytes.Buffer{compressed}
-		return ret, nil
-	} else {
+		return []*bytes.Buffer{compressed}, nil
+	} else if len(logsEvents) > 1 {
 		// Payload is too large, split in half, recursively
 		split := len(logsEvents) / 2
 		leftRet, err := CompressedPayloadsForLogEvents(logsEvents[0:split], functionName, invokedFunctionARN)
@@ -131,6 +130,9 @@ func CompressedPayloadsForLogEvents(logsEvents []LogsEvent, functionName string,
 		}
 
 		return append(leftRet, rightRet...), nil
+	} else {
+		// when there is one event that is too large, we try to send it anyway. It will fail with a 413 error, but wont loop infinitely.
+		return []*bytes.Buffer{compressed}, nil
 	}
 }
 

@@ -106,6 +106,7 @@ func getLogEndpointURL(licenseKey string, logEndpointOverride string) string {
 }
 
 func (c *Client) SendTelemetry(ctx context.Context, invokedFunctionARN string, telemetry [][]byte) (error, int) {
+	util.Debugf("SendTelemetry: sending telemetry to New Relic...")
 	start := time.Now()
 	logEvents := make([]LogsEvent, 0, len(telemetry))
 	for _, payload := range telemetry {
@@ -113,6 +114,7 @@ func (c *Client) SendTelemetry(ctx context.Context, invokedFunctionARN string, t
 		logEvents = append(logEvents, logEvent)
 	}
 
+	util.Debugf("SendTelemetry: compressing telemetry payloads...")
 	compressedPayloads, err := CompressedPayloadsForLogEvents(logEvents, c.functionName, invokedFunctionARN)
 	if err != nil {
 		return err, 0
@@ -255,6 +257,11 @@ func (c *Client) attemptSend(ctx context.Context, currentPayloadBytes []byte, bu
 // SendFunctionLogs constructs log payloads and sends them to new relic
 func (c *Client) SendFunctionLogs(ctx context.Context, invokedFunctionARN string, lines []logserver.LogLine) error {
 	start := time.Now()
+	if len(lines) == 0 {
+		util.Debugln("client.SendFunctionLogs invoked with 0 log lines. Returning without sending a payload to New Relic")
+		return nil
+	}
+
 	compressedPayloads, builder, err := c.buildLogPayloads(ctx, invokedFunctionARN, lines)
 	if err != nil {
 		return err

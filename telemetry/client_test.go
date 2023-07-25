@@ -30,6 +30,12 @@ func TestClientSend(t *testing.T) {
 		assert.Equal(t, r.Header.Get("X-License-Key"), "a mock license key")
 
 		reqBytes, err := io.ReadAll(r.Body)
+		if len(reqBytes) > 1000000 {
+			w.WriteHeader(413)
+			w.Write([]byte(""))
+			return
+		}
+
 		assert.NoError(t, err)
 		defer util.Close(r.Body)
 		assert.NotEmpty(t, reqBytes)
@@ -51,8 +57,102 @@ func TestClientSend(t *testing.T) {
 	client := NewWithHTTPClient(srv.Client(), "", "a mock license key", srv.URL, srv.URL, &Batch{}, false, clientTestingTimeout)
 
 	ctx := context.Background()
-	bytes := []byte("foobar")
+	bytes := []byte("valid example payload")
 	err, successCount := client.SendTelemetry(ctx, "arn:aws:lambda:us-east-1:1234:function:newrelic-example-go", [][]byte{bytes})
+
+	assert.NoError(t, err)
+	assert.Equal(t, 1, successCount)
+
+	client = New("", "mock license key", srv.URL, srv.URL, &Batch{}, false, clientTestingTimeout)
+	assert.NotNil(t, client)
+}
+
+func TestClientSendPayloadTooLarge(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, r.Method, http.MethodPost)
+
+		assert.Equal(t, r.Header.Get("Content-Encoding"), "gzip")
+		assert.Equal(t, r.Header.Get("Content-Type"), "application/json")
+		assert.Equal(t, r.Header.Get("User-Agent"), "newrelic-lambda-extension")
+		assert.Equal(t, r.Header.Get("X-License-Key"), "a mock license key")
+
+		reqBytes, err := io.ReadAll(r.Body)
+		if len(reqBytes) > 1000000 {
+			w.WriteHeader(413)
+			w.Write([]byte(""))
+			return
+		}
+
+		assert.NoError(t, err)
+		defer util.Close(r.Body)
+		assert.NotEmpty(t, reqBytes)
+
+		reqBody, err := util.Uncompress(reqBytes)
+		assert.NoError(t, err)
+		assert.NotEmpty(t, reqBody)
+
+		var reqData RequestData
+		assert.NoError(t, json.Unmarshal(reqBody, &reqData))
+		assert.NotEmpty(t, reqData)
+
+		w.WriteHeader(200)
+		w.Write([]byte(""))
+	}))
+
+	defer srv.Close()
+
+	client := NewWithHTTPClient(srv.Client(), "", "a mock license key", srv.URL, srv.URL, &Batch{}, false, clientTestingTimeout)
+
+	ctx := context.Background()
+	bytes := []byte(payloadTooLarge)
+	err, successCount := client.SendTelemetry(ctx, "arn:aws:lambda:us-east-1:1234:function:newrelic-example-go", [][]byte{bytes})
+
+	assert.NoError(t, err)
+	assert.Equal(t, 0, successCount)
+
+	client = New("", "mock license key", srv.URL, srv.URL, &Batch{}, false, clientTestingTimeout)
+	assert.NotNil(t, client)
+}
+
+func TestClientSendPayloadTooLargeSplit(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, r.Method, http.MethodPost)
+
+		assert.Equal(t, r.Header.Get("Content-Encoding"), "gzip")
+		assert.Equal(t, r.Header.Get("Content-Type"), "application/json")
+		assert.Equal(t, r.Header.Get("User-Agent"), "newrelic-lambda-extension")
+		assert.Equal(t, r.Header.Get("X-License-Key"), "a mock license key")
+
+		reqBytes, err := io.ReadAll(r.Body)
+		if len(reqBytes) > 1000000 {
+			w.WriteHeader(413)
+			w.Write([]byte(""))
+			return
+		}
+
+		assert.NoError(t, err)
+		defer util.Close(r.Body)
+		assert.NotEmpty(t, reqBytes)
+
+		reqBody, err := util.Uncompress(reqBytes)
+		assert.NoError(t, err)
+		assert.NotEmpty(t, reqBody)
+
+		var reqData RequestData
+		assert.NoError(t, json.Unmarshal(reqBody, &reqData))
+		assert.NotEmpty(t, reqData)
+
+		w.WriteHeader(200)
+		w.Write([]byte(""))
+	}))
+
+	defer srv.Close()
+
+	client := NewWithHTTPClient(srv.Client(), "", "a mock license key", srv.URL, srv.URL, &Batch{}, false, clientTestingTimeout)
+
+	ctx := context.Background()
+	bytes := []byte(payloadTooLarge)
+	err, successCount := client.SendTelemetry(ctx, "arn:aws:lambda:us-east-1:1234:function:newrelic-example-go", [][]byte{bytes, []byte("valid example payload")})
 
 	assert.NoError(t, err)
 	assert.Equal(t, 1, successCount)
@@ -198,7 +298,7 @@ func TestClientSendAttemptFailsRetry(t *testing.T) {
 	}
 }
 
-func TestSendFunctionLogs(t *testing.T) {
+func TestSendFunctionLogsEmpty(t *testing.T) {
 	util.ConfigLogger(true, true)
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -235,23 +335,8 @@ func TestSendFunctionLogs(t *testing.T) {
 	httpClient.Timeout = 200 * time.Millisecond
 	client := NewWithHTTPClient(httpClient, "", "a mock license key", srv.URL, srv.URL, &Batch{}, false, clientTimeout)
 
-	logLines := []logserver.LogLine{
-		{
-			Time:      time.Now(),
-			RequestID: "test-request-1",
-			Content:   []byte("test content"),
-		},
-		{
-			Time:      time.Now(),
-			RequestID: "test-request-2",
-			Content:   []byte("test content"),
-		},
-		{
-			Time:      time.Now(),
-			RequestID: "test-request-3",
-			Content:   []byte("test content"),
-		},
-	}
+	// empty log bundle
+	logLines := []logserver.LogLine{}
 
 	startSendLogs := time.Now()
 	err := client.SendFunctionLogs(context.Background(), testARN, logLines)

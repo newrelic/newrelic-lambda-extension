@@ -95,7 +95,7 @@ func formatReport(metrics map[string]interface{}) string {
 	if val, ok := metrics["initDurationMs"]; ok {
 		ret += fmt.Sprintf("\tInit Duration: %.2f ms", val)
 	}
-	util.Debugf("Formatted Return Report: %s", ret)
+
 	return ret
 }
 

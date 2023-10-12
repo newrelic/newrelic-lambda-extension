@@ -152,7 +152,7 @@ func (c *Client) sendPayloads(compressedPayloads []*bytes.Buffer, builder reques
 
 	var wg sync.WaitGroup
 	wg.Add(len(compressedPayloads))
-
+	// in order to enforce user set timeout on the full operation ctx.WithTimeOut must be outside of the loop
 	ctx, cancel := context.WithTimeout(context.Background(), c.timeout)
 	defer cancel()
 

@@ -10,6 +10,7 @@ import (
 	"net"
 	"net/http"
 	"strings"
+	"sync"
 	"time"
 
 	crypto_rand "crypto/rand"
@@ -148,34 +149,45 @@ func (c *Client) sendPayloads(compressedPayloads []*bytes.Buffer, builder reques
 	successCount = 0
 	sentBytes = 0
 	sendPayloadsStartTime := time.Now()
+
+	var wg sync.WaitGroup
+	wg.Add(len(compressedPayloads))
+
+	ctx, cancel := context.WithTimeout(context.Background(), c.timeout)
+	defer cancel()
+
 	for _, p := range compressedPayloads {
-		sentBytes += p.Len()
-		currentPayloadBytes := p.Bytes()
+		go func(p *bytes.Buffer) {
+			defer wg.Done()
 
-		var response AttemptData
+			sentBytes += p.Len()
+			currentPayloadBytes := p.Bytes()
 
-		// buffer this chanel to allow succesful attempts to go through if possible
-		data := make(chan AttemptData, 1)
-		ctx, cancel := context.WithTimeout(context.Background(), c.timeout)
-		defer cancel()
+			var response AttemptData
 
-		go c.attemptSend(ctx, currentPayloadBytes, builder, data)
+			// buffer this channel to allow successful attempts to go through if possible
+			data := make(chan AttemptData, 1)
 
-		select {
-		case <-ctx.Done():
-			response.Error = fmt.Errorf("failed to send data within user defined timeout period: %s", c.timeout.String())
-		case response = <-data:
-		}
+			go c.attemptSend(ctx, currentPayloadBytes, builder, data)
 
-		if response.Error != nil {
-			util.Logf("Telemetry client error: %s", response.Error)
-			sentBytes -= p.Len()
-		} else if response.Response.StatusCode >= 300 {
-			util.Logf("Telemetry client response: [%s] %s", response.Response.Status, response.ResponseBody)
-		} else {
-			successCount += 1
-		}
+			select {
+			case <-ctx.Done():
+				response.Error = fmt.Errorf("failed to send data within user defined timeout period: %s", c.timeout.String())
+			case response = <-data:
+			}
+
+			if response.Error != nil {
+				util.Logf("Telemetry client error: %s", response.Error)
+				sentBytes -= p.Len()
+			} else if response.Response.StatusCode >= 300 {
+				util.Logf("Telemetry client response: [%s] %s", response.Response.Status, response.ResponseBody)
+			} else {
+				successCount += 1
+			}
+		}(p)
 	}
+
+	wg.Wait()
 
 	util.Debugf("sendPayloads: took %s to finish sending all payloads", time.Since(sendPayloadsStartTime).String())
 	return successCount, sentBytes
@@ -204,6 +216,8 @@ func (c *Client) attemptSend(ctx context.Context, currentPayloadBytes []byte, bu
 				}
 				return
 			}
+			// Sets to user defined context to ensure timeout is respected
+			req = req.WithContext(ctx)
 			//Make request, check for timeout
 			res, err := c.httpClient.Do(req)
 

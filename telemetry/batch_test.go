@@ -24,6 +24,15 @@ var (
 	requestStart = time.Unix(1603821157, 0)
 )
 
+func generateNLengthTelemetryString(length int) string {
+	outStr := ""
+	for i := 0; i < length; i++ {
+		outStr += "a"
+	}
+
+	return outStr
+}
+
 func TestMissingInvocation(t *testing.T) {
 	batch := NewBatch(ripe, rot, false)
 
@@ -71,7 +80,7 @@ func TestWithInvocationRipeHarvest(t *testing.T) {
 	invocation := batch.AddTelemetry(testRequestId, bytes.NewBufferString(testTelemetry).Bytes())
 	assert.NotNil(t, invocation)
 
-	invocation2 := batch.AddTelemetry(testRequestId, bytes.NewBufferString(moreTestTelemetry).Bytes())
+	invocation2 := batch.AddTelemetry(testRequestId, []byte(testTelemetry))
 	assert.Equal(t, invocation, invocation2)
 
 	batch.AddTelemetry(testRequestId2, bytes.NewBufferString(testTelemetry).Bytes())
@@ -92,7 +101,7 @@ func TestWithInvocationAggressiveHarvest(t *testing.T) {
 	invocation := batch.AddTelemetry(testRequestId, bytes.NewBufferString(testTelemetry).Bytes())
 	assert.NotNil(t, invocation)
 
-	invocation2 := batch.AddTelemetry(testRequestId, bytes.NewBufferString(moreTestTelemetry).Bytes())
+	invocation2 := batch.AddTelemetry(testRequestId, bytes.NewBufferString(testTelemetry).Bytes())
 	assert.Equal(t, invocation, invocation2)
 
 	batch.AddTelemetry(testRequestId2, bytes.NewBufferString(testTelemetry).Bytes())
@@ -111,7 +120,7 @@ func TestBatch_Close(t *testing.T) {
 	invocation := batch.AddTelemetry(testRequestId, bytes.NewBufferString(testTelemetry).Bytes())
 	assert.NotNil(t, invocation)
 
-	invocation2 := batch.AddTelemetry(testRequestId, bytes.NewBufferString(moreTestTelemetry).Bytes())
+	invocation2 := batch.AddTelemetry(testRequestId, bytes.NewBufferString(testTelemetry).Bytes())
 	assert.Equal(t, invocation, invocation2)
 
 	batch.AddTelemetry(testRequestId2, bytes.NewBufferString(testTelemetry).Bytes())

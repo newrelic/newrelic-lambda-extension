@@ -24,11 +24,23 @@ var (
 // sanityCheck checks for configuration that is either misplaced or in conflict
 func sanityCheck(ctx context.Context, conf *config.Configuration, res *api.RegistrationResponse, _ runtimeConfig) error {
 	if util.AnyEnvVarsExist(awsLogIngestionEnvVars) {
-		return fmt.Errorf("Environment varaible '%s' is used by aws-log-ingestion and has no effect here. Recommend unsetting this environment variable within this function.", util.AnyEnvVarsExistString(awsLogIngestionEnvVars))
+		return fmt.Errorf("Environment variable '%s' is used by aws-log-ingestion and has no effect here. Recommend unsetting this environment variable within this function.", util.AnyEnvVarsExistString(awsLogIngestionEnvVars))
 	}
 
-	if credentials.IsSecretConfigured(ctx, conf) && util.EnvVarExists("NEW_RELIC_LICENSE_KEY") {
+	envKeyExists := util.EnvVarExists("NEW_RELIC_LICENSE_KEY")
+	isSecretConfigured := credentials.IsSecretConfigured(ctx, conf)
+	isSSMParameterConfigured := credentials.IsSSMParameterConfigured(ctx, conf)
+
+	if isSecretConfigured && envKeyExists {
 		return fmt.Errorf("There is both a AWS Secrets Manager secret and a NEW_RELIC_LICENSE_KEY environment variable set. Recommend removing the NEW_RELIC_LICENSE_KEY environment variable and using the AWS Secrets Manager secret.")
+	}
+
+	if isSSMParameterConfigured && envKeyExists {
+		return fmt.Errorf("There is both a AWS Parameter Store parameter and a NEW_RELIC_LICENSE_KEY environment variable set. Recommend removing the NEW_RELIC_LICENSE_KEY environment variable and using the AWS Parameter Store parameter.")
+	}
+
+	if isSecretConfigured && isSSMParameterConfigured {
+		return fmt.Errorf("There is both a AWS Secrets Manager secret and a AWS Parameter Store parameter set. Recommend using just one.")
 	}
 
 	return nil

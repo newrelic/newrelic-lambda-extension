@@ -13,7 +13,7 @@ def lambda_handler(event, context):
         "zip": "zap"
     })
     # This attribute gets added to the normal AwsLambdaInvocation event
-    agent.add_custom_parameter('customAttribute', 'customAttributeValue')
+    agent.add_custom_attribute('customAttribute', 'customAttributeValue')
 
     # As normal, anything you write to stdout ends up in CloudWatch
     print("Hello, world")

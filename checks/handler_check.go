@@ -35,7 +35,17 @@ func handlerCheck(ctx context.Context, conf *config.Configuration, reg *api.Regi
 func (r runtimeConfig) check(h handlerConfigs) bool {
 	functionHandler := r.getTrueHandler(h)
 	p := removePathMethodName(functionHandler)
-	p = pathFormatter(p, r.fileType)
+	if r.language == Node {
+		pJS := pathFormatter(p, "js")
+		cJS := pathFormatter(p, "cjs")
+		pMJS := pathFormatter(p, "mjs")
+
+		if util.PathExists(pJS) || util.PathExists(pMJS) || util.PathExists(cJS) {
+			return true
+		}
+	} else {
+		p = pathFormatter(p, r.fileType)
+	}
 	return util.PathExists(p)
 }
 

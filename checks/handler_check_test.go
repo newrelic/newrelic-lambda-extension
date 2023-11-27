@@ -54,7 +54,7 @@ func TestRuntimeMethods(t *testing.T) {
 	assert.Equal(t, e3, t3)
 }
 
-func TestHandlerCheck(t *testing.T) {
+func TestHandlerCheckJS(t *testing.T) {
 	conf := config.Configuration{}
 	reg := api.RegistrationResponse{}
 	r := runtimeConfigs[Node]
@@ -78,6 +78,99 @@ func TestHandlerCheck(t *testing.T) {
 	handlerPath = filepath.Join(dirname, "var", "task")
 	os.MkdirAll(filepath.Join(handlerPath, "path", "to"), os.ModePerm)
 	os.Create(filepath.Join(handlerPath, "path", "to", "app.js"))
+
+	reg.Handler = testHandler
+	conf.NRHandler = config.EmptyNRWrapper
+	err = handlerCheck(ctx, &conf, &reg, r)
+	assert.Nil(t, err)
+}
+
+func TestHandlerCheckMJS(t *testing.T) {
+	conf := config.Configuration{}
+	reg := api.RegistrationResponse{}
+	r := runtimeConfigs[Node]
+	ctx := context.Background()
+
+	// No Runtime
+	err := handlerCheck(ctx, &conf, &reg, runtimeConfig{})
+	assert.Nil(t, err)
+
+	// Error
+	reg.Handler = testHandler
+	conf.NRHandler = config.EmptyNRWrapper
+	err = handlerCheck(ctx, &conf, &reg, r)
+	assert.EqualError(t, err, "Missing handler file path/to/app.handler (NEW_RELIC_LAMBDA_HANDLER=Undefined)")
+
+	// Success
+	dirname, err := os.MkdirTemp("", "")
+	assert.Nil(t, err)
+	defer os.RemoveAll(dirname)
+
+	handlerPath = filepath.Join(dirname, "var", "task")
+	os.MkdirAll(filepath.Join(handlerPath, "path", "to"), os.ModePerm)
+	os.Create(filepath.Join(handlerPath, "path", "to", "app.mjs"))
+
+	reg.Handler = testHandler
+	conf.NRHandler = config.EmptyNRWrapper
+	err = handlerCheck(ctx, &conf, &reg, r)
+	assert.Nil(t, err)
+}
+
+func TestHandlerCheckCJS(t *testing.T) {
+	conf := config.Configuration{}
+	reg := api.RegistrationResponse{}
+	r := runtimeConfigs[Node]
+	ctx := context.Background()
+
+	// No Runtime
+	err := handlerCheck(ctx, &conf, &reg, runtimeConfig{})
+	assert.Nil(t, err)
+
+	// Error
+	reg.Handler = testHandler
+	conf.NRHandler = config.EmptyNRWrapper
+	err = handlerCheck(ctx, &conf, &reg, r)
+	assert.EqualError(t, err, "Missing handler file path/to/app.handler (NEW_RELIC_LAMBDA_HANDLER=Undefined)")
+
+	// Success
+	dirname, err := os.MkdirTemp("", "")
+	assert.Nil(t, err)
+	defer os.RemoveAll(dirname)
+
+	handlerPath = filepath.Join(dirname, "var", "task")
+	os.MkdirAll(filepath.Join(handlerPath, "path", "to"), os.ModePerm)
+	os.Create(filepath.Join(handlerPath, "path", "to", "app.cjs"))
+
+	reg.Handler = testHandler
+	conf.NRHandler = config.EmptyNRWrapper
+	err = handlerCheck(ctx, &conf, &reg, r)
+	assert.Nil(t, err)
+}
+
+func TestHandlerCheckPython(t *testing.T) {
+	conf := config.Configuration{}
+	reg := api.RegistrationResponse{}
+	r := runtimeConfigs[Python]
+	ctx := context.Background()
+
+	// No Runtime
+	err := handlerCheck(ctx, &conf, &reg, runtimeConfig{})
+	assert.Nil(t, err)
+
+	// Error
+	reg.Handler = testHandler
+	conf.NRHandler = config.EmptyNRWrapper
+	err = handlerCheck(ctx, &conf, &reg, r)
+	assert.EqualError(t, err, "Missing handler file path/to/app.handler (NEW_RELIC_LAMBDA_HANDLER=Undefined)")
+
+	// Success
+	dirname, err := os.MkdirTemp("", "")
+	assert.Nil(t, err)
+	defer os.RemoveAll(dirname)
+
+	handlerPath = filepath.Join(dirname, "var", "task")
+	os.MkdirAll(filepath.Join(handlerPath, "path", "to"), os.ModePerm)
+	os.Create(filepath.Join(handlerPath, "path", "to", "app.py"))
 
 	reg.Handler = testHandler
 	conf.NRHandler = config.EmptyNRWrapper

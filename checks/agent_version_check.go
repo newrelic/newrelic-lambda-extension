@@ -4,7 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"os"
 	"path/filepath"
 
 	"github.com/newrelic/newrelic-lambda-extension/config"
@@ -32,7 +32,7 @@ func agentVersionCheck(ctx context.Context, conf *config.Configuration, reg *api
 			continue
 		}
 
-		b, err := ioutil.ReadFile(f)
+		b, err := os.ReadFile(f)
 		if err != nil {
 			return nil
 		}

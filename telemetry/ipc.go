@@ -5,11 +5,16 @@ import (
 	"log"
 	"os"
 	"syscall"
+	"time"
 
 	"github.com/newrelic/newrelic-lambda-extension/util"
 )
 
-const telemetryNamedPipePath = "/tmp/newrelic-telemetry"
+const (
+	telemetryNamedPipePath       = "/tmp/newrelic-telemetry"
+	telemetryNamedPipeRetries    = 10
+	telemetryNamedPipeRetryDelay = 10 * time.Millisecond
+)
 
 func InitTelemetryChannel() (chan []byte, error) {
 	_ = os.Remove(telemetryNamedPipePath)
@@ -17,6 +22,22 @@ func InitTelemetryChannel() (chan []byte, error) {
 	err := syscall.Mkfifo(telemetryNamedPipePath, 0666)
 	if err != nil {
 		return nil, err
+	}
+
+	// verify that the special file is visible in the file system
+	// before we try to open it, to avoid a race condition
+	var tries int
+	for {
+		_, err := os.Stat(telemetryNamedPipePath)
+		if err == nil {
+			break
+		}
+		if tries < telemetryNamedPipeRetries {
+			tries++
+			time.Sleep(telemetryNamedPipeRetryDelay)
+		} else {
+			log.Panic("failed to create telemetry pipe ", err)
+		}
 	}
 
 	telemetryChan := make(chan []byte)

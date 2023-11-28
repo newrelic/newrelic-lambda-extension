@@ -3,6 +3,7 @@ package checks
 import (
 	"context"
 	"fmt"
+	"os"
 	"strings"
 
 	"github.com/newrelic/newrelic-lambda-extension/config"
@@ -25,7 +26,7 @@ func handlerCheck(ctx context.Context, conf *config.Configuration, reg *api.Regi
 		}
 
 		if !r.check(h) {
-			return fmt.Errorf("Missing handler file %s (NEW_RELIC_LAMBDA_HANDLER=%s)", h.handlerName, conf.NRHandler)
+			return fmt.Errorf("missing handler file %s (NEW_RELIC_LAMBDA_HANDLER=%s)", h.handlerName, conf.NRHandler)
 		}
 	}
 
@@ -50,6 +51,10 @@ func (r runtimeConfig) check(h handlerConfigs) bool {
 }
 
 func (r runtimeConfig) getTrueHandler(h handlerConfigs) string {
+	esm := strings.ToLower(os.Getenv("NEW_RELIC_USE_ESM"))
+	if esm == "true" {
+		return h.handlerName
+	}
 	if h.handlerName != r.wrapperName {
 		util.Logln("Warning: handler not set to New Relic layer wrapper", r.wrapperName)
 		return h.handlerName

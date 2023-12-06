@@ -75,9 +75,11 @@ func ConfigurationFromEnvironment() *Configuration {
 
 	if lkOverride {
 		ret.LicenseKey = licenseKey
-	} else if lkSecretOverride {
+	}
+	if lkSecretOverride {
 		ret.LicenseKeySecretId = licenseKeySecretId
-	} else if lkSSMParameterOverride {
+	}
+	if lkSSMParameterOverride {
 		ret.LicenseKeySSMParameterName = licenseKeySSMParameterName
 	}
 

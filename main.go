@@ -64,6 +64,8 @@ func main() {
 	// Optionally enable debug logging, disabled by default
 	util.ConfigLogger(conf.LogsEnabled, conf.LogLevel == config.DebugLogLevel)
 
+	util.Logf("Initializing version %s of the New Relic Lambda Extension...", util.Version)
+
 	// Extensions must register
 	registrationClient := client.New(http.Client{})
 

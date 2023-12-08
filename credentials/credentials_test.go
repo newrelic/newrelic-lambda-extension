@@ -181,15 +181,6 @@ func TestGetNewRelicLicenseKey(t *testing.T) {
 			ExpectedErr: "Parameter not found",
 		},
 		{
-			Name: "defaults to license key",
-			Conf: config.Configuration{
-				LicenseKey:         "12345",
-				LicenseKeySecretId: "testSecretName",
-			},
-			SecretsManager: mockSecretManager{},
-			ExpectedKey:    "12345",
-		},
-		{
 			Name:           "returns error if no license key is configured",
 			Conf:           config.Configuration{},
 			SecretsManager: mockSecretManager{},

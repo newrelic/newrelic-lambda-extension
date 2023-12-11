@@ -149,12 +149,12 @@ func main() {
 
 	util.Logf("New Relic Extension shutting down after %v events\n", eventCounter)
 
+	pollLogServer(logServer, batch)
 	err = logServer.Close()
 	if err != nil {
 		util.Logln("Error shutting down Log API server", err)
 	}
 
-	pollLogServer(logServer, batch)
 	finalHarvest := batch.Close()
 	shipHarvest(ctx, finalHarvest, telemetryClient)
 

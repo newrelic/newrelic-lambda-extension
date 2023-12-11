@@ -1,6 +1,7 @@
 package logserver
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -33,7 +34,6 @@ type LogServer struct {
 	functionLogChan   chan []LogLine
 	lastRequestId     string
 	lastRequestIdLock *sync.Mutex
-	wg                *sync.WaitGroup
 }
 
 func (ls *LogServer) Port() uint16 {
@@ -43,13 +43,10 @@ func (ls *LogServer) Port() uint16 {
 }
 
 func (ls *LogServer) Close() error {
-	// Pause briefly to allow final platform logs to arrive
-	time.Sleep(200 * time.Millisecond)
+	ctx, cancel := context.WithTimeout(context.Background(), 200*time.Millisecond)
+	defer cancel()
 
-	// Wait for all ongoing log processing to complete
-	ls.wg.Wait()
-
-	ret := ls.server.Close()
+	ret := ls.server.Shutdown(ctx)
 
 	close(ls.platformLogChan)
 	close(ls.functionLogChan)
@@ -187,9 +184,7 @@ func (ls *LogServer) handler(res http.ResponseWriter, req *http.Request) {
 	}
 
 	if len(functionLogs) > 0 {
-		ls.wg.Add(1) // Increment the shared WaitGroup counter
 		ls.functionLogChan <- functionLogs
-		ls.wg.Done() // Decrement the shared WaitGroup counter
 	}
 
 	_, _ = res.Write(nil)
@@ -213,7 +208,6 @@ func startInternal(host string) (*LogServer, error) {
 		platformLogChan:   make(chan LogLine, platformLogBufferSize),
 		functionLogChan:   make(chan []LogLine),
 		lastRequestIdLock: &sync.Mutex{},
-		wg:                &sync.WaitGroup{},
 	}
 
 	mux := http.NewServeMux()

@@ -1,6 +1,7 @@
 package logserver
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -42,10 +43,11 @@ func (ls *LogServer) Port() uint16 {
 }
 
 func (ls *LogServer) Close() error {
-	// Pause briefly to allow final platform logs to arrive
-	time.Sleep(200 * time.Millisecond)
+	ctx, cancel := context.WithTimeout(context.Background(), 200*time.Millisecond)
+	defer cancel()
 
-	ret := ls.server.Close()
+	ret := ls.server.Shutdown(ctx)
+
 	close(ls.platformLogChan)
 	close(ls.functionLogChan)
 	return ret

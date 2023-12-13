@@ -47,6 +47,9 @@ func (ls *LogServer) Close() error {
 	defer cancel()
 
 	ret := ls.server.Shutdown(ctx)
+	if ret == context.DeadlineExceeded {
+		ret = nil
+	}
 
 	close(ls.platformLogChan)
 	close(ls.functionLogChan)

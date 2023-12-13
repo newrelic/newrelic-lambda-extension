@@ -14,7 +14,7 @@ import (
 var testHandler = "path/to/app.handler"
 
 func TestRuntimeMethods(t *testing.T) {
-	conf := config.Configuration{}
+	conf := config.Configuration{TestingOverride: true}
 	r := runtimeConfigs[Node]
 	h := handlerConfigs{
 		handlerName: r.wrapperName,
@@ -55,7 +55,7 @@ func TestRuntimeMethods(t *testing.T) {
 }
 
 func TestHandlerCheckJS(t *testing.T) {
-	conf := config.Configuration{}
+	conf := config.Configuration{TestingOverride: true}
 	reg := api.RegistrationResponse{}
 	r := runtimeConfigs[Node]
 	ctx := context.Background()
@@ -86,7 +86,7 @@ func TestHandlerCheckJS(t *testing.T) {
 }
 
 func TestHandlerCheckMJS(t *testing.T) {
-	conf := config.Configuration{}
+	conf := config.Configuration{TestingOverride: true}
 	reg := api.RegistrationResponse{}
 	r := runtimeConfigs[Node]
 	ctx := context.Background()
@@ -117,7 +117,7 @@ func TestHandlerCheckMJS(t *testing.T) {
 }
 
 func TestHandlerCheckCJS(t *testing.T) {
-	conf := config.Configuration{}
+	conf := config.Configuration{TestingOverride: true}
 	reg := api.RegistrationResponse{}
 	r := runtimeConfigs[Node]
 	ctx := context.Background()
@@ -148,7 +148,7 @@ func TestHandlerCheckCJS(t *testing.T) {
 }
 
 func TestHandlerCheckPython(t *testing.T) {
-	conf := config.Configuration{}
+	conf := config.Configuration{TestingOverride: true}
 	reg := api.RegistrationResponse{}
 	r := runtimeConfigs[Python]
 	ctx := context.Background()

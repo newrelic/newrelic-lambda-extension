@@ -19,6 +19,7 @@ const (
 var EmptyNRWrapper = "Undefined"
 
 type Configuration struct {
+	TestingOverride            bool // ignores envioronment specific details when running unit tests
 	ExtensionEnabled           bool
 	LogsEnabled                bool
 	SendFunctionLogs           bool

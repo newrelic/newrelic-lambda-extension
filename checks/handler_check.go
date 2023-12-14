@@ -51,13 +51,16 @@ func (r runtimeConfig) check(h handlerConfigs) bool {
 }
 
 func (r runtimeConfig) getTrueHandler(h handlerConfigs) string {
-	esm := strings.ToLower(os.Getenv("NEW_RELIC_USE_ESM"))
-	if esm == "true" {
-		return h.handlerName
+	if !h.conf.TestingOverride {
+		esm := strings.ToLower(os.Getenv("NEW_RELIC_USE_ESM"))
+		if esm == "true" {
+			return h.handlerName
+		}
+		if util.PathExists("/.dockerenv") {
+			return h.handlerName
+		}
 	}
-	if util.PathExists("/.dockerenv") {
-		return h.handlerName
-	}
+
 	if h.handlerName != r.wrapperName {
 		util.Logln("Warning: handler not set to New Relic layer wrapper", r.wrapperName)
 		return h.handlerName

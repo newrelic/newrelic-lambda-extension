@@ -45,7 +45,7 @@ func main() {
 	go func() {
 		s := <-sigs
 		cancel()
-		util.Logf("Received %v Exiting", s)
+		util.Infof("Received %v Exiting", s)
 	}()
 
 	// Allow extension to be interrupted with CTRL-C
@@ -64,7 +64,7 @@ func main() {
 	// Optionally enable debug logging, disabled by default
 	util.ConfigLogger(conf.LogsEnabled, conf.LogLevel == config.DebugLogLevel)
 
-	util.Logf("Initializing version %s of the New Relic Lambda Extension...", util.Version)
+	util.Infof("Initializing version %s of the New Relic Lambda Extension...", util.Version)
 
 	// Extensions must register
 	registrationClient := client.New(http.Client{})
@@ -80,7 +80,7 @@ func main() {
 
 	// If extension disabled, go into no op mode
 	if !conf.ExtensionEnabled {
-		util.Logln("Extension telemetry processing disabled")
+		util.Infoln("Extension telemetry processing disabled")
 		noopLoop(ctx, invocationClient)
 		return
 	}
@@ -88,7 +88,7 @@ func main() {
 	// Attempt to find the license key for telemetry sending
 	licenseKey, err := credentials.GetNewRelicLicenseKey(ctx, conf)
 	if err != nil {
-		util.Logln("Failed to retrieve New Relic license key", err)
+		util.Infoln("Failed to retrieve New Relic license key", err)
 		// We fail open; telemetry will go to CloudWatch instead
 		noopLoop(ctx, invocationClient)
 		return
@@ -102,7 +102,7 @@ func main() {
 	if err != nil {
 		err2 := invocationClient.InitError(ctx, "logServer.start", err)
 		if err2 != nil {
-			util.Logln(err2)
+			util.Infoln(err2)
 		}
 		util.Panic("Failed to start logs HTTP server", err)
 	}
@@ -116,7 +116,7 @@ func main() {
 	if err != nil {
 		err2 := invocationClient.InitError(ctx, "logServer.register", err)
 		if err2 != nil {
-			util.Logln(err2)
+			util.Infoln(err2)
 		}
 		util.Panic("Failed to register with Logs API", err)
 	}
@@ -127,7 +127,7 @@ func main() {
 	if err != nil {
 		err2 := invocationClient.InitError(ctx, "telemetryClient.init", err)
 		if err2 != nil {
-			util.Logln(err2)
+			util.Infoln(err2)
 		}
 		util.Panic("telemetry pipe init failed: ", err)
 	}
@@ -149,12 +149,12 @@ func main() {
 	// Call next, and process telemetry, until we're shut down
 	eventCounter := mainLoop(ctx, invocationClient, batch, telemetryChan, logServer, telemetryClient)
 
-	util.Logf("New Relic Extension shutting down after %v events\n", eventCounter)
+	util.Infof("New Relic Extension shutting down after %v events\n", eventCounter)
 
 	pollLogServer(logServer, batch)
 	err = logServer.Close()
 	if err != nil {
-		util.Logln("Error shutting down Log API server", err)
+		util.Infoln("Error shutting down Log API server", err)
 	}
 
 	finalHarvest := batch.Close()
@@ -165,7 +165,7 @@ func main() {
 
 	shutdownAt := time.Now()
 	ranFor := shutdownAt.Sub(extensionStartup)
-	util.Logf("Extension shutdown after %vms", ranFor.Milliseconds())
+	util.Infof("Extension shutdown after %vms", ranFor.Milliseconds())
 }
 
 // logShipLoop ships function logs to New Relic as they arrive.
@@ -178,7 +178,7 @@ func logShipLoop(ctx context.Context, logServer *logserver.LogServer, telemetryC
 
 		err := telemetryClient.SendFunctionLogs(ctx, invokedFunctionARN, functionLogs)
 		if err != nil {
-			util.Logf("Failed to send %d function logs", len(functionLogs))
+			util.Infof("Failed to send %d function logs", len(functionLogs))
 		}
 	}
 }
@@ -202,10 +202,10 @@ func mainLoop(ctx context.Context, invocationClient *client.InvocationClient, ba
 			eventStart := time.Now()
 
 			if err != nil {
-				util.Logln(err)
+				util.Infoln(err)
 				err = invocationClient.ExitError(ctx, "NextEventError.Main", err)
 				if err != nil {
-					util.Logln(err)
+					util.Infoln(err)
 				}
 				continue
 			}
@@ -222,7 +222,7 @@ func mainLoop(ctx context.Context, invocationClient *client.InvocationClient, ba
 					// We received telemetry
 					util.Debugf("Agent telemetry bytes: %s", base64.URLEncoding.EncodeToString(telemetryBytes))
 					batch.AddTelemetry(lastRequestId, telemetryBytes)
-					util.Logf("We suspected a timeout for request %s but got telemetry anyway", lastRequestId)
+					util.Infof("We suspected a timeout for request %s but got telemetry anyway", lastRequestId)
 				default:
 				}
 			}
@@ -287,7 +287,7 @@ func mainLoop(ctx context.Context, invocationClient *client.InvocationClient, ba
 				util.Debugf("Agent telemetry bytes: %s", base64.URLEncoding.EncodeToString(telemetryBytes))
 				inv := batch.AddTelemetry(lastRequestId, telemetryBytes)
 				if inv == nil {
-					util.Logf("Failed to add telemetry for request %v", lastRequestId)
+					util.Infof("Failed to add telemetry for request %v", lastRequestId)
 				}
 
 				// Opportunity for an aggressive harvest, in which case, we definitely want to wait for the HTTP POST
@@ -322,13 +322,13 @@ func shipHarvest(ctx context.Context, harvested []*telemetry.Invocation, telemet
 
 		err, _ := telemetryClient.SendTelemetry(ctx, invokedFunctionARN, telemetrySlice)
 		if err != nil {
-			util.Logf("Failed to send harvested telemetry for %d invocations %s", len(harvested), err)
+			util.Infof("Failed to send harvested telemetry for %d invocations %s", len(harvested), err)
 		}
 	}
 }
 
 func noopLoop(ctx context.Context, invocationClient *client.InvocationClient) {
-	util.Logln("Starting no-op mode, no telemetry will be sent")
+	util.Infoln("Starting no-op mode, no telemetry will be sent")
 
 	for {
 		select {
@@ -337,10 +337,10 @@ func noopLoop(ctx context.Context, invocationClient *client.InvocationClient) {
 		default:
 			event, err := invocationClient.NextEvent(ctx)
 			if err != nil {
-				util.Logln(err)
+				util.Infoln(err)
 				errErr := invocationClient.ExitError(ctx, "NextEventError.Noop", err)
 				if errErr != nil {
-					util.Logln(errErr)
+					util.Infoln(errErr)
 				}
 				continue
 			}

@@ -8,6 +8,6 @@ import (
 func Close(thing io.Closer) {
 	err := thing.Close()
 	if err != nil {
-		Logln(err)
+		Infoln(err)
 	}
 }

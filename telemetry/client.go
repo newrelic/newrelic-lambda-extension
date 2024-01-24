@@ -129,7 +129,7 @@ func (c *Client) SendTelemetry(ctx context.Context, invokedFunctionARN string, t
 	end := time.Now()
 	totalTime := end.Sub(start)
 	transmissionTime := end.Sub(transmitStart)
-	util.Logf(
+	util.Infof(
 		"Sent %d/%d New Relic payload batches with %d log events successfully with certainty in %.3fms (%dms to transmit %.1fkB).\n",
 		successCount,
 		len(compressedPayloads),
@@ -168,10 +168,10 @@ func (c *Client) sendPayloads(compressedPayloads []*bytes.Buffer, builder reques
 		}
 
 		if response.Error != nil {
-			util.Logf("Telemetry client error: %s", response.Error)
+			util.Infof("Telemetry client error: %s", response.Error)
 			sentBytes -= p.Len()
 		} else if response.Response.StatusCode >= 300 {
-			util.Logf("Telemetry client response: [%s] %s", response.Response.Status, response.ResponseBody)
+			util.Infof("Telemetry client response: [%s] %s", response.Response.Status, response.ResponseBody)
 		} else {
 			successCount += 1
 		}
@@ -271,7 +271,7 @@ func (c *Client) SendFunctionLogs(ctx context.Context, invokedFunctionARN string
 	successCount, sentBytes := c.sendPayloads(compressedPayloads, builder)
 	totalTime := time.Since(start)
 	transmissionTime := time.Since(transmitStart)
-	util.Logf(
+	util.Infof(
 		"Sent %d/%d New Relic function log batches successfully with certainty in %.3fms (%dms to transmit %.1fkB).\n",
 		successCount,
 		len(compressedPayloads),

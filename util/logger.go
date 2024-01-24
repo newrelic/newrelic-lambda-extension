@@ -35,13 +35,13 @@ func (l Logger) Debugln(v ...interface{}) {
 	}
 }
 
-func (l Logger) Logf(format string, v ...interface{}) {
+func (l Logger) Infof(format string, v ...interface{}) {
 	if l.isEnabled {
 		log.Printf(format, v...)
 	}
 }
 
-func (l Logger) Logln(v ...interface{}) {
+func (l Logger) Infoln(v ...interface{}) {
 	if l.isEnabled {
 		log.Println(v...)
 	}
@@ -59,13 +59,13 @@ func Debugln(v ...interface{}) {
 	}
 }
 
-func Logf(format string, v ...interface{}) {
+func Infof(format string, v ...interface{}) {
 	if logger.isEnabled {
 		log.Printf(format, v...)
 	}
 }
 
-func Logln(v ...interface{}) {
+func Infoln(v ...interface{}) {
 	if logger.isEnabled {
 		log.Println(v...)
 	}

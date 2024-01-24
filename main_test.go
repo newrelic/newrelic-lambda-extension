@@ -192,7 +192,7 @@ func TestMainShutdown(t *testing.T) {
 	)
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		util.Logln("Path: ", r.URL.Path)
+		util.Infoln("Path: ", r.URL.Path)
 		defer util.Close(r.Body)
 
 		if r.URL.Path == "/2020-01-01/extension/register" {
@@ -281,7 +281,7 @@ func TestMainNoLicenseKey(t *testing.T) {
 	)
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		util.Logln("Path: ", r.URL.Path)
+		util.Infoln("Path: ", r.URL.Path)
 		defer util.Close(r.Body)
 
 		if r.URL.Path == "/2020-01-01/extension/register" {
@@ -364,7 +364,7 @@ func TestMainExtensionDisabled(t *testing.T) {
 	)
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		util.Logln("Path: ", r.URL.Path)
+		util.Infoln("Path: ", r.URL.Path)
 		defer util.Close(r.Body)
 
 		if r.URL.Path == "/2020-01-01/extension/register" {

@@ -26,7 +26,7 @@ jobs:
       
       - name: upload artifact
         env:
-          AUTH_TOKEN: ${{ secrets.RELEASE_ASSET_TOKEN }}
+          GH_TOKEN: ${{ secrets.RELEASE_ASSET_TOKEN }}
         run: |
           tag=$(gh release list --json tagName -q '.[0].tagName')
           file=/tmp/newrelic-lambda-extension.arm64.zip
@@ -35,8 +35,6 @@ jobs:
           fi
 
           echo "uploading $file to release $tag"
-          
-          gh auth login --with-token <<< "$AUTH_TOKEN"
           gh release upload "$tag" "$file"        
         
         

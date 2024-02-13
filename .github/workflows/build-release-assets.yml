@@ -29,13 +29,14 @@ jobs:
           AUTH_TOKEN: ${{ secrets.RELEASE_ASSET_TOKEN }}
         run: |
           tag=$(git tag | sort -V | tail -1)
+          file=/tmp/newrelic-lambda-extension.arm64.zip
           if [ -f /tmp/newrelic-lambda-extension.x86_64.zip ];then
             file=/tmp/newrelic-lambda-extension.x86_64.zip
-          else
-            file=/tmp/newrelic-lambda-extension.arm64.zip
           fi
+
+          echo "uploading $file to release $tag"
           
-          #gh auth login --with-token <<< "$AUTH_TOKEN"
-          gh release upload $tag $file        
+          gh auth login --with-token <<< "$AUTH_TOKEN"
+          gh release upload "$tag" "$file"        
         
         

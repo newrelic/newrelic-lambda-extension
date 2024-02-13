@@ -25,13 +25,8 @@ jobs:
         run: make ${{ matrix.make_directive }}
       
       - name: upload artifact
-        run: |
-          tag=$(git tag | sort -V | tail -1)
-          if [ -f /tmp/newrelic-lambda-extension.x86_64.zip ];then
-            file=/tmp/newrelic-lambda-extension.x86_64.zip
-          else
-            file=/tmp/newrelic-lambda-extension.arm64.zip
-          fi
-          
-          gh auth login --with-token ${{ secrets.GITHUB_TOKEN }}
-          gh release upload $tag $file        
+        uses: actions/upload-artifact@v4
+        with:
+          path: /tmp/newrelic-lambda-extension.*.zip
+        
+        

@@ -35,7 +35,7 @@ jobs:
             file=/tmp/newrelic-lambda-extension.arm64.zip
           fi
           
-          gh auth login --with-token <<< "$AUTH_TOKEN"
+          #gh auth login --with-token <<< "$AUTH_TOKEN"
           gh release upload $tag $file        
         
         

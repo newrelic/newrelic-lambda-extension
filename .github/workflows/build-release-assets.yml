@@ -19,7 +19,7 @@ jobs:
       - name: set up Go
         uses: actions/setup-go@v3
         with:
-          go-version: 1.19
+          go-version: 1.21
 
       - name: make zip
         run: make ${{ matrix.make_directive }}
@@ -28,6 +28,8 @@ jobs:
         env:
           AUTH_TOKEN: ${{ secrets.RELEASE_ASSET_TOKEN }}
         run: |
+          pwd
+          git tag
           tag=$(git tag | sort -V | tail -1)
           file=/tmp/newrelic-lambda-extension.arm64.zip
           if [ -f /tmp/newrelic-lambda-extension.x86_64.zip ];then

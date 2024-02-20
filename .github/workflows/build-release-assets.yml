@@ -6,35 +6,92 @@ on:
   workflow_dispatch:
   release:
     types: [published]
+
+env:
+  TEST_RESULTS: /tmp/test-results
+
 jobs:
-  releases-matrix:
-    name: Release Zip
+  build:
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        make_directive: [zip-x86_64, zip-arm64]
+    container:
+      image: cimg/go:1.19
     steps:
       - uses: actions/checkout@v3
-
-      - name: set up Go
-        uses: actions/setup-go@v3
-        with:
-          go-version: 1.21
-
-      - name: make zip
-        run: make ${{ matrix.make_directive }}
-      
-      - name: upload artifact
-        env:
-          GH_TOKEN: ${{ secrets.RELEASE_ASSET_TOKEN }}
+      - name: Set up test results directory
+        run: mkdir -p $GITHUB_WORKSPACE/test-results
+      - name: Run unit tests
         run: |
-          tag=$(gh release list --json tagName -q '.[0].tagName')
-          file=/tmp/newrelic-lambda-extension.arm64.zip
-          if [ -f /tmp/newrelic-lambda-extension.x86_64.zip ];then
-            file=/tmp/newrelic-lambda-extension.x86_64.zip
-          fi
+          PACKAGE_NAMES=$(go list ./... | xargs)
+          gotestsum --junitfile $TEST_RESULTS/gotestsum-report.xml -- $PACKAGE_NAMES
+      - name: Cache Go modules
+        uses: actions/cache@v3
+        with:
+          path: /go/pkg/mod
+          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go-
+      - name: Run build
+        run: make build
 
-          echo "uploading $file to release $tag"
-          gh release upload "$tag" "$file"        
-        
-        
+  coverage:
+    runs-on: ubuntu-latest
+    container:
+      image: cimg/go:1.19
+    needs: build
+    steps:
+      - uses: actions/checkout@v3
+      - name: Generate coverage report
+        run: make coverage
+      - name: Upload coverage report
+        run: bash -c "$(curl -s https://codecov.io/bash)"
+
+
+  build-release-x86_64:
+    runs-on: ubuntu-latest
+    container:
+      image: cimg/go:1.19
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/v')
+    steps:
+      - uses: actions/checkout@v3
+      - name: Build and archive x86_64 distribution
+        run: make zip-x86_64
+      - name: Upload x86_64 binary as artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: newrelic-lambda-extension-x86_64
+          path: /tmp/newrelic-lambda-extension.x86_64.zip
+      - name: Publish x86_64 release on GitHub
+        uses: softprops/action-gh-release@v1
+        with:
+          files: /tmp/newrelic-lambda-extension.x86_64.zip
+          token: ${{ secrets.GITHUB_TOKEN }}
+          tag_name: ${{ github.ref_name }}
+          name: "Experimenatal Extension ${{ github.ref_name }}"
+          draft: false
+          prerelease: false
+
+  build-release-arm:
+    runs-on: ubuntu-latest
+    container:
+      image: cimg/go:1.19
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/v')
+    steps:
+      - uses: actions/checkout@v3
+      - name: Build and archive arm distribution
+        run: make zip-arm64
+      - name: Upload arm binary as artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: newrelic-lambda-extension-arm64
+          path: /tmp/newrelic-lambda-extension.arm64.zip
+      - name: Publish zip-arm64 release on GitHub
+        uses: softprops/action-gh-release@v1
+        with:
+          files: /tmp/newrelic-lambda-extension.arm64.zip
+          token: ${{ secrets.GITHUB_TOKEN }}
+          tag_name: ${{ github.ref_name }}
+          name: "newrelic-lambda-extension ${{ github.ref_name }}"
+          draft: false
+          prerelease: false

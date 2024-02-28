@@ -5,7 +5,7 @@ name: Build Release Assets
 on: [push]
 
 env:
-
+  TEST_RESULTS: /tmp/test-results
 
 jobs:
   build-release-x86_64:
@@ -18,10 +18,15 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Create test directory
+        run: mkdir -p $TEST_RESULTS
+
       - name: Run unit tests
         run: |
           PACKAGE_NAMES=$(go list ./... | xargs)
           gotestsum --junitfile ${TEST_RESULTS}/gotestsum-report.xml -- $PACKAGE_NAMES
+      - name: Run build
+        run: make build
 
 
   # build-release-arm:

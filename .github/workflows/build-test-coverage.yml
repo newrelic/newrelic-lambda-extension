@@ -1,0 +1,52 @@
+# This workflow will test and run code coverage for the golang project
+# For more information see: https://docs.github.com/en/actions/automating-builds-and-tests/building-and-testing-go
+
+name: Build Test Coverage
+on:
+  pull_request:
+  push:
+
+
+env:
+  TEST_RESULTS: /tmp/test-results
+
+jobs:
+  build-test:
+    runs-on: ubuntu-20.04
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.20'
+          cache-dependency-path: |
+             subdir/go.sum
+             tools/go.sum
+      - name: Create test directory
+        run: mkdir -p $TEST_RESULTS
+      - name: Install gotestsum
+        run: go install gotest.tools/gotestsum@latest
+      - name: Run unit tests
+        run: |
+          PACKAGE_NAMES=$(go list ./... | xargs)
+          gotestsum --junitfile ${TEST_RESULTS}/gotestsum-report.xml -- $PACKAGE_NAMES
+      - name: Run build
+        run: make build
+
+
+  coverage:
+    runs-on: ubuntu-20.04
+    needs: build-test
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Setup Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: '1.20'
+          cache: true
+      - name: Generate coverage report
+        run: make coverage
+      - name: Upload coverage report
+        run: bash -c "$(curl -s https://codecov.io/bash)"

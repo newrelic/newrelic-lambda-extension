@@ -23,15 +23,14 @@ jobs:
       - name: Build and archive x86_64 distribution
         run: make zip-x86_64
       - name: Publish x86_64 release on GitHub
-        uses: softprops/action-gh-release@v1
-        with:
-          files: /tmp/newrelic-lambda-extension.x86_64.zip
-          token: ${{ secrets.GITHUB_TOKEN }}
-          tag_name: ${{ github.ref_name }}
-          name: "Release ${{ github.ref_name }}"
-          draft: false
-          prerelease: false
-
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          file=/tmp/newrelic-lambda-extension.x86_64.zip
+          echo "uploading $file to release $TAG"
+          gh release upload "$tag" "$file"
+  
   build-release-arm:
     runs-on: ubuntu-20.04
     if: startsWith(github.ref, 'refs/tags/v')
@@ -47,11 +46,10 @@ jobs:
       - name: Build and archive arm distribution
         run: make zip-arm64
       - name: Publish zip-arm64 release on GitHub
-        uses: softprops/action-gh-release@v1
-        with:
-          files: /tmp/newrelic-lambda-extension.arm64.zip
-          token: ${{ secrets.GITHUB_TOKEN }}
-          tag_name: ${{ github.ref_name }}
-          name: "Release ${{ github.ref_name }}"
-          draft: false
-          prerelease: false
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          file=/tmp/newrelic-lambda-extension.arm64.zip
+          echo "uploading $file to release $TAG"
+          gh release upload "$tag" "$file"

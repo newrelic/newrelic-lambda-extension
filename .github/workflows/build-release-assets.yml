@@ -29,7 +29,7 @@ jobs:
         run: |
           file=/tmp/newrelic-lambda-extension.x86_64.zip
           echo "uploading $file to release $TAG"
-          gh release upload "$tag" "$file"
+          gh release upload "$TAG" "$file"
   
   build-release-arm:
     runs-on: ubuntu-20.04
@@ -52,4 +52,4 @@ jobs:
         run: |
           file=/tmp/newrelic-lambda-extension.arm64.zip
           echo "uploading $file to release $TAG"
-          gh release upload "$tag" "$file"
+          gh release upload "$TAG" "$file"

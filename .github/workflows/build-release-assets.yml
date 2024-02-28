@@ -12,9 +12,9 @@ env:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
     container:
-      image: cimg/go:1.19
+      image: golang:1.20
     steps:
       - uses: actions/checkout@v3
       - name: Set up test results directory
@@ -34,9 +34,9 @@ jobs:
         run: make build
 
   coverage:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
     container:
-      image: cimg/go:1.19
+      image: golang:1.20
     needs: build
     steps:
       - uses: actions/checkout@v3
@@ -47,9 +47,9 @@ jobs:
 
 
   build-release-x86_64:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
     container:
-      image: cimg/go:1.19
+      image: golang:1.20
     needs: build
     if: startsWith(github.ref, 'refs/tags/v')
     steps:
@@ -72,9 +72,9 @@ jobs:
           prerelease: false
 
   build-release-arm:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
     container:
-      image: cimg/go:1.19
+      image: golang:1.20
     needs: build
     if: startsWith(github.ref, 'refs/tags/v')
     steps:

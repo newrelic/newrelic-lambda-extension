@@ -17,10 +17,12 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
       - name: Setup Go
-        uses: actions/setup-go@v4
+        uses: actions/setup-go@v5
         with:
           go-version: '1.20'
-          cache: true
+          cache-dependency-path: |
+             subdir/go.sum
+             tools/go.sum
       - name: Create test directory
         run: mkdir -p $TEST_RESULTS
       - name: Install gotestsum
@@ -35,6 +37,7 @@ jobs:
 
   coverage:
     runs-on: ubuntu-20.04
+    needs: build-test
     steps:
       - name: Checkout code
         uses: actions/checkout@v4

@@ -21,18 +21,18 @@ jobs:
       - uses: actions/checkout@v4
       - name: Build and archive x86_64 distribution
         run: make zip-x86_64
-      - name: Upload x86_64 binary as artifact
-        uses: actions/upload-artifact@v3
-        with:
-          name: newrelic-lambda-extension-x86_64
-          path: /tmp/newrelic-lambda-extension.x86_64.zip
+      # - name: Upload x86_64 binary as artifact
+      #   uses: actions/upload-artifact@v3
+      #   with:
+      #     name: newrelic-lambda-extension-x86_64
+      #     path: /tmp/newrelic-lambda-extension.x86_64.zip
       - name: Publish x86_64 release on GitHub
         uses: softprops/action-gh-release@v1
         with:
           files: /tmp/newrelic-lambda-extension.x86_64.zip
           token: ${{ secrets.GITHUB_TOKEN }}
           tag_name: ${{ github.ref_name }}
-          name: "Experimenatal Extension ${{ github.ref_name }}"
+          name: "Release ${{ github.ref_name }}"
           draft: false
           prerelease: false
 

@@ -14,9 +14,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Setup Go
-        uses: actions/setup-go@v4
+        uses: actions/setup-go@v5
         with:
           go-version: '1.20'
+          cache-dependency-path: |
+             subdir/go.sum
+             tools/go.sum
       - name: Build and archive x86_64 distribution
         run: make zip-x86_64
       - name: Publish x86_64 release on GitHub
@@ -35,9 +38,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Setup Go
-        uses: actions/setup-go@v4
+        uses: actions/setup-go@v5
         with:
           go-version: '1.20'
+          cache-dependency-path: |
+             subdir/go.sum
+             tools/go.sum
       - name: Build and archive arm distribution
         run: make zip-arm64
       - name: Publish zip-arm64 release on GitHub

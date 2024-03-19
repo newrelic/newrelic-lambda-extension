@@ -7,20 +7,13 @@ REGION="us-west-2" # Preferred AWS region
 TRUST_POLICY="trust-policy.json"
 lambda_result_file="lambda_output.txt"
 
-NEW_RELIC_ACCOUNT_ID="${NEW_RELIC_ACCOUNT_ID}"
-NEW_RELIC_LAMBDA_EXTENSION_ENABLED="True"
-NEW_RELIC_LAMBDA_HANDLER="${NEW_RELIC_LAMBDA_HANDLER}"
-NEW_RELIC_LICENSE_KEY_SECRET="${NEW_RELIC_LICENSE_KEY_SECRET}"
-NEW_RELIC_LOG_ENDPOINT="${NEW_RELIC_LOG_ENDPOINT}"
-NEW_RELIC_TELEMETRY_ENDPOINT="${NEW_RELIC_TELEMETRY_ENDPOINT}"
-
 source nr_tmp_env.sh
 
 zip function.zip function.py
 
 role_exists=$(aws iam get-role --role-name "$ROLE_NAME" --query 'Role.Arn' --output text --region "$REGION" 2>&1)
 if [[ $role_exists == arn:aws:iam::* ]]; then
-    echo "IAM role already exists."
+    echo "IAM role $ROLE_NAME already exists."
     EXECUTION_ROLE_ARN=$role_exists
 else
     EXECUTION_ROLE_ARN=$(aws iam create-role --role-name "$ROLE_NAME" --assume-role-policy-document "file://$TRUST_POLICY" --query 'Role.Arn' --output text --region "$REGION")
@@ -65,7 +58,7 @@ for arch in "${architectures[@]}"; do
                 --architectures "$arch" \
                 --role "$EXECUTION_ROLE_ARN" \
                 --layers "$final_layer_arn" \
-                --environment Variables="{NEW_RELIC_ACCOUNT_ID=$NEW_RELIC_ACCOUNT_ID,NEW_RELIC_LAMBDA_EXTENSION_ENABLED=$NEW_RELIC_LAMBDA_EXTENSION_ENABLED,NEW_RELIC_LAMBDA_HANDLER=$NEW_RELIC_LAMBDA_HANDLER,NEW_RELIC_LICENSE_KEY_SECRET=$NEW_RELIC_LICENSE_KEY_SECRET,NEW_RELIC_LOG_ENDPOINT=$NEW_RELIC_LOG_ENDPOINT,NEW_RELIC_TELEMETRY_ENDPOINT=$NEW_RELIC_TELEMETRY_ENDPOINT}" \
+                --environment file://environment.json \
                 --query 'FunctionArn' \
                 --output text \
                 --region "$REGION")

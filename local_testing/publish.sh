@@ -22,7 +22,6 @@ REGIONS_ARM=(us-west-2)
 
 EXTENSION_DIST_DIR=extensions
 EXTENSION_DIST_ZIP=extension.zip
-EXTENSION_DIST_PREVIEW_FILE=preview-extensions-ggqizro707
 
 TMP_ENV_FILE_NAME=nr_tmp_env.sh
 
@@ -34,14 +33,31 @@ function fetch_extension {
 }
 
 function download_extension {
-    fetch_extension $@
-
-    unzip $EXTENSION_DIST_ZIP -d .
-    rm -f $EXTENSION_DIST_ZIP
+    if [ "$NEWRELIC_LOCAL_TESTING" = "true" ]; then
+        case "$1" in
+            "x86_64")
+                echo "Locally building x86_64 extension"
+                make -C ../ dist-x86_64
+                ;;
+            "arm64")
+                echo "Locally building arm64 extension"
+                make -C ../ dist-arm64
+                ;;
+            *)
+                echo "No matching architecture"
+                return 1 
+                ;;
+        esac
+        cp -r ../extensions .
+    else
+        fetch_extension "$@"
+        unzip "$EXTENSION_DIST_ZIP" -d .
+        rm -f "$EXTENSION_DIST_ZIP"
+    fi
 }
 
 function layer_name_str() {
-    rt_part="LambdaExtension"
+    rt_part="Custom"
     arch_part=""
 
     case $1 in
@@ -62,7 +78,7 @@ function layer_name_str() {
       ;;
     esac
 
-    echo "NewRelic${rt_part}${arch_part}"
+    echo "NRTestExtension${rt_part}${arch_part}"
 }
 
 
@@ -148,8 +164,8 @@ function build_python_version {
     cp newrelic_lambda_wrapper.py $BUILD_DIR/lib/python$version/site-packages/newrelic_lambda_wrapper.py
     find $BUILD_DIR -name '__pycache__' -exec rm -rf {} +
     download_extension $arch
-    zip -rq $dist_dir $BUILD_DIR $EXTENSION_DIST_DIR $EXTENSION_DIST_PREVIEW_FILE
-    rm -rf $BUILD_DIR $EXTENSION_DIST_DIR $EXTENSION_DIST_PREVIEW_FILE
+    zip -rq $dist_dir $BUILD_DIR $EXTENSION_DIST_DIR 
+    rm -rf $BUILD_DIR $EXTENSION_DIST_DIR
     echo "Build complete: ${dist_dir}"
 }
 
@@ -170,6 +186,7 @@ function publish_python_version {
 }
 
 if [ -f "$TMP_ENV_FILE_NAME" ]; then
+    echo "Deleting tmp env file"
     rm -r "$TMP_ENV_FILE_NAME"
 else
     echo "File $TMP_ENV_FILE_NAME does not exist."
@@ -188,10 +205,10 @@ publish_python_version $PY311_DIST_X86_64 "x86_64" "3.11" "${REGIONS_X86[@]}"
 
 # Build and publish for python3.12 arm64
 echo "Building and publishing for Python 3.12 ARM64..."
-build_python_version "3.12" "arm64" $PY311_DIST_ARM64
-publish_python_version $PY311_DIST_ARM64 "arm64" "3.12" "${REGIONS_ARM[@]}"
+build_python_version "3.12" "arm64" $PY312_DIST_ARM64
+publish_python_version $PY312_DIST_ARM64 "arm64" "3.12" "${REGIONS_ARM[@]}"
 
 # Build and publish for python3.12 x86_64
 echo "Building and publishing for Python 3.11 x86_64..."
-build_python_version "3.12" "x86_64" $PY311_DIST_X86_64
-publish_python_version $PY311_DIST_X86_64 "x86_64" "3.12" "${REGIONS_X86[@]}"
+build_python_version "3.12" "x86_64" $PY312_DIST_X86_64
+publish_python_version $PY312_DIST_X86_64 "x86_64" "3.12" "${REGIONS_X86[@]}"

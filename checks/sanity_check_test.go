@@ -217,8 +217,6 @@ func TestSanityCheckSSMParameter(t *testing.T) {
         },
         {
             name:               "SSM Parameter not configured",
-            ssmParameterName:   "",
-            validParameters:    []string{""}, 
             expectParamCalled:  false,
             expectedErr:        nil,
         },

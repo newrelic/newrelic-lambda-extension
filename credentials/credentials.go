@@ -99,19 +99,19 @@ func IsSSMParameterConfigured(ctx context.Context, conf *config.Configuration) b
 // variable if set.
 func GetNewRelicLicenseKey(ctx context.Context, conf *config.Configuration) (string, error) {
 	if conf.LicenseKey != "" {
-		util.Logln("Using license key from environment variable")
+		util.Infoln("Using license key from environment variable")
 		return conf.LicenseKey, nil
 	}
 
 	secretId := conf.LicenseKeySecretId
 	if secretId != "" {
-		util.Logln("Fetching license key from secret id " + secretId)
+		util.Infoln("Fetching license key from secret id " + secretId)
 		return tryLicenseKeyFromSecret(ctx, secretId)
 	}
 
 	parameterName := conf.LicenseKeySSMParameterName
 	if parameterName != "" {
-		util.Logln("Fetching license key from parameter name " + conf.LicenseKeySSMParameterName)
+		util.Infoln("Fetching license key from parameter name " + conf.LicenseKeySSMParameterName)
 		return tryLicenseKeyFromSSMParameter(ctx, parameterName)
 	}
 

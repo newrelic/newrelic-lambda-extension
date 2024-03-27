@@ -29,7 +29,7 @@ func RunChecks(ctx context.Context, conf *config.Configuration, reg *api.Registr
 	runtimeConfig, err := checkAndReturnRuntime()
 	if err != nil {
 		errLog := fmt.Sprintf("There was an issue querying for the latest agent version: %v", err)
-		util.Logln(errLog)
+		util.Infoln(errLog)
 	}
 
 	for _, check := range checks {
@@ -41,7 +41,7 @@ func runCheck(ctx context.Context, conf *config.Configuration, reg *api.Registra
 	err := check(ctx, conf, reg, r)
 	if err != nil {
 		errLog := fmt.Sprintf("Startup check failed: %v", err)
-		util.Logln(errLog)
+		util.Infoln(errLog)
 
 		//Send a log line to NR as well
 		logSender.SendFunctionLogs(ctx, "", []logserver.LogLine{

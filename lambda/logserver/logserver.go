@@ -111,13 +111,13 @@ func (ls *LogServer) handler(res http.ResponseWriter, req *http.Request) {
 
 	bodyBytes, err := io.ReadAll(req.Body)
 	if err != nil {
-		util.Logf("Error processing log request: %v", err)
+		util.Infof("Error processing log request: %v", err)
 	}
 
 	var logEvents []api.LogEvent
 	err = json.Unmarshal(bodyBytes, &logEvents)
 	if err != nil {
-		util.Logf("Error parsing log payload: %v", err)
+		util.Infof("Error parsing log payload: %v", err)
 	}
 
 	var functionLogs []LogLine
@@ -171,7 +171,7 @@ func (ls *LogServer) handler(res http.ResponseWriter, req *http.Request) {
 			}
 			ls.platformLogChan <- reportLine
 		case "platform.logsDropped":
-			util.Logf("Platform dropped logs: %v", event.Record)
+			util.Infof("Platform dropped logs: %v", event.Record)
 		case "function":
 			record := event.Record.(string)
 			ls.lastRequestIdLock.Lock()
@@ -218,8 +218,8 @@ func startInternal(host string) (*LogServer, error) {
 	server.Handler = mux
 
 	go func() {
-		util.Logln("Starting log server.")
-		util.Logf("Log server terminating: %v\n", server.Serve(listener))
+		util.Infoln("Starting log server.")
+		util.Infof("Log server terminating: %v\n", server.Serve(listener))
 	}()
 
 	return logServer, nil

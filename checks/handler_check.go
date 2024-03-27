@@ -62,7 +62,7 @@ func (r runtimeConfig) getTrueHandler(h handlerConfigs) string {
 	}
 
 	if h.handlerName != r.wrapperName {
-		util.Logln("Warning: handler not set to New Relic layer wrapper", r.wrapperName)
+		util.Infoln("Warning: handler not set to New Relic layer wrapper", r.wrapperName)
 		return h.handlerName
 	}
 

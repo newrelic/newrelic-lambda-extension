@@ -38,9 +38,11 @@ func (m mockSecretManager) GetSecretValueWithContext(_ context.Context, input *s
 type mockSSM struct {
 	ssmiface.SSMAPI
 	validParameters []string
+	IsParameterCalled bool
 }
 
-func (m mockSSM) GetParameterWithContext(_ context.Context, input *ssm.GetParameterInput, _ ...request.Option) (*ssm.GetParameterOutput, error) {
+func (m *mockSSM) GetParameterWithContext(_ context.Context, input *ssm.GetParameterInput, _ ...request.Option) (*ssm.GetParameterOutput, error) {
+	m.IsParameterCalled = true
 	for _, parameter := range m.validParameters {
 		if parameter == *input.Name {
 			return &ssm.GetParameterOutput{
@@ -71,7 +73,7 @@ func TestSanityCheck(t *testing.T) {
 			Conf:           config.Configuration{},
 			Environment:    map[string]string{},
 			SecretsManager: mockSecretManager{},
-			SSM:            mockSSM{},
+			SSM:            &mockSSM{},
 		},
 		{
 			Name: "returns nil when just the environment variable exists",
@@ -81,7 +83,7 @@ func TestSanityCheck(t *testing.T) {
 				"NEW_RELIC_LICENSE_KEY": "12345",
 			},
 			SecretsManager: mockSecretManager{},
-			SSM:            mockSSM{},
+			SSM:            &mockSSM{},
 		},
 		{
 			Name: "return nil when just the secret is configured",
@@ -93,7 +95,7 @@ func TestSanityCheck(t *testing.T) {
 			SecretsManager: mockSecretManager{
 				validSecrets: []string{"secret"},
 			},
-			SSM: mockSSM{},
+			SSM: &mockSSM{},
 		},
 		{
 			Name: "return nil when just the parameter is configured",
@@ -103,7 +105,7 @@ func TestSanityCheck(t *testing.T) {
 			},
 			Environment:    map[string]string{},
 			SecretsManager: mockSecretManager{},
-			SSM: mockSSM{
+			SSM: &mockSSM{
 				validParameters: []string{"parameter"},
 			},
 		},
@@ -115,7 +117,7 @@ func TestSanityCheck(t *testing.T) {
 				"DEBUG_LOGGING_ENABLED": "1",
 			},
 			SecretsManager: mockSecretManager{},
-			SSM:            mockSSM{},
+			SSM:            &mockSSM{},
 
 			ExpectedErr: "Environment variable 'DEBUG_LOGGING_ENABLED' is used by aws-log-ingestion and has no effect here. Recommend unsetting this environment variable within this function.",
 		},
@@ -131,7 +133,7 @@ func TestSanityCheck(t *testing.T) {
 			SecretsManager: mockSecretManager{
 				validSecrets: []string{"secret"},
 			},
-			SSM: mockSSM{},
+			SSM: &mockSSM{},
 
 			ExpectedErr: "There is both a AWS Secrets Manager secret and a NEW_RELIC_LICENSE_KEY environment variable set. Recommend removing the NEW_RELIC_LICENSE_KEY environment variable and using the AWS Secrets Manager secret.",
 		},
@@ -145,7 +147,7 @@ func TestSanityCheck(t *testing.T) {
 				"NEW_RELIC_LICENSE_KEY": "12345",
 			},
 			SecretsManager: mockSecretManager{},
-			SSM: mockSSM{
+			SSM: &mockSSM{
 				validParameters: []string{"parameter"},
 			},
 
@@ -161,7 +163,7 @@ func TestSanityCheck(t *testing.T) {
 			SecretsManager: mockSecretManager{
 				validSecrets: []string{"secret"},
 			},
-			SSM: mockSSM{
+			SSM: &mockSSM{
 				validParameters: []string{"parameter"},
 			},
 
@@ -194,3 +196,49 @@ func TestSanityCheck(t *testing.T) {
 		})
 	}
 }
+
+
+func TestSanityCheckSSMParameter(t *testing.T) {
+    ctx := context.Background()
+
+    tests := []struct {
+        name               string
+        ssmParameterName   string
+        validParameters    []string
+        expectParamCalled  bool
+        expectedErr        error
+    }{
+        {
+            name:               "SSM Parameter configured",
+            ssmParameterName:   "parameter",
+            validParameters:    []string{"parameter"},
+            expectParamCalled:  true,
+            expectedErr:        nil,
+        },
+        {
+            name:               "SSM Parameter not configured",
+            expectParamCalled:  false,
+            expectedErr:        nil,
+        },
+    }
+
+    for _, tc := range tests {
+        t.Run(tc.name, func(t *testing.T) {
+            conf := config.Configuration{
+                LicenseKeySSMParameterName: tc.ssmParameterName,
+            }
+
+            mSSM := &mockSSM{
+                validParameters: tc.validParameters,
+            }
+
+            credentials.OverrideSSM(mSSM)
+
+            err := sanityCheck(ctx, &conf, &api.RegistrationResponse{}, runtimeConfig{})
+
+            assert.Equal(t, tc.expectedErr, err, "Error from sanityCheck")
+            assert.Equal(t, tc.expectParamCalled, mSSM.IsParameterCalled, "Error in expected SSM parameter check")
+        })
+    }
+}
+

@@ -29,7 +29,12 @@ func sanityCheck(ctx context.Context, conf *config.Configuration, res *api.Regis
 
 	envKeyExists := util.EnvVarExists("NEW_RELIC_LICENSE_KEY")
 	isSecretConfigured := credentials.IsSecretConfigured(ctx, conf)
-	isSSMParameterConfigured := credentials.IsSSMParameterConfigured(ctx, conf)
+
+	isSSMParameterConfigured := false
+	if conf.LicenseKeySSMParameterName != "" {
+		isSSMParameterConfigured = credentials.IsSSMParameterConfigured(ctx, conf)
+	}
+	
 
 	if isSecretConfigured && envKeyExists {
 		return fmt.Errorf("There is both a AWS Secrets Manager secret and a NEW_RELIC_LICENSE_KEY environment variable set. Recommend removing the NEW_RELIC_LICENSE_KEY environment variable and using the AWS Secrets Manager secret.")

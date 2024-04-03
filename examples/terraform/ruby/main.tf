@@ -1,4 +1,4 @@
-module "python_test_function" {
+module "ruby_test_function" {
   source = "../lambda"
   aws_region = var.aws_region
   lambda_function_handler = "app.lambda_handler"

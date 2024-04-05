@@ -18,7 +18,7 @@ Resources:
       FunctionName: newrelic-example-ruby
       # The handler for your function needs to be the one provided by the instrumentation layer, below.
       Handler: newrelic_lambda_wrapper.handler
-      Runtime: ruby3.2
+      Runtime: ruby3.3
       # Currently, we don't support Image based PackageType
       PackageType: Zip
       Environment:

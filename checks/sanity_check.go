@@ -34,12 +34,12 @@ func sanityCheck(ctx context.Context, conf *config.Configuration, res *api.Regis
 	defer cancelSecret()
 	isSecretConfigured := credentials.IsSecretConfigured(ctxSecret, conf)
 
-	ctxSMParameter, cancelSMParameter := context.WithTimeout(ctx, timeout)
-	defer cancelSMParameter()
-	
+	ctxSSMParameter, cancelSSMParameter := context.WithTimeout(ctx, timeout)
+	defer cancelSSMParameter()
+
 	isSSMParameterConfigured := false
 	if conf.LicenseKeySSMParameterName != "" {
-		isSSMParameterConfigured = credentials.IsSSMParameterConfigured(ctxSMParameter, conf)
+		isSSMParameterConfigured = credentials.IsSSMParameterConfigured(ctxSSMParameter, conf)
 	}
 	
 

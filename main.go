@@ -87,8 +87,8 @@ func main() {
 
 	// Attempt to find the license key for telemetry sending
 	var timeout = 1 * time.Second
-	ctxLicenseKey, cancel := context.WithTimeout(ctx, timeout)
-	defer cancel()
+	ctxLicenseKey, cancelLicenseKey := context.WithTimeout(ctx, timeout)
+	defer cancelLicenseKey()
 	licenseKey, err := credentials.GetNewRelicLicenseKey(ctxLicenseKey, conf)
 	if err != nil {
 		util.Logln("Failed to retrieve New Relic license key", err)

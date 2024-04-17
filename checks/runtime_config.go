@@ -66,7 +66,7 @@ var runtimeConfigs = map[Runtime]runtimeConfig{
 		wrapperName:     "newrelic_lambda_wrapper.handler",
 		fileType:        "rb",
 		layerAgentPaths: layerAgentPathsRuby,
-		vendorAgentPath: vendorAgentPathsRuby,
+		vendorAgentPath: vendorAgentPathRuby,
 		// TODO: requires Ruby to parse out the version
 		agentVersionFile:    "lib/new_relic/version.rb",
 		agentVersionGitOrg:  "newrelic",

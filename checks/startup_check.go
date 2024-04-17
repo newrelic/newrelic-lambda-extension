@@ -40,7 +40,7 @@ func RunChecks(ctx context.Context, conf *config.Configuration, reg *api.Registr
 func runCheck(ctx context.Context, conf *config.Configuration, reg *api.RegistrationResponse, r runtimeConfig, logSender LogSender, check checkFn) error {
 	err := check(ctx, conf, reg, r)
 	if err != nil {
-		errLog := fmt.Sprintf("Startup check failed: %v", err)
+		errLog := fmt.Sprintf("Startup check warning: %v", err)
 		util.Logln(errLog)
 
 		//Send a log line to NR as well

@@ -3,6 +3,7 @@ package checks
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/newrelic/newrelic-lambda-extension/config"
 	"github.com/newrelic/newrelic-lambda-extension/credentials"
@@ -28,11 +29,17 @@ func sanityCheck(ctx context.Context, conf *config.Configuration, res *api.Regis
 	}
 
 	envKeyExists := util.EnvVarExists("NEW_RELIC_LICENSE_KEY")
-	isSecretConfigured := credentials.IsSecretConfigured(ctx, conf)
+	var timeout = 1 * time.Second
+	ctxSecret, cancelSecret := context.WithTimeout(ctx, timeout)
+	defer cancelSecret()
+	isSecretConfigured := credentials.IsSecretConfigured(ctxSecret, conf)
+
+	ctxSSMParameter, cancelSSMParameter := context.WithTimeout(ctx, timeout)
+	defer cancelSSMParameter()
 
 	isSSMParameterConfigured := false
 	if conf.LicenseKeySSMParameterName != "" {
-		isSSMParameterConfigured = credentials.IsSSMParameterConfigured(ctx, conf)
+		isSSMParameterConfigured = credentials.IsSSMParameterConfigured(ctxSSMParameter, conf)
 	}
 	
 

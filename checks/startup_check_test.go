@@ -65,7 +65,7 @@ func TestRunCheckErr(t *testing.T) {
 	assert.Equal(t, true, tested)
 	assert.NotNil(t, result)
 
-	assert.Equal(t, "Startup check failed: Failure Test", string(logSender.sent[0].Content))
+	assert.Equal(t, "Startup check warning: Failure Test", string(logSender.sent[0].Content))
 }
 
 func TestRunChecks(t *testing.T) {

@@ -11,7 +11,7 @@ var (
 	}
 	layerAgentPathsRuby    = []string{
     "/opt/ruby/gems/3.2.0/gems/newrelic_rpm",
-    "/opt/ruby/gems/3.3.0/gems/newrelic_rpm"
+    "/opt/ruby/gems/3.3.0/gems/newrelic_rpm",
   }
 	vendorAgentPathNode   = "/var/task/node_modules/newrelic"
 	vendorAgentPathPython = "/var/task/newrelic"

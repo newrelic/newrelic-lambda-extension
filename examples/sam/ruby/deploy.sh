@@ -16,6 +16,6 @@ sam package --region "${region}" --s3-bucket "${bucket}" --output-template-file 
 aws cloudformation deploy \
 	--region "${region}" \
 	--template-file packaged.yaml \
-	--stack-name NewrelicExamplePython \
+	--stack-name NewrelicExampleRuby \
 	--capabilities CAPABILITY_IAM \
 	--parameter-overrides "NRAccountId=${accountId}"

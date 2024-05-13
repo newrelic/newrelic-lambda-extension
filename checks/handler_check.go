@@ -34,6 +34,12 @@ func handlerCheck(ctx context.Context, conf *config.Configuration, reg *api.Regi
 }
 
 func (r runtimeConfig) check(h handlerConfigs) bool {
+	if !h.conf.TestingOverride {
+		esm := strings.ToLower(os.Getenv("NEW_RELIC_USE_ESM"))
+		if esm == "true" {
+			return true
+		}
+	}
 	functionHandler := r.getTrueHandler(h)
 	p := removePathMethodName(functionHandler)
 	if r.language == Node {
@@ -52,10 +58,6 @@ func (r runtimeConfig) check(h handlerConfigs) bool {
 
 func (r runtimeConfig) getTrueHandler(h handlerConfigs) string {
 	if !h.conf.TestingOverride {
-		esm := strings.ToLower(os.Getenv("NEW_RELIC_USE_ESM"))
-		if esm == "true" {
-			return h.handlerName
-		}
 		if util.PathExists("/.dockerenv") {
 			return h.handlerName
 		}

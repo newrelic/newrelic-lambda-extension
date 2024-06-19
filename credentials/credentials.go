@@ -120,7 +120,7 @@ func GetNewRelicLicenseKey(ctx context.Context, conf *config.Configuration) (str
 		return envLicenseKey, nil
 	}
 
-	util.Debugln("No configured license key found, attempting fallbacks")
+	util.Debugln("No configured license key found, attempting fallbacks to default")
 
 	licenseKey, err := tryLicenseKeyFromSecret(ctx, defaultSecretId)
 	if err == nil {

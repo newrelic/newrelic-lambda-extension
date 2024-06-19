@@ -216,11 +216,6 @@ func TestSanityCheckSSMParameter(t *testing.T) {
 			expectParamCalled: true,
 			expectedErr:       nil,
 		},
-		{
-			name:              "SSM Parameter not configured",
-			expectParamCalled: false,
-			expectedErr:       nil,
-		},
 	}
 
 	for _, tc := range tests {

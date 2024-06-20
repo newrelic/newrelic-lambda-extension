@@ -30,10 +30,17 @@ func sanityCheck(ctx context.Context, conf *config.Configuration, res *api.Regis
 
 	envKeyExists := util.EnvVarExists("NEW_RELIC_LICENSE_KEY")
 	var timeout = 1 * time.Second
+
+	//Secret Manager
 	ctxSecret, cancelSecret := context.WithTimeout(ctx, timeout)
 	defer cancelSecret()
-	isSecretConfigured := credentials.IsSecretConfigured(ctxSecret, conf)
 
+	isSecretConfigured := false
+	if conf.LicenseKeySecretId != "" {
+		isSecretConfigured = credentials.IsSecretConfigured(ctxSecret, conf)
+	}
+
+	// SSM Parameter
 	ctxSSMParameter, cancelSSMParameter := context.WithTimeout(ctx, timeout)
 	defer cancelSSMParameter()
 
@@ -41,7 +48,6 @@ func sanityCheck(ctx context.Context, conf *config.Configuration, res *api.Regis
 	if conf.LicenseKeySSMParameterName != "" {
 		isSSMParameterConfigured = credentials.IsSSMParameterConfigured(ctxSSMParameter, conf)
 	}
-	
 
 	if isSecretConfigured && envKeyExists {
 		return fmt.Errorf("There is both a AWS Secrets Manager secret and a NEW_RELIC_LICENSE_KEY environment variable set. Recommend removing the NEW_RELIC_LICENSE_KEY environment variable and using the AWS Secrets Manager secret.")
@@ -53,6 +59,10 @@ func sanityCheck(ctx context.Context, conf *config.Configuration, res *api.Regis
 
 	if isSecretConfigured && isSSMParameterConfigured {
 		return fmt.Errorf("There is both a AWS Secrets Manager secret and a AWS Parameter Store parameter set. Recommend using just one.")
+	}
+
+	if !envKeyExists && !isSecretConfigured && !isSSMParameterConfigured {
+		util.Debugln("No configured license key found, attempting fallback to default AWS Secrets Manager secret with NEW_RELIC_LICENSE_KEY.")
 	}
 
 	return nil

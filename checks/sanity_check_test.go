@@ -37,7 +37,7 @@ func (m mockSecretManager) GetSecretValueWithContext(_ context.Context, input *s
 
 type mockSSM struct {
 	ssmiface.SSMAPI
-	validParameters []string
+	validParameters   []string
 	IsParameterCalled bool
 }
 
@@ -197,48 +197,46 @@ func TestSanityCheck(t *testing.T) {
 	}
 }
 
-
 func TestSanityCheckSSMParameter(t *testing.T) {
-    ctx := context.Background()
+	ctx := context.Background()
 
-    tests := []struct {
-        name               string
-        ssmParameterName   string
-        validParameters    []string
-        expectParamCalled  bool
-        expectedErr        error
-    }{
-        {
-            name:               "SSM Parameter configured",
-            ssmParameterName:   "parameter",
-            validParameters:    []string{"parameter"},
-            expectParamCalled:  true,
-            expectedErr:        nil,
-        },
-        {
-            name:               "SSM Parameter not configured",
-            expectParamCalled:  false,
-            expectedErr:        nil,
-        },
-    }
+	tests := []struct {
+		name              string
+		ssmParameterName  string
+		validParameters   []string
+		expectParamCalled bool
+		expectedErr       error
+	}{
+		{
+			name:              "SSM Parameter configured",
+			ssmParameterName:  "parameter",
+			validParameters:   []string{"parameter"},
+			expectParamCalled: true,
+			expectedErr:       nil,
+		},
+		{
+			name:              "SSM Parameter not configured",
+			expectParamCalled: false,
+			expectedErr:       nil,
+		},
+	}
 
-    for _, tc := range tests {
-        t.Run(tc.name, func(t *testing.T) {
-            conf := config.Configuration{
-                LicenseKeySSMParameterName: tc.ssmParameterName,
-            }
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			conf := config.Configuration{
+				LicenseKeySSMParameterName: tc.ssmParameterName,
+			}
 
-            mSSM := &mockSSM{
-                validParameters: tc.validParameters,
-            }
+			mSSM := &mockSSM{
+				validParameters: tc.validParameters,
+			}
 
-            credentials.OverrideSSM(mSSM)
+			credentials.OverrideSSM(mSSM)
 
-            err := sanityCheck(ctx, &conf, &api.RegistrationResponse{}, runtimeConfig{})
+			err := sanityCheck(ctx, &conf, &api.RegistrationResponse{}, runtimeConfig{})
 
-            assert.Equal(t, tc.expectedErr, err, "Error from sanityCheck")
-            assert.Equal(t, tc.expectParamCalled, mSSM.IsParameterCalled, "Error in expected SSM parameter check")
-        })
-    }
+			assert.Equal(t, tc.expectedErr, err, "Error from sanityCheck")
+			assert.Equal(t, tc.expectParamCalled, mSSM.IsParameterCalled, "Error in expected SSM parameter check")
+		})
+	}
 }
-

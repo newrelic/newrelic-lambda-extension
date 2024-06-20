@@ -68,14 +68,12 @@ func TestSanityCheck(t *testing.T) {
 		ExpectedErr string
 	}{
 		{
-			Name: "returns error when nothing is configured",
+			Name: "returns nil when nothing is configured",
 
 			Conf:           config.Configuration{},
 			Environment:    map[string]string{},
 			SecretsManager: mockSecretManager{},
 			SSM:            &mockSSM{},
-
-			ExpectedErr: "No configured license key found, attempting fallback to default AWS Secrets Manager secret with NEW_RELIC_LICENSE_KEY.",
 		},
 		{
 			Name: "returns nil when just the environment variable exists",
@@ -214,6 +212,11 @@ func TestSanityCheckSSMParameter(t *testing.T) {
 			ssmParameterName:  "parameter",
 			validParameters:   []string{"parameter"},
 			expectParamCalled: true,
+			expectedErr:       nil,
+		},
+		{
+			name:              "SSM Parameter not configured",
+			expectParamCalled: false,
 			expectedErr:       nil,
 		},
 	}

@@ -62,7 +62,7 @@ func sanityCheck(ctx context.Context, conf *config.Configuration, res *api.Regis
 	}
 
 	if !envKeyExists && !isSecretConfigured && !isSSMParameterConfigured {
-		return fmt.Errorf("No configured license key found, attempting fallback to default AWS Secrets Manager secret with NEW_RELIC_LICENSE_KEY.")
+		util.Debugln("No configured license key found, attempting fallback to default AWS Secrets Manager secret with NEW_RELIC_LICENSE_KEY.")
 	}
 
 	return nil

@@ -53,7 +53,11 @@ layer version ARNs for your runtime and region are available [here](https://laye
 Use the included `Makefile` to compile the extension. 
 
 ```sh
-make dist
+# build extension for x86_64 architecture
+make dist-x86_64
+
+# build extension for arm64 architecture
+make dist-arm64
 ```
 
 This creates the extension binary in `./extensions/newrelic-lambda-extension`. The binary is compiled for Amazon Linux, which is likely different from the platform you're working on.

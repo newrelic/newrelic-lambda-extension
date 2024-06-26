@@ -1,7 +1,7 @@
 # Instrumented Dotnet Lambda
 
-This is a "Hello, World" style Lambda function in Dotnet, instrumented 
-with the New Relic OpenTracing Dotnet SDK.
+This is a "Hello, World" style Lambda function in .NET, instrumented 
+with the New Relic .NET Agent AWS Lambda layer.
 
 This example is both instructive, and a diagnostic tool: if you can
 deploy this Lambda function, and see its events in NR One, you'll
@@ -50,21 +50,12 @@ environment variables that are available to the handler function.
 
 ### Function.cs
 
-Lambda functions written in Dotnet are C# classes. The runtime loads them
+Lambda functions written in .NET are C# classes. The runtime loads them
 just like any C# class, and then invokes the handler function for each 
 invocation event.
 
-New Relic's Dotnet instrumentation is based on the OpenTracing API standard. 
-Libraries that implement the standard create spans using the OpenTracing API.
-New Relic gathers these traces, and acts as an "exporter", serializing them
-and sending them to the New Relic collector.
-
-For all that to work, two things happen here. First, we register the New Relic
-`LambdaTracer` as the concrete `Tracer` implementation in the static initializer.
-Second, we need to wrap your request handler's business logic so that the trace
-begins and ends correctly, and errors are handled appropriately. That's the call
-to `new TracingRequestHandler().LambdaWrapper()` on the first line of our request 
-handler.
-
-There are a couple examples here of how you might use the OpenTracing API in
-your own code. 
+The New Relic .NET Agent is used to instrument your AWS Lambda.  In most cases, 
+the agent automatically instruments your AWS Lambda function handler.  The layer 
+used in this example includes both the agent and the required New Relic Lambda 
+Extension.  When instrumenting an AWS Lambda, the .NET Agent relies on the Lambda 
+Extension to send telemetry to New Relic.

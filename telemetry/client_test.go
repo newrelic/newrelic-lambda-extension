@@ -463,6 +463,7 @@ func TestGetLogEndpointURL(t *testing.T) {
 	assert.Equal(t, LogEndpointUS, getLogEndpointURL("us mock license key", ""))
 	assert.Equal(t, LogEndpointEU, getLogEndpointURL("eu mock license key", ""))
 }
+
 func TestGetNewRelicTags(t *testing.T) {
     os.Setenv("NR_TAGS", "env:prod;team:myTeam")
     os.Setenv("NR_ENV_DELIMITER", ";")

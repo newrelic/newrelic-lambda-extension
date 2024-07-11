@@ -296,7 +296,6 @@ func getNewRelicTags(common map[string]interface{}) {
         tags := strings.Split(nrTagsStr, nrDelimiter)
         nrTags := make(map[string]string)
         for _, tag := range tags {
-			fmt.Println(tag)
             keyValue := strings.Split(tag, ":")
             if len(keyValue) == 2 {
                 nrTags[keyValue[0]] = keyValue[1]

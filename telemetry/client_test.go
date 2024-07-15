@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -461,4 +462,119 @@ func TestGetLogEndpointURL(t *testing.T) {
 	assert.Equal(t, "barbaz", getLogEndpointURL("foobar", "barbaz"))
 	assert.Equal(t, LogEndpointUS, getLogEndpointURL("us mock license key", ""))
 	assert.Equal(t, LogEndpointEU, getLogEndpointURL("eu mock license key", ""))
+}
+
+func TestGetNewRelicTags(t *testing.T) {
+
+	tests := []struct {
+		name         string
+		common       map[string]interface{}
+		expected     map[string]interface{}
+		envTags      string
+		envDelimiter string
+	}{
+		{
+			name: "Add New Relic tags to common",
+			common: map[string]interface{}{
+				"plugin":    "testPlugin",
+				"faas.arn":  "arn:aws:lambda:us-east-1:123456789012:function:testFunction",
+				"faas.name": "testFunction",
+			},
+			expected: map[string]interface{}{
+				"plugin":    "testPlugin",
+				"faas.arn":  "arn:aws:lambda:us-east-1:123456789012:function:testFunction",
+				"faas.name": "testFunction",
+				"env":       "prod",
+				"team":      "myTeam",
+			},
+			envTags:      "env:prod;team:myTeam",
+			envDelimiter: ";",
+		},
+		{
+			name: "Add New Relic tags to common if no delimiter is set",
+			common: map[string]interface{}{
+				"plugin":    "testPlugin",
+				"faas.arn":  "arn:aws:lambda:us-east-1:123456789012:function:testFunction",
+				"faas.name": "testFunction",
+			},
+			expected: map[string]interface{}{
+				"plugin":    "testPlugin",
+				"faas.arn":  "arn:aws:lambda:us-east-1:123456789012:function:testFunction",
+				"faas.name": "testFunction",
+				"env":       "prod",
+				"team":      "myTeam",
+			},
+			envTags: "env:prod;team:myTeam",
+		},
+		{
+			name: "No New Relic tags to common if delimiter is incorrect",
+			common: map[string]interface{}{
+				"plugin":    "testPlugin",
+				"faas.arn":  "arn:aws:lambda:us-east-1:123456789012:function:testFunction",
+				"faas.name": "testFunction",
+			},
+			expected: map[string]interface{}{
+				"plugin":    "testPlugin",
+				"faas.arn":  "arn:aws:lambda:us-east-1:123456789012:function:testFunction",
+				"faas.name": "testFunction",
+			},
+			envTags:      "env:prod;team:myTeam",
+			envDelimiter: ",",
+		},
+		{
+			name: "No New Relic tags to add",
+			common: map[string]interface{}{
+				"plugin":    "testPlugin",
+				"faas.arn":  "arn:aws:lambda:us-east-1:123456789012:function:testFunction",
+				"faas.name": "testFunction",
+			},
+			expected: map[string]interface{}{
+				"plugin":    "testPlugin",
+				"faas.arn":  "arn:aws:lambda:us-east-1:123456789012:function:testFunction",
+				"faas.name": "testFunction",
+			},
+			envTags:      "",
+			envDelimiter: "",
+		},
+		{
+			name: "No New Relic tags to add when enTags and envDelimiter are undeclared",
+			common: map[string]interface{}{
+				"plugin":    "testPlugin",
+				"faas.arn":  "arn:aws:lambda:us-east-1:123456789012:function:testFunction",
+				"faas.name": "testFunction",
+			},
+			expected: map[string]interface{}{
+				"plugin":    "testPlugin",
+				"faas.arn":  "arn:aws:lambda:us-east-1:123456789012:function:testFunction",
+				"faas.name": "testFunction",
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_ = os.Setenv("NR_TAGS", tt.envTags)
+			defer os.Unsetenv("NR_TAGS")
+			_ = os.Setenv("NR_ENV_DELIMITER", tt.envDelimiter)
+			defer os.Unsetenv("NR_ENV_DELIMITER")
+
+			common := make(map[string]interface{}, len(tt.common))
+			for k, v := range tt.common {
+				common[k] = v
+			}
+
+			getNewRelicTags(common)
+
+			for k, v := range tt.expected {
+				if common[k] != v {
+					t.Errorf("expected common[%q] to be %v, but got %v", k, v, common[k])
+				}
+			}
+			for k := range common {
+				if _, ok := tt.expected[k]; !ok {
+					t.Errorf("unexpected key %q in common map", k)
+				}
+			}
+		})
+	}
 }

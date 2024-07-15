@@ -9,6 +9,7 @@ import (
 	"log"
 	"net"
 	"net/http"
+	"os"
 	"strings"
 	"time"
 
@@ -283,6 +284,30 @@ func (c *Client) SendFunctionLogs(ctx context.Context, invokedFunctionARN string
 	return nil
 }
 
+// getNewRelicTags adds tags to the logs if NR_TAGS has values
+func getNewRelicTags(common map[string]interface{}) {
+    nrTagsStr := os.Getenv("NR_TAGS")
+    nrDelimiter := os.Getenv("NR_ENV_DELIMITER")
+    if nrDelimiter == "" {
+        nrDelimiter = ";"
+    }
+
+    if nrTagsStr != "" {
+        tags := strings.Split(nrTagsStr, nrDelimiter)
+        nrTags := make(map[string]string)
+        for _, tag := range tags {
+            keyValue := strings.Split(tag, ":")
+            if len(keyValue) == 2 {
+                nrTags[keyValue[0]] = keyValue[1]
+            }
+        }
+
+        for k, v := range nrTags {
+            common[k] = v
+        }
+    }
+}
+
 // buildLogPayloads is a helper function that improves readability of the SendFunctionLogs method
 func (c *Client) buildLogPayloads(ctx context.Context, invokedFunctionARN string, lines []logserver.LogLine) ([]*bytes.Buffer, requestBuilder, error) {
 	common := map[string]interface{}{
@@ -290,6 +315,8 @@ func (c *Client) buildLogPayloads(ctx context.Context, invokedFunctionARN string
 		"faas.arn":  invokedFunctionARN,
 		"faas.name": c.functionName,
 	}
+	
+	getNewRelicTags(common)
 
 	logMessages := make([]FunctionLogMessage, 0, len(lines))
 	for _, l := range lines {

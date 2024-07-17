@@ -1,0 +1,47 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: And example of a simple instrumented .NET Lambda
+
+Parameters:
+  NRAccountId:
+    Type: String
+    Description: Your New Relic account ID; necessary for distributed tracing.
+    AllowedPattern: '[0-9]+'
+
+Resources:
+  NewRelicExample:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: ./src/NewRelicExampleDotnet/
+      Description: A simple Lambda, with New Relic telemetry
+      FunctionName: newrelic-example-dotnet
+      Handler: NewRelicExampleDotnet::NewRelicExampleDotnet.Function::FunctionHandler
+      Runtime: dotnet8
+      PackageType: Zip
+      Timeout: 6
+      Environment:
+        Variables:
+          CORECLR_ENABLE_PROFILING: 1
+          CORECLR_PROFILER: "{36032161-FFC0-4B61-B559-F6C5D41BAE5A}"
+          CORECLR_NEWRELIC_HOME: /opt/lib/newrelic-dotnet-agent
+          CORECLR_PROFILER_PATH: /opt/lib/newrelic-dotnet-agent/libNewRelicProfiler.so
+          # NEW_RELIC_LOG_CONSOLE: true
+          # NEWRELIC_LOG_LEVEL: finest
+          # NEW_RELIC_APP_NAME: NewRelicExampleDotnet
+          NEW_RELIC_ACCOUNT_ID: !Sub ${NRAccountId}
+          # NEW_RELIC_EXTENSION_SEND_FUNCTION_LOGS: true
+          # NEW_RELIC_EXTENSION_LOG_LEVEL: DEBUG
+      Layers:
+        # This layer includes the .NET Agent and the New Relic Lambda Extension, a sidecar process that sends telemetry.
+        - !Sub arn:${AWS::Partition}:lambda:${AWS::Region}:451483290750:layer:NewRelicDotnet:4
+      Policies:
+        # This policy allows the lambda to know the value of the New Relic license key. We need this so
+        # that we can send telemetry back to New Relic
+        - AWSSecretsManagerGetSecretValuePolicy:
+            SecretArn: !ImportValue NewRelicLicenseKeySecret-NewRelic-LicenseKeySecretARN
+  Logs:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: {"Fn::Join": ["", ["/aws/lambda/", {"Ref": "NewRelicExample"}]]}
+      # Lambda functions will auto-create their log group on first execution, but it retains logs forever, which can get expensive.
+      RetentionInDays: 7

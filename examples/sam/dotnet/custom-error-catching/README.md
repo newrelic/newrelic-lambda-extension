@@ -115,10 +115,10 @@ Tracking failed business logic is trackable without throwing an exception and st
     }
 ```
 
-Now New Relic can respond to any number of problems that also does not incurr an invocation error. This will help with less time sorting through logs for problems
-but directly using New Relic Lambda's built in `Dashboards` and `Error Triage` reducing the frustraction and creating custom alerts based on log messages.
+New Relic can respond to any number of problems that also do not incur an invocation error. This will help with less time sorting through logs for problems
+but directly using New Relic Lambda's built-in `Dashboards` and `Error Triage`, reducing the frustration and creating custom alerts based on log messages.
 
-Invocation/Transcation can be found with the Exception Class and the error message. To increase searchablity of `Error Triage` or `Invocations` you can add custom attributes:
+`Error Triage` and `Invocations`  dashboards can filter with the Exception Class and the error message.
 
 ```C#
     public async Task<boolean> ValidIdDoesNotExist (IdLookUp idLookup) {

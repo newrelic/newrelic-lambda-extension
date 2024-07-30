@@ -330,7 +330,6 @@ func (c *Client) buildLogPayloads(ctx context.Context, invokedFunctionARN string
 			traceId = c.batch.RetrieveTraceID(l.RequestID)
 		}
 		logMessages = append(logMessages, NewFunctionLogMessage(ts, l.RequestID, traceId, string(l.Content)))
-		util.Debugf("Sending function logs for request %s", l.RequestID)
 	}
 	// The Log API expects an array
 	logData := []DetailedFunctionLog{NewDetailedFunctionLog(common, logMessages)}

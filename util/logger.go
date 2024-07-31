@@ -17,10 +17,13 @@ func ConfigLogger(logsEnabled bool, isDebugEnabled bool) {
 	log.SetPrefix("[NR_EXT] ")
 	log.SetFlags(0)
 
-	log.Println("New Relic Lambda Extension starting up")
 
 	logger.isEnabled = logsEnabled
 	logger.isDebugEnabled = isDebugEnabled
+
+	if logger.isEnabled {
+		log.Println("New Relic Lambda Extension starting up")
+	}
 }
 
 func (l Logger) Debugf(format string, v ...interface{}) {

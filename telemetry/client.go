@@ -131,7 +131,7 @@ func (c *Client) SendTelemetry(ctx context.Context, invokedFunctionARN string, t
 	totalTime := end.Sub(start)
 	transmissionTime := end.Sub(transmitStart)
 	util.Logf(
-		"Sent %d/%d New Relic payload batches with %d log events successfully with certainty in %.3fms (%dms to transmit %.1fkB).\n",
+		"Sent %d/%d New Relic Telemetry payload batches with %d log events successfully with certainty in %.3fms (%dms to transmit %.1fkB).\n",
 		successCount,
 		len(compressedPayloads),
 		len(telemetry),
@@ -150,7 +150,8 @@ func (c *Client) sendPayloads(compressedPayloads []*bytes.Buffer, builder reques
 	sentBytes = 0
 	sendPayloadsStartTime := time.Now()
 	for _, p := range compressedPayloads {
-		sentBytes += p.Len()
+		payloadSize := p.Len()
+		sentBytes += payloadSize
 		currentPayloadBytes := p.Bytes()
 
 		var response AttemptData
@@ -169,8 +170,8 @@ func (c *Client) sendPayloads(compressedPayloads []*bytes.Buffer, builder reques
 		}
 
 		if response.Error != nil {
-			util.Logf("Telemetry client error: %s", response.Error)
-			sentBytes -= p.Len()
+			util.Logf("Telemetry client error: %s, payload size: %d bytes", response.Error, payloadSize)
+			sentBytes -= payloadSize
 		} else if response.Response.StatusCode >= 300 {
 			util.Logf("Telemetry client response: [%s] %s", response.Response.Status, response.ResponseBody)
 		} else {
@@ -330,7 +331,6 @@ func (c *Client) buildLogPayloads(ctx context.Context, invokedFunctionARN string
 			traceId = c.batch.RetrieveTraceID(l.RequestID)
 		}
 		logMessages = append(logMessages, NewFunctionLogMessage(ts, l.RequestID, traceId, string(l.Content)))
-		util.Debugf("Sending function logs for request %s", l.RequestID)
 	}
 	// The Log API expects an array
 	logData := []DetailedFunctionLog{NewDetailedFunctionLog(common, logMessages)}

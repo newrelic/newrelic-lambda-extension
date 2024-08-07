@@ -198,7 +198,7 @@ func mainLoop(ctx context.Context, invocationClient *client.InvocationClient, ba
 			return eventCounter
 		default:
 			// Our call to next blocks. It is likely that the container is frozen immediately after we call NextEvent.
-			util.Debugln("mainLoop: blocking while awaiting next invocation event...")
+			util.Debugln("mainLoop: waiting for next lambda invocation event...")
 			event, err := invocationClient.NextEvent(ctx)
 
 			// We've thawed.

@@ -87,6 +87,17 @@ Startup checks include:
 * Lambda environment variable checks
 * Vendored New Relic agent checks
 
+## Logging
+
+The New Relic Lambda Extension can also send your function's logs to New Relic. If you use the Lambda Extension, you can avoid the CloudWatch Logs ingest charge for telemetry gathered by New Relic. For additional Lambda Extension environment variables, you can refer to the [docs](https://docs.newrelic.com/docs/serverless-function-monitoring/aws-lambda-monitoring/instrument-lambda-function/introduction-lambda/#extension). You can use the following extension environment variable for logging
+
+| Environment variable | Default value | Options | Description |
+|--------|-----------|-------------|-------------|
+| `NEW_RELIC_EXTENSION_SEND_FUNCTION_LOGS` | `false` | `true` , `false` | Send function logs to New Relic. |
+| `NEW_RELIC_EXTENSION_LOGS_ENABLED` | `true` | `true` , `false` | Enable or disable `[NR_EXT]` log lines |
+| `NR_TAGS` |  | | Specify tags to be added to all log events. **Optional**. Each tag is composed of a colon-delimited key and value. Multiple key-value pairs are semicolon-delimited; for example, env:prod;team:myTeam. |
+| `NR_ENV_DELIMITER` | | | Some users in UTF-8 environments might face difficulty in defining strings of `NR_TAGS` delimited by the semicolon `;` character. Use `NR_ENV_DELIMITER`, to set custom delimiter for `NR_TAGS`. |
+
 ## Disabling Extension
 
 The New Relic Lambda Extension is enabled by default. To disable it, after adding or

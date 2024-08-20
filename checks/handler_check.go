@@ -33,10 +33,18 @@ func handlerCheck(ctx context.Context, conf *config.Configuration, reg *api.Regi
 	return nil
 }
 
+func isDocker() bool {
+	aws_runtime := strings.ToLower(os.Getenv("AWS_EXECUTION_ENV"))
+	return !strings.HasPrefix(aws_runtime, "AWS_Lambda")
+}
+
 func (r runtimeConfig) check(h handlerConfigs) bool {
 	if !h.conf.TestingOverride {
 		esm := strings.ToLower(os.Getenv("NEW_RELIC_USE_ESM"))
 		if esm == "true" {
+			return true
+		}
+		if isDocker() {
 			return true
 		}
 	}
@@ -57,12 +65,6 @@ func (r runtimeConfig) check(h handlerConfigs) bool {
 }
 
 func (r runtimeConfig) getTrueHandler(h handlerConfigs) string {
-	if !h.conf.TestingOverride {
-		if util.PathExists("/.dockerenv") {
-			return h.handlerName
-		}
-	}
-
 	if h.handlerName != r.wrapperName {
 		util.Logln("Warning: handler not set to New Relic layer wrapper", r.wrapperName)
 		return h.handlerName

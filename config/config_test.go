@@ -75,6 +75,22 @@ func TestConfigurationFromEnvironment(t *testing.T) {
 	assert.Equal(t, false, conf.LogsEnabled)
 }
 
+func TestConfigurationFromEnvironmentNREnabled(t *testing.T) {
+	os.Setenv("NEW_RELIC_ENABLED", "false")
+	defer os.Unsetenv("NEW_RELIC_ENABLED")
+
+	conf := ConfigurationFromEnvironment()
+	assert.Equal(t, conf.ExtensionEnabled, false)
+}
+
+func TestConfigurationFromEnvironmentNRAgentEnabled(t *testing.T) {
+	os.Setenv("NEW_RELIC_AGENT_ENABLED", "false")
+	defer os.Unsetenv("NEW_RELIC_AGENT_ENABLED")
+
+	conf := ConfigurationFromEnvironment()
+	assert.Equal(t, conf.ExtensionEnabled, false)
+}
+
 func TestConfigurationFromEnvironmentSecretId(t *testing.T) {
 	os.Setenv("NEW_RELIC_LICENSE_KEY_SECRET", "secretId")
 	defer os.Unsetenv("NEW_RELIC_LICENSE_KEY_SECRET")

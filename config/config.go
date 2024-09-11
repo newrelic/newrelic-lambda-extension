@@ -38,6 +38,8 @@ type Configuration struct {
 }
 
 func ConfigurationFromEnvironment() *Configuration {
+	nrEnabledStr, nrEnabledOverride := os.LookupEnv("NEW_RELIC_ENABLED")
+	nrEnabledRubyStr, nrEnabledRubyOverride := os.LookupEnv("NEW_RELIC_AGENT_ENABLED")
 	enabledStr, extensionEnabledOverride := os.LookupEnv("NEW_RELIC_LAMBDA_EXTENSION_ENABLED")
 	licenseKey, lkOverride := os.LookupEnv("NEW_RELIC_LICENSE_KEY")
 	licenseKeySecretId, lkSecretOverride := os.LookupEnv("NEW_RELIC_LICENSE_KEY_SECRET")
@@ -55,6 +57,12 @@ func ConfigurationFromEnvironment() *Configuration {
 	collectTraceIDStr, collectTraceIDOverride := os.LookupEnv("NEW_RELIC_COLLECT_TRACE_ID")
 
 	extensionEnabled := true
+	if nrEnabledOverride && strings.ToLower(nrEnabledStr) == "false" {
+		extensionEnabled = false
+	}
+	if nrEnabledRubyOverride && strings.ToLower(nrEnabledRubyStr) == "false" {
+		extensionEnabled = false
+	}
 	if extensionEnabledOverride && strings.ToLower(enabledStr) == "false" {
 		extensionEnabled = false
 	}

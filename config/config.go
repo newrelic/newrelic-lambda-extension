@@ -57,8 +57,11 @@ func ConfigurationFromEnvironment() *Configuration {
 	collectTraceIDStr, collectTraceIDOverride := os.LookupEnv("NEW_RELIC_COLLECT_TRACE_ID")
 
 	extensionEnabled := true
-	if nrEnabledOverride && strings.ToLower(nrEnabledStr) == "false" {
-		extensionEnabled = false
+	if nrEnabledOverride {
+		b, err := strconv.ParseBool(nrEnabledStr)
+		if err == nil && !b {
+			extensionEnabled = false
+		}
 	}
 	if nrEnabledRubyOverride && strings.ToLower(nrEnabledRubyStr) == "false" {
 		extensionEnabled = false

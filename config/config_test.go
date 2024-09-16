@@ -83,6 +83,14 @@ func TestConfigurationFromEnvironmentNREnabled(t *testing.T) {
 	assert.Equal(t, conf.ExtensionEnabled, false)
 }
 
+func TestConfigurationFromEnvironmentNREnabledBool(t *testing.T) {
+	os.Setenv("NEW_RELIC_ENABLED", "0")
+	defer os.Unsetenv("NEW_RELIC_ENABLED")
+
+	conf := ConfigurationFromEnvironment()
+	assert.Equal(t, conf.ExtensionEnabled, false)
+}
+
 func TestConfigurationFromEnvironmentNRAgentEnabled(t *testing.T) {
 	os.Setenv("NEW_RELIC_AGENT_ENABLED", "false")
 	defer os.Unsetenv("NEW_RELIC_AGENT_ENABLED")

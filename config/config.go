@@ -21,6 +21,7 @@ var EmptyNRWrapper = "Undefined"
 type Configuration struct {
 	TestingOverride            bool // ignores envioronment specific details when running unit tests
 	ExtensionEnabled           bool
+	ExtensionChecks            map[string]bool
 	LogsEnabled                bool
 	SendFunctionLogs           bool
 	CollectTraceID             bool
@@ -40,6 +41,7 @@ type Configuration struct {
 func ConfigurationFromEnvironment() *Configuration {
 	nrEnabledStr, nrEnabledOverride := os.LookupEnv("NEW_RELIC_ENABLED")
 	nrEnabledRubyStr, nrEnabledRubyOverride := os.LookupEnv("NEW_RELIC_AGENT_ENABLED")
+	nrExtensionChecksStr, nrExtensionChecksOverride := os.LookupEnv("NEW_RELIC_EXTENSION_CHECKS")
 	enabledStr, extensionEnabledOverride := os.LookupEnv("NEW_RELIC_LAMBDA_EXTENSION_ENABLED")
 	licenseKey, lkOverride := os.LookupEnv("NEW_RELIC_LICENSE_KEY")
 	licenseKeySecretId, lkSecretOverride := os.LookupEnv("NEW_RELIC_LICENSE_KEY_SECRET")
@@ -91,6 +93,28 @@ func ConfigurationFromEnvironment() *Configuration {
 		ret.LicenseKeySecretId = licenseKeySecretId
 	} else if lkSSMParameterOverride {
 		ret.LicenseKeySSMParameterName = licenseKeySSMParameterName
+	}
+
+	if nrExtensionChecksOverride && nrExtensionChecksStr != "" {
+		validChecks := map[string]bool{
+			"agent":   true,
+			"handler": true,
+			"sanity":  true,
+			"vendor":  true,
+		}
+		selectedChecks := make(map[string]bool)
+		checks := strings.Split(nrExtensionChecksStr, ",")
+	
+		for _, check := range checks {
+			trimmedCheck := strings.TrimSpace(check)
+			if trimmedCheck != "" && validChecks[trimmedCheck] {
+				selectedChecks[trimmedCheck] = true
+			}
+		}
+	
+		if len(selectedChecks) > 0 {
+			ret.ExtensionChecks = selectedChecks
+		}
 	}
 
 	if nrOverride {

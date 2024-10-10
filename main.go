@@ -137,6 +137,10 @@ func main() {
 
 	// Run startup checks
 	go func() {
+		if conf.IgnoreExtensionChecks["all"] {
+			util.Debugf("Ignoring all extension checks")
+			return
+		}
 		checks.RunChecks(ctx, conf, registrationResponse, telemetryClient)
 	}()
 

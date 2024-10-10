@@ -32,13 +32,11 @@ func RunChecks(ctx context.Context, conf *config.Configuration, reg *api.Registr
 		util.Logln(errLog)
 	}
 
-	runAllChecks := len(conf.ExtensionChecks) == 0
-
 	for checkName, check := range checks {
-		if runAllChecks || conf.ExtensionChecks[checkName] {
-			util.Debugf("Running Extension check: %s", checkName)
-			runCheck(ctx, conf, reg, runtimeConfig, logSender, check)
+		if conf.IgnoreExtensionChecks[checkName] {
+			continue
 		}
+		runCheck(ctx, conf, reg, runtimeConfig, logSender, check)
 	}
 }
 

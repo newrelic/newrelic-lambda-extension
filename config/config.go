@@ -42,7 +42,7 @@ func parseIgnoredExtensionChecks(nrIgnoreExtensionChecksOverride bool, nrIgnoreE
 	ignoredChecks := make(map[string]bool)
 
 	if !nrIgnoreExtensionChecksOverride || nrIgnoreExtensionChecksStr == "" {
-		return ignoredChecks
+		return nil
 	}
 
 	validChecks := map[string]bool{

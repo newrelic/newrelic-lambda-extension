@@ -2,9 +2,12 @@ package config
 
 import (
 	"os"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/newrelic/newrelic-lambda-extension/util"
 )
 
 const (
@@ -70,6 +73,26 @@ func parseIgnoredExtensionChecks(nrIgnoreExtensionChecksOverride bool, nrIgnoreE
 	return ignoredChecks
 }
 
+func checkLicenseKeySecretId(licenseKeySecretId string) string {
+	arnPattern := `^arn:aws:secretsmanager:[a-z0-9-]+:[0-9]{12}:secret:[a-zA-Z0-9-_/+=.@]+$`
+
+	re := regexp.MustCompile(arnPattern)
+
+	if re.MatchString(licenseKeySecretId) {
+		return licenseKeySecretId
+	}
+
+	namePattern := `^[a-zA-Z0-9/_+=.@-]+$`
+	nameRe := regexp.MustCompile(namePattern)
+
+	if nameRe.MatchString(licenseKeySecretId) && !strings.Contains(licenseKeySecretId, "arn:") {
+		return licenseKeySecretId
+	}
+
+	util.Debugf("Invalid secret id: %s", licenseKeySecretId)
+	return ""
+}
+
 func ConfigurationFromEnvironment() *Configuration {
 	nrEnabledStr, nrEnabledOverride := os.LookupEnv("NEW_RELIC_ENABLED")
 	nrEnabledRubyStr, nrEnabledRubyOverride := os.LookupEnv("NEW_RELIC_AGENT_ENABLED")
@@ -122,7 +145,7 @@ func ConfigurationFromEnvironment() *Configuration {
 	if lkOverride {
 		ret.LicenseKey = licenseKey
 	} else if lkSecretOverride {
-		ret.LicenseKeySecretId = licenseKeySecretId
+		ret.LicenseKeySecretId = checkLicenseKeySecretId(licenseKeySecretId)
 	} else if lkSSMParameterOverride {
 		ret.LicenseKeySSMParameterName = licenseKeySSMParameterName
 	}

@@ -99,6 +99,60 @@ func TestConfigurationFromEnvironmentNRAgentEnabled(t *testing.T) {
 	assert.Equal(t, conf.ExtensionEnabled, false)
 }
 
+func TestConfigurationFromEnvironmentExtensionChecks(t *testing.T) {
+	os.Setenv("NEW_RELIC_IGNORE_EXTENSION_CHECKS", "agent,handler,dummy")
+	defer os.Unsetenv("NEW_RELIC_IGNORE_EXTENSION_CHECKS")
+
+	conf := ConfigurationFromEnvironment()
+	assert.Equal(t, conf.IgnoreExtensionChecks["agent"], true)
+	assert.Equal(t, conf.IgnoreExtensionChecks["handler"], true)
+	assert.Equal(t, len(conf.IgnoreExtensionChecks), 2)
+}
+
+func TestConfigurationFromEnvironmentExtensionChecksAll(t *testing.T) {
+	os.Setenv("NEW_RELIC_IGNORE_EXTENSION_CHECKS", "ALL")
+	defer os.Unsetenv("NEW_RELIC_IGNORE_EXTENSION_CHECKS")
+
+	conf := ConfigurationFromEnvironment()
+	assert.Equal(t, conf.IgnoreExtensionChecks["agent"], false)
+	assert.Equal(t, conf.IgnoreExtensionChecks["handler"], false)
+	assert.Equal(t, conf.IgnoreExtensionChecks["sanity"], false)
+	assert.Equal(t, conf.IgnoreExtensionChecks["vendor"], false)
+	assert.Equal(t, len(conf.IgnoreExtensionChecks), 1)
+}
+
+func TestConfigurationFromEnvironmentExtensionChecksIncorrectString(t *testing.T) {
+	os.Setenv("NEW_RELIC_IGNORE_EXTENSION_CHECKS", "incorrect,valuess,...,,")
+	defer os.Unsetenv("NEW_RELIC_IGNORE_EXTENSION_CHECKS")
+
+	conf := ConfigurationFromEnvironment()
+	assert.Equal(t, len(conf.IgnoreExtensionChecks), 0)
+}
+
+func TestConfigurationFromEnvironmentExtensionChecksIncorrectStringWithAll(t *testing.T) {
+	os.Setenv("NEW_RELIC_IGNORE_EXTENSION_CHECKS", "incorrect,valuess,...,ALL,")
+	defer os.Unsetenv("NEW_RELIC_IGNORE_EXTENSION_CHECKS")
+
+	conf := ConfigurationFromEnvironment()
+	assert.Equal(t, len(conf.IgnoreExtensionChecks), 0)
+}
+
+func TestConfigurationFromEnvironmentExtensionChecksIncorrectStringAll(t *testing.T) {
+	os.Setenv("NEW_RELIC_IGNORE_EXTENSION_CHECKS", "All,ALL,...,ALL,")
+	defer os.Unsetenv("NEW_RELIC_IGNORE_EXTENSION_CHECKS")
+
+	conf := ConfigurationFromEnvironment()
+	assert.Equal(t, len(conf.IgnoreExtensionChecks), 0)
+}
+
+func TestConfigurationFromEnvironmentExtensionChecksEmptyString(t *testing.T) {
+	os.Setenv("NEW_RELIC_IGNORE_EXTENSION_CHECKS", "")
+	defer os.Unsetenv("NEW_RELIC_IGNORE_EXTENSION_CHECKS")
+
+	conf := ConfigurationFromEnvironment()
+	assert.Equal(t, len(conf.IgnoreExtensionChecks), 0)
+}
+
 func TestConfigurationFromEnvironmentSecretId(t *testing.T) {
 	os.Setenv("NEW_RELIC_LICENSE_KEY_SECRET", "secretId")
 	defer os.Unsetenv("NEW_RELIC_LICENSE_KEY_SECRET")

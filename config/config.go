@@ -21,6 +21,7 @@ var EmptyNRWrapper = "Undefined"
 type Configuration struct {
 	TestingOverride            bool // ignores envioronment specific details when running unit tests
 	ExtensionEnabled           bool
+	IgnoreExtensionChecks      map[string]bool
 	LogsEnabled                bool
 	SendFunctionLogs           bool
 	CollectTraceID             bool
@@ -37,9 +38,42 @@ type Configuration struct {
 	ClientTimeout              time.Duration
 }
 
+func parseIgnoredExtensionChecks(nrIgnoreExtensionChecksOverride bool, nrIgnoreExtensionChecksStr string) map[string]bool {
+	ignoredChecks := make(map[string]bool)
+
+	if !nrIgnoreExtensionChecksOverride || nrIgnoreExtensionChecksStr == "" {
+		return nil
+	}
+
+	validChecks := map[string]bool{
+		"agent":   true,
+		"handler": true,
+		"sanity":  true,
+		"vendor":  true,
+	}
+
+	ignoredChecksStr := strings.ToLower(nrIgnoreExtensionChecksStr)
+	
+	if ignoredChecksStr == "all" {
+		ignoredChecks["all"] = true
+		return ignoredChecks
+	}
+
+	checks := strings.Split(ignoredChecksStr, ",")
+	for _, check := range checks {
+		trimmedCheck := strings.TrimSpace(check)
+		if trimmedCheck != "" && validChecks[trimmedCheck] {
+			ignoredChecks[trimmedCheck] = true
+		}
+	}
+
+	return ignoredChecks
+}
+
 func ConfigurationFromEnvironment() *Configuration {
 	nrEnabledStr, nrEnabledOverride := os.LookupEnv("NEW_RELIC_ENABLED")
 	nrEnabledRubyStr, nrEnabledRubyOverride := os.LookupEnv("NEW_RELIC_AGENT_ENABLED")
+	nrIgnoreExtensionChecksStr, nrIgnoreExtensionChecksOverride := os.LookupEnv("NEW_RELIC_IGNORE_EXTENSION_CHECKS")
 	enabledStr, extensionEnabledOverride := os.LookupEnv("NEW_RELIC_LAMBDA_EXTENSION_ENABLED")
 	licenseKey, lkOverride := os.LookupEnv("NEW_RELIC_LICENSE_KEY")
 	licenseKeySecretId, lkSecretOverride := os.LookupEnv("NEW_RELIC_LICENSE_KEY_SECRET")
@@ -92,6 +126,8 @@ func ConfigurationFromEnvironment() *Configuration {
 	} else if lkSSMParameterOverride {
 		ret.LicenseKeySSMParameterName = licenseKeySSMParameterName
 	}
+
+	ret.IgnoreExtensionChecks = parseIgnoredExtensionChecks(nrIgnoreExtensionChecksOverride, nrIgnoreExtensionChecksStr)
 
 	if nrOverride {
 		ret.NRHandler = nrHandler

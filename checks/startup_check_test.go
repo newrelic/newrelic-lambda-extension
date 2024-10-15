@@ -78,3 +78,25 @@ func TestRunChecks(t *testing.T) {
 	ctx := context.Background()
 	RunChecks(ctx, c, r, l)
 }
+
+func TestRunChecksIgnoreExtensionChecks(t *testing.T) {
+	c := &config.Configuration{IgnoreExtensionChecks: map[string]bool{"agent": true}}
+	r := &api.RegistrationResponse{}
+	l := &TestLogSender{}
+
+	client = &mockClientError{}
+
+	ctx := context.Background()
+	RunChecks(ctx, c, r, l)
+}
+
+func TestRunChecksIgnoreExtensionChecksAll(t *testing.T) {
+	c := &config.Configuration{IgnoreExtensionChecks: map[string]bool{"all": true}}
+	r := &api.RegistrationResponse{}
+	l := &TestLogSender{}
+
+	client = &mockClientError{}
+
+	ctx := context.Background()
+	RunChecks(ctx, c, r, l)
+}

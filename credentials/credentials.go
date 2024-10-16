@@ -72,10 +72,18 @@ func decodeLicenseKey(rawJson *string) (string, error) {
 func IsSecretConfigured(ctx context.Context, conf *config.Configuration) bool {
 	secretId := getLicenseKeySecretId(conf)
 	secretValueInput := secretsmanager.GetSecretValueInput{SecretId: &secretId}
-
+	svc := secretsmanager.New(sess, aws.NewConfig().WithRegion("us-east-1"))
 	_, err := secrets.GetSecretValueWithContext(ctx, &secretValueInput)
 	if err != nil {
-		return false
+		util.Debugf("Secret '%s' not found in Secrets Manager trying different region\n", secretId)
+		input := &secretsmanager.GetSecretValueInput{
+			SecretId: &secretId,
+		}
+	
+		_, err := svc.GetSecretValueWithContext(ctx, input)
+		if err != nil {
+			return false
+		}
 	}
 
 	return true
@@ -142,7 +150,15 @@ func tryLicenseKeyFromSecret(ctx context.Context, secretId string) (string, erro
 
 	secretValueOutput, err := secrets.GetSecretValueWithContext(ctx, &secretValueInput)
 	if err != nil {
-		return "", err
+		util.Debugf("Secret '%s' not found in Secrets Manager trying different region\n", secretId)
+		svc := secretsmanager.New(sess, aws.NewConfig().WithRegion("us-east-1"))
+		secretValueInput := secretsmanager.GetSecretValueInput{SecretId: &secretId}
+		secretValueOutput, err := svc.GetSecretValueWithContext(ctx, &secretValueInput)
+		util.Debugf("secretValueOutput: %v\n", secretValueOutput)
+		if err != nil {
+			return "", err
+		}
+		return decodeLicenseKey(secretValueOutput.SecretString)
 	}
 
 	return decodeLicenseKey(secretValueOutput.SecretString)

@@ -21,8 +21,6 @@ Resources:
         Variables:
           NEW_RELIC_LAMBDA_HANDLER: "app.lambdaHandler"
           NEW_RELIC_LICENSE_KEY: "YOUR_NEWRELIC_LICENSE_KEY"
-          NEW_RELIC_LOG_ENDPOINT: "YOUR_NEWRELIC_LOG_ENDPOINT"
-          NEW_RELIC_TELEMETRY_ENDPOINT: "YOUR_NEWRELIC_TELEMETRY_ENDPOINT"
     Metadata:
       DockerTag: nodejs20.x-v1
       DockerContext: ./hello-world

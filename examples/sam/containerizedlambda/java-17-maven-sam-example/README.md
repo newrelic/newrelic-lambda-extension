@@ -1,134 +1,87 @@
 # java-17-maven-sam-example
 
-This project contains source code and supporting files for a serverless application that you can deploy with the SAM CLI. It includes the following files and folders.
+This project contains source code and supporting files for a serverless application that you can deploy with the SAM CLI. It includes:
 
-- HelloWorldFunction/src/main - Code for the application's Lambda function and Project Dockerfile.
-- events - Invocation events that you can use to invoke the function.
-- HelloWorldFunction/src/test - Unit tests for the application code. 
-- template.yaml - A template that defines the application's AWS resources.
+- `HelloWorldFunction/src/main`: Code for the application's Lambda function and Project Dockerfile.
+- `events`: Invocation events that you can use to invoke the function.
+- `HelloWorldFunction/src/test`: Unit tests for the application code.
+- `template.yaml`: A template that defines the application's AWS resources.
 
-The application uses several AWS resources, including Lambda functions and an API Gateway API. These resources are defined in the `template.yaml` file in this project. You can update the template to add AWS resources through the same deployment process that updates your application code.
+## Getting Started
 
-## Getting started
+### Prerequisites
 
-There are two ways to start using this serverless application example:
+1. **Install SAM CLI**: [Installation instructions](https://docs.aws.amazon.com/serverless-application-model/latest/developerguide/serverless-sam-cli-install.html)
+2. **Install Docker**: [Docker Community Edition installation guide](https://hub.docker.com/search/?type=edition&offering=community)
+3. **Install Java 17**: [Java 17 installation](https://docs.aws.amazon.com/corretto/latest/corretto-17-ug/downloads-list.html)
+4. **Install Maven**: [Maven installation](https://maven.apache.org/install.html)
 
-### Option 1: Create a new SAM project
+### Option 1: Create a New SAM Project
 
-You can create your own SAM project using the `sam init` command:
-
-1. **Set up your environment**: Before you start, make sure that you have the SAM CLI and Docker installed on your machine.
-   - Install the SAM CLI following these [installation instructions](https://docs.aws.amazon.com/serverless-application-model/latest/developerguide/serverless-sam-cli-install.html).
-   - Install Docker using the [Docker Community Edition installation guide](https://hub.docker.com/search/?type=edition&offering=community).
-
-2. **Initiate a new project**:
-   Run the following command to create a new serverless application with a Docker image package type:
-
+1. **Initialize Project**:
    ```bash
    sam init --package-type Image
    ```
+2. **Select Template**: Choose `AWS Quick Start Templates` and `Hello World Example`.
+3. **Configure Project**: Follow the prompts.
 
-3. **Select the desired template**: Choose `AWS Quick Start Templates` and then select the `Hello World Example`.
+### Option 2: Clone Existing Repository
 
-4. **Configure your project**: Follow the prompts to set up your project, adding any additional features if necessary.
+1. **Clone Repository**:
+   ```bash
+   git clone https://github.com/newrelic/newrelic-lambda-extension.git
+   ```
 
-### Option 2: Clone an existing repository
+## Deploy the Application
 
-Alternatively, you can clone this existing repository and deploy the application directly.
+1. **Build Application**:
+   ```bash
+   sam build
+   ```
+2. **Deploy Application**:
+   ```bash
+   sam deploy --guided
+   ```
 
-After cloning the repository or creating a new SAM project, you can then build and deploy your application as described in the following sections.
+## Local Development
 
+1. **Build Locally**:
+   ```bash
+   sam build
+   ```
+2. **Invoke Function Locally**:
+   ```bash
+   sam local invoke HelloWorldFunction
+   ```
+3. **Start Local API**:
+   ```bash
+   sam local start-api
+   curl http://localhost:3000/
+   ```
 
-The application uses several AWS resources, including Lambda functions and an API Gateway API. These resources are defined in the `template.yaml` file in this project. You can update the template to add AWS resources through the same deployment process that updates your application code.
+## Fetch Logs
 
-## Deploy the sample application
+1. **Fetch Lambda Logs**:
+   ```bash
+   sam logs -n HelloWorldFunction --stack-name java-17-maven-sam-example --tail
+   ```
 
-The Serverless Application Model Command Line Interface (SAM CLI) is an extension of the AWS CLI that adds functionality for building and testing Lambda applications. It uses Docker to run your functions in an Amazon Linux environment that matches Lambda. It can also emulate your application's build environment and API.
+## Run Unit Tests
 
-To use the SAM CLI, you need the following tools.
-
-* SAM CLI - [Install the SAM CLI](https://docs.aws.amazon.com/serverless-application-model/latest/developerguide/serverless-sam-cli-install.html)
-* Docker - [Install Docker community edition](https://hub.docker.com/search/?type=edition&offering=community)
-
-You may need the following for local testing.
-* java17 - [Install the Java 17](https://docs.aws.amazon.com/corretto/latest/corretto-17-ug/downloads-list.html)
-* Maven - [Install Maven](https://maven.apache.org/install.html)
-
-To build and deploy your application for the first time, run the following in your shell:
-
-```bash
-sam build
-sam deploy --guided
-```
-
-The first command will build a docker image from a Dockerfile and then copy the source of your application inside the Docker image. The second command will package and deploy your application to AWS, with a series of prompts:
-
-* **Stack Name**: The name of the stack to deploy to CloudFormation. This should be unique to your account and region, and a good starting point would be something matching your project name.
-* **AWS Region**: The AWS region you want to deploy your app to.
-* **Confirm changes before deploy**: If set to yes, any change sets will be shown to you before execution for manual review. If set to no, the AWS SAM CLI will automatically deploy application changes.
-* **Allow SAM CLI IAM role creation**: Many AWS SAM templates, including this example, create AWS IAM roles required for the AWS Lambda function(s) included to access AWS services. By default, these are scoped down to minimum required permissions. To deploy an AWS CloudFormation stack which creates or modifies IAM roles, the `CAPABILITY_IAM` value for `capabilities` must be provided. If permission isn't provided through this prompt, to deploy this example you must explicitly pass `--capabilities CAPABILITY_IAM` to the `sam deploy` command.
-* **Save arguments to samconfig.toml**: If set to yes, your choices will be saved to a configuration file inside the project, so that in the future you can just re-run `sam deploy` without parameters to deploy changes to your application.
-
-You can find your API Gateway Endpoint URL in the output values displayed after deployment.
-
-## Use the SAM CLI to build and test locally
-
-Build your application with the `sam build` command.
-
-```bash
-java-17-maven-sam-example$ sam build
-```
-
-The SAM CLI builds a docker image from a Dockerfile and then installs dependencies defined in `HelloWorldFunction/pom.xml` inside the docker image. The processed template file is saved in the `.aws-sam/build` folder.
-
-
-
-Run functions locally and invoke them with the `sam local invoke` command.
-
-```bash
-java-17-maven-sam-example$ sam local invoke HelloWorldFunction
-```
-
-The SAM CLI can also emulate your application's API. Use the `sam local start-api` to run the API locally on port 3000.
-
-```bash
-java-17-maven-sam-example$ sam local start-api
-java-17-maven-sam-example$ curl http://localhost:3000/
-
-## Add a resource to your application
-The application template uses AWS Serverless Application Model (AWS SAM) to define application resources. AWS SAM is an extension of AWS CloudFormation with a simpler syntax for configuring common serverless application resources such as functions, triggers, and APIs. For resources not included in [the SAM specification](https://github.com/awslabs/serverless-application-model/blob/master/versions/2016-10-31.md), you can use standard [AWS CloudFormation](https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-template-resource-type-ref.html) resource types.
-
-## Fetch, tail, and filter Lambda function logs
-
-To simplify troubleshooting, SAM CLI has a command called `sam logs`. `sam logs` lets you fetch logs generated by your deployed Lambda function from the command line. In addition to printing the logs on the terminal, this command has several nifty features to help you quickly find the bug.
-
-`NOTE`: This command works for all AWS Lambda functions; not just the ones you deploy using SAM.
-
-```bash
-java-17-maven-sam-example$ sam logs -n HelloWorldFunction --stack-name java-17-maven-sam-example --tail
-```
-
-You can find more information and examples about filtering Lambda function logs in the [SAM CLI Documentation](https://docs.aws.amazon.com/serverless-application-model/latest/developerguide/serverless-sam-cli-logging.html).
-
-## Unit tests
-
-Tests are defined in the `HelloWorldFunction/src/test` folder in this project.
-
-```bash
-java-17-maven-sam-example$ cd HelloWorldFunction
-HelloWorldFunction$ mvn test
-```
+1. **Run Tests**:
+   ```bash
+   cd HelloWorldFunction
+   mvn test
+   ```
 
 ## Cleanup
 
-To delete the sample application that you created, use the AWS CLI. Assuming you used your project name for the stack name, you can run the following:
-
-```bash
-sam delete --stack-name java-17-maven-sam-example
-```
+1. **Delete Deployed Application**:
+   ```bash
+   sam delete --stack-name java-17-maven-sam-example
+   ```
 
 ## Resources
 
-See the [AWS SAM developer guide](https://docs.aws.amazon.com/serverless-application-model/latest/developerguide/what-is-sam.html) for an introduction to SAM specification, the SAM CLI, and serverless application concepts.
-
-Next, you can use AWS Serverless Application Repository to deploy ready to use Apps that go beyond hello world samples and learn how authors developed their applications: [AWS Serverless Application Repository main page](https://aws.amazon.com/serverless/serverlessrepo/)
+- [AWS SAM Developer Guide](https://docs.aws.amazon.com/serverless-application-model/latest/developerguide/what-is-sam.html)
+- [AWS Serverless Application Repository](https://aws.amazon.com/serverless/serverlessrepo/)

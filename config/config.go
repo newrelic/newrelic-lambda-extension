@@ -24,6 +24,7 @@ type Configuration struct {
 	IgnoreExtensionChecks      map[string]bool
 	LogsEnabled                bool
 	SendFunctionLogs           bool
+	SendExtensionLogs		   bool
 	CollectTraceID             bool
 	RipeMillis                 uint32
 	RotMillis                  uint32
@@ -87,6 +88,7 @@ func ConfigurationFromEnvironment() *Configuration {
 	logLevelStr, logLevelOverride := os.LookupEnv("NEW_RELIC_EXTENSION_LOG_LEVEL")
 	logsEnabledStr, logsEnabledOverride := os.LookupEnv("NEW_RELIC_EXTENSION_LOGS_ENABLED")
 	sendFunctionLogsStr, sendFunctionLogsOverride := os.LookupEnv("NEW_RELIC_EXTENSION_SEND_FUNCTION_LOGS")
+	sendExtensionLogsStr, sendExtensionLogsOverride := os.LookupEnv("NEW_RELIC_EXTENSION_SEND_EXTENSION_LOGS")
 	logServerHostStr, logServerHostOverride := os.LookupEnv("NEW_RELIC_LOG_SERVER_HOST")
 	collectTraceIDStr, collectTraceIDOverride := os.LookupEnv("NEW_RELIC_COLLECT_TRACE_ID")
 
@@ -179,6 +181,10 @@ func ConfigurationFromEnvironment() *Configuration {
 
 	if sendFunctionLogsOverride && sendFunctionLogsStr == "true" {
 		ret.SendFunctionLogs = true
+	}
+
+	if sendExtensionLogsOverride && strings.ToLower(sendExtensionLogsStr) == "true" {
+		ret.SendExtensionLogs = true
 	}
 
 	if collectTraceIDOverride && collectTraceIDStr == "true" {

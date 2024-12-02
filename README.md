@@ -95,6 +95,7 @@ The New Relic Lambda Extension can also send your function's logs to New Relic. 
 | Environment variable | Default value | Options | Description |
 |--------|-----------|-------------|-------------|
 | `NEW_RELIC_EXTENSION_SEND_FUNCTION_LOGS` | `false` | `true` , `false` | Send function logs to New Relic. |
+| `NEW_RELIC_EXTENSION_SEND_EXTENSION_LOGS` | `false` | `true` , `false` | Send extension logs in addition to the function logs to New Relic. |
 | `NEW_RELIC_EXTENSION_LOGS_ENABLED` | `true` | `true` , `false` | Enable or disable `[NR_EXT]` log lines |
 | `NR_TAGS` |  | | Specify tags to be added to all log events. **Optional**. Each tag is composed of a colon-delimited key and value. Multiple key-value pairs are semicolon-delimited; for example, env:prod;team:myTeam. |
 | `NR_ENV_DELIMITER` | | | Some users in UTF-8 environments might face difficulty in defining strings of `NR_TAGS` delimited by the semicolon `;` character. Use `NR_ENV_DELIMITER`, to set custom delimiter for `NR_TAGS`. |

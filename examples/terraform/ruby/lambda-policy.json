@@ -2,16 +2,15 @@
   "Version": "2012-10-17",
   "Statement": [
     {
-      "Sid": "",
-      "Action": "logs:*",
       "Effect": "Allow",
-      "Resource": "*"
-    },
-    {
-      "Sid": "",
-      "Action": "s3:*",
-      "Effect": "Allow",
-      "Resource": "*"
+      "Action": [
+        "logs:CreateLogGroup",
+        "logs:CreateLogStream",
+        "logs:PutLogEvents"
+      ],
+      "Resource": [
+        "arn:aws:logs:us-east-1:<aws-account-id>:log-group:/aws/lambda/newrelic-terraform-example-nodejs:*"
+      ]
     }
   ]
 }

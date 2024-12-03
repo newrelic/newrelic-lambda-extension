@@ -17,8 +17,8 @@ class App
     # As normal, anything you write to stdout ends up in CloudWatch
     puts 'Hello, world'
     puts "Event size: #{event.size}"
-    puts "Context size: #{context.size}"
+    puts "Context size: #{context.length}"
 
-    { statusCode: 200, body: JSON.generate('Hello from Ruby Lambda!') }
+    { statusCode: 200, body: JSON.generate('Hello from Ruby Lambda!, Here') }
   end
 end

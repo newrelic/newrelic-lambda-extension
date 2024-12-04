@@ -4,8 +4,8 @@ module "nodejs_test_function" {
   lambda_function_handler = "app.lambdaHandler"
   wrapper_handler = "newrelic-lambda-wrapper.handler"
   lambda_function_name = "newrelic-terraform-example-nodejs"
-  lambda_runtime = "nodejs14.x"
+  lambda_runtime = "nodejs20.x"
   lambda_zip_filename = "function.zip"
   newrelic_account_id = var.newrelic_account_id
-  newrelic_layer = "arn:aws:lambda:${var.aws_region}:451483290750:layer:NewRelicNodeJS14X:44"
+  newrelic_layer = "arn:aws:lambda:${var.aws_region}:451483290750:layer:NewRelicNodeJS20X:44"
 }

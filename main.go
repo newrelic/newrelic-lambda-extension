@@ -114,6 +114,9 @@ func main() {
 	if conf.SendFunctionLogs {
 		eventTypes = append(eventTypes, api.Function)
 	}
+	if conf.SendExtensionLogs {
+		eventTypes = append(eventTypes, api.Extension)
+	}
 	subscriptionRequest := api.DefaultLogSubscription(eventTypes, logServer.Port())
 	err = invocationClient.LogRegister(ctx, subscriptionRequest)
 	if err != nil {

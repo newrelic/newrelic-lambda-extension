@@ -124,15 +124,6 @@ func (ls *LogServer) handler(res http.ResponseWriter, req *http.Request) {
 
 	for _, event := range logEvents {
 		switch event.Type {
-		case "extension":
-			record := event.Record.(string)
-			ls.lastRequestIdLock.Lock()
-			functionLogs = append(functionLogs, LogLine{
-				Time:      event.Time,
-				RequestID: ls.lastRequestId,
-				Content:   []byte(record),
-			})
-			ls.lastRequestIdLock.Unlock()
 		case "platform.start":
 			ls.lastRequestIdLock.Lock()
 			switch event.Record.(type) {
@@ -181,7 +172,7 @@ func (ls *LogServer) handler(res http.ResponseWriter, req *http.Request) {
 			ls.platformLogChan <- reportLine
 		case "platform.logsDropped":
 			util.Logf("Platform dropped logs: %v", event.Record)
-		case "function":
+		case "function", "extension":
 			record := event.Record.(string)
 			ls.lastRequestIdLock.Lock()
 			functionLogs = append(functionLogs, LogLine{

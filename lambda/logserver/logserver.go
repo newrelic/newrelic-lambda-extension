@@ -172,7 +172,7 @@ func (ls *LogServer) handler(res http.ResponseWriter, req *http.Request) {
 			ls.platformLogChan <- reportLine
 		case "platform.logsDropped":
 			util.Logf("Platform dropped logs: %v", event.Record)
-		case "function", "extension":
+		case "function", "extension", "platform.fault":
 			record := event.Record.(string)
 			ls.lastRequestIdLock.Lock()
 			functionLogs = append(functionLogs, LogLine{

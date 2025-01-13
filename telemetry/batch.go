@@ -4,12 +4,37 @@ import (
 	"math"
 	"sync"
 	"time"
-
+    "encoding/base64"
 	"github.com/newrelic/newrelic-lambda-extension/util"
 )
 
 // The Unix epoch instant; used as a nil time for eldest and lastHarvest
 var epochStart = time.Unix(0, 0)
+
+// this is a global map to store trace ID for each request id. key is request id and value is trace ID
+var (
+	storeTraceID = make(map[string]interface{})
+	mutex     = sync.RWMutex{}
+)
+func SetTraceIDValue(key string, value interface{}) {
+	mutex.Lock()
+	defer mutex.Unlock()
+	storeTraceID[key] = value
+}
+func GetTraceIDValue(key string) (interface{}, bool) {
+	mutex.RLock()
+	defer mutex.RUnlock()
+	value, exists := storeTraceID[key]
+	return value, exists
+}
+func ClearStoreTraceID() {
+	mutex.Lock()
+	defer mutex.Unlock()
+	for k := range storeTraceID {
+		delete(storeTraceID, k)
+	}
+}
+
 
 // Batch represents the unsent invocations and their telemetry, along with timing data.
 type Batch struct {
@@ -55,6 +80,7 @@ func (b *Batch) AddTelemetry(requestId string, telemetry []byte) *Invocation {
 		if b.eldest.Equal(epochStart) {
 			b.eldest = inv.Start
 		}
+		telemetryBytesEncoded := []byte(base64.StdEncoding.EncodeToString(telemetry))
 		if b.extractTraceID {
 			traceId, err := ExtractTraceID(telemetry)
 			if err != nil {
@@ -63,6 +89,7 @@ func (b *Batch) AddTelemetry(requestId string, telemetry []byte) *Invocation {
 			// We don't want to unset a previously set trace ID
 			if traceId != "" {
 				inv.TraceId = traceId
+				SetTraceIDValue(requestId, traceId)
 			}
 		}
 		return inv
@@ -142,9 +169,13 @@ func (b *Batch) RetrieveTraceID(requestId string) string {
 	b.lock.RLock()
 	defer b.lock.RUnlock()
 
-	inv, ok := b.invocations[requestId]
-	if ok {
-		return inv.TraceId
+	// inv, ok := b.invocations[requestId]
+	// if ok {
+	// 	return inv.TraceId
+	// }
+	if traceId, exists := GetTraceIDValue(requestId); exists {
+		util.Logf("In RetrieveTraceID function , TraceId %s\n", traceId)
+		return traceId.(string)
 	}
 	return ""
 }

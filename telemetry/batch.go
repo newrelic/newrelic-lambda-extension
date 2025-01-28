@@ -82,7 +82,7 @@ func (b *Batch) AddTelemetry(requestId string, telemetry []byte) *Invocation {
 		}
 		telemetryBytesEncoded := []byte(base64.StdEncoding.EncodeToString(telemetry))
 		if b.extractTraceID {
-			traceId, err := ExtractTraceID(telemetry)
+			traceId, err := ExtractTraceID(telemetryBytesEncoded)
 			if err != nil {
 				util.Debugln(err)
 			}

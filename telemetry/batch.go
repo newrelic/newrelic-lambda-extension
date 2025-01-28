@@ -174,7 +174,6 @@ func (b *Batch) RetrieveTraceID(requestId string) string {
 	// 	return inv.TraceId
 	// }
 	if traceId, exists := GetTraceIDValue(requestId); exists {
-		util.Logf("In RetrieveTraceID function , TraceId %s\n", traceId)
 		return traceId.(string)
 	}
 	return ""

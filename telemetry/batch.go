@@ -1,10 +1,11 @@
 package telemetry
 
 import (
+	"encoding/base64"
 	"math"
 	"sync"
 	"time"
-    "encoding/base64"
+
 	"github.com/newrelic/newrelic-lambda-extension/util"
 )
 
@@ -14,8 +15,9 @@ var epochStart = time.Unix(0, 0)
 // this is a global map to store trace ID for each request id. key is request id and value is trace ID
 var (
 	storeTraceID = make(map[string]interface{})
-	mutex     = sync.RWMutex{}
+	mutex        = sync.RWMutex{}
 )
+
 func SetTraceIDValue(key string, value interface{}) {
 	mutex.Lock()
 	defer mutex.Unlock()
@@ -34,7 +36,6 @@ func ClearStoreTraceID() {
 		delete(storeTraceID, k)
 	}
 }
-
 
 // Batch represents the unsent invocations and their telemetry, along with timing data.
 type Batch struct {
@@ -169,10 +170,6 @@ func (b *Batch) RetrieveTraceID(requestId string) string {
 	b.lock.RLock()
 	defer b.lock.RUnlock()
 
-	// inv, ok := b.invocations[requestId]
-	// if ok {
-	// 	return inv.TraceId
-	// }
 	if traceId, exists := GetTraceIDValue(requestId); exists {
 		return traceId.(string)
 	}

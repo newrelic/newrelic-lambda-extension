@@ -33,13 +33,6 @@ func (t *TraceIDStore) GetTraceIDValue(key string) (interface{}, bool) {
 	value, exists := t.store[key]
 	return value, exists
 }
-func (t *TraceIDStore) ClearStoreTraceID() {
-	t.mutex.Lock()
-	defer t.mutex.Unlock()
-	for k := range t.store {
-		delete(t.store, k)
-	}
-}
 
 // Batch represents the unsent invocations and their telemetry, along with timing data.
 type Batch struct {

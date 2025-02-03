@@ -170,8 +170,6 @@ func main() {
 	finalHarvest := batch.Close()
 	shipHarvest(ctx, finalHarvest, telemetryClient)
 
-	telemetry.StoreTraceID.ClearStoreTraceID()
-
 	util.Debugln("Waiting for background tasks to complete")
 	backgroundTasks.Wait()
 

@@ -13,20 +13,20 @@ import (
 var epochStart = time.Unix(0, 0)
 
 var storeTraceID = &TraceIDStore{
-	store: make(map[string]interface{}),
+	store: make(map[string]string),
 }
 
 type TraceIDStore struct {
-	store map[string]interface{}
+	store map[string]string
 	mutex sync.RWMutex
 }
 
-func (t *TraceIDStore) SetTraceIDValue(key string, value interface{}) {
+func (t *TraceIDStore) SetTraceIDValue(key string, value string) {
 	t.mutex.Lock()
 	defer t.mutex.Unlock()
 	t.store[key] = value
 }
-func (t *TraceIDStore) GetTraceIDValue(key string) (interface{}, bool) {
+func (t *TraceIDStore) GetTraceIDValue(key string) (string, bool) {
 	t.mutex.RLock()
 	defer t.mutex.RUnlock()
 	value, exists := t.store[key]
@@ -168,7 +168,7 @@ func (b *Batch) RetrieveTraceID(requestId string) string {
 	defer b.lock.RUnlock()
 
 	if traceId, exists := storeTraceID.GetTraceIDValue(requestId); exists {
-		return traceId.(string)
+		return traceId
 	}
 	return ""
 }

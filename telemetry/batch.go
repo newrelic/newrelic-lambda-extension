@@ -16,7 +16,6 @@ var storeTraceID = &TraceIDStore{
 	store: make(map[string]interface{}),
 }
 
-// TraceIDStore is a struct to store trace ID for each request id. key is request id and value is trace ID
 type TraceIDStore struct {
 	store map[string]interface{}
 	mutex sync.RWMutex

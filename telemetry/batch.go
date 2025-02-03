@@ -12,28 +12,32 @@ import (
 // The Unix epoch instant; used as a nil time for eldest and lastHarvest
 var epochStart = time.Unix(0, 0)
 
-// this is a global map to store trace ID for each request id. key is request id and value is trace ID
-var (
-	storeTraceID = make(map[string]interface{})
-	mutex        = sync.RWMutex{}
-)
-
-func SetTraceIDValue(key string, value interface{}) {
-	mutex.Lock()
-	defer mutex.Unlock()
-	storeTraceID[key] = value
+var StoreTraceID = &TraceIDStore{
+	store: make(map[string]interface{}),
 }
-func GetTraceIDValue(key string) (interface{}, bool) {
-	mutex.RLock()
-	defer mutex.RUnlock()
-	value, exists := storeTraceID[key]
+
+// TraceIDStore is a struct to store trace ID for each request id. key is request id and value is trace ID
+type TraceIDStore struct {
+	store map[string]interface{}
+	mutex sync.RWMutex
+}
+
+func (t *TraceIDStore) SetTraceIDValue(key string, value interface{}) {
+	t.mutex.Lock()
+	defer t.mutex.Unlock()
+	t.store[key] = value
+}
+func (t *TraceIDStore) GetTraceIDValue(key string) (interface{}, bool) {
+	t.mutex.RLock()
+	defer t.mutex.RUnlock()
+	value, exists := t.store[key]
 	return value, exists
 }
-func ClearStoreTraceID() {
-	mutex.Lock()
-	defer mutex.Unlock()
-	for k := range storeTraceID {
-		delete(storeTraceID, k)
+func (t *TraceIDStore) ClearStoreTraceID() {
+	t.mutex.Lock()
+	defer t.mutex.Unlock()
+	for k := range t.store {
+		delete(t.store, k)
 	}
 }
 
@@ -87,10 +91,11 @@ func (b *Batch) AddTelemetry(requestId string, telemetry []byte) *Invocation {
 			if err != nil {
 				util.Debugln(err)
 			}
+
 			// We don't want to unset a previously set trace ID
 			if traceId != "" {
 				inv.TraceId = traceId
-				SetTraceIDValue(requestId, traceId)
+				StoreTraceID.SetTraceIDValue(requestId, traceId)
 			}
 		}
 		return inv
@@ -170,7 +175,7 @@ func (b *Batch) RetrieveTraceID(requestId string) string {
 	b.lock.RLock()
 	defer b.lock.RUnlock()
 
-	if traceId, exists := GetTraceIDValue(requestId); exists {
+	if traceId, exists := StoreTraceID.GetTraceIDValue(requestId); exists {
 		return traceId.(string)
 	}
 	return ""

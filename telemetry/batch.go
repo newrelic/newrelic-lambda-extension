@@ -12,7 +12,7 @@ import (
 // The Unix epoch instant; used as a nil time for eldest and lastHarvest
 var epochStart = time.Unix(0, 0)
 
-var StoreTraceID = &TraceIDStore{
+var storeTraceID = &TraceIDStore{
 	store: make(map[string]interface{}),
 }
 
@@ -88,7 +88,7 @@ func (b *Batch) AddTelemetry(requestId string, telemetry []byte) *Invocation {
 			// We don't want to unset a previously set trace ID
 			if traceId != "" {
 				inv.TraceId = traceId
-				StoreTraceID.SetTraceIDValue(requestId, traceId)
+				storeTraceID.SetTraceIDValue(requestId, traceId)
 			}
 		}
 		return inv
@@ -168,7 +168,7 @@ func (b *Batch) RetrieveTraceID(requestId string) string {
 	b.lock.RLock()
 	defer b.lock.RUnlock()
 
-	if traceId, exists := StoreTraceID.GetTraceIDValue(requestId); exists {
+	if traceId, exists := storeTraceID.GetTraceIDValue(requestId); exists {
 		return traceId.(string)
 	}
 	return ""

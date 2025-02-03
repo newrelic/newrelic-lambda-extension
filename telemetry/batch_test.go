@@ -188,12 +188,12 @@ func TestBatch_RetrieveTraceID(t *testing.T) {
 	// Add a trace ID to the batch
 	requestId := "testRequestId"
 	expectedTraceID := "testTraceID"
-	StoreTraceID.SetTraceIDValue(requestId, expectedTraceID)
+	storeTraceID.SetTraceIDValue(requestId, expectedTraceID)
 
 	// Retrieve the trace ID
 	traceID := batch.RetrieveTraceID(requestId)
 	assert.Equal(t, expectedTraceID, traceID)
-	StoreTraceID.SetTraceIDValue(requestId, "")
+	storeTraceID.SetTraceIDValue(requestId, "")
 	traceID = batch.RetrieveTraceID(requestId)
 	assert.Empty(t, traceID)
 	// Test for a non-existent request ID

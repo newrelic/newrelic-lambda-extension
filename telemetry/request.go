@@ -31,16 +31,21 @@ type FunctionLogMessage struct {
 }
 
 func NewFunctionLogMessage(timestamp int64, requestId, traceId, message string) FunctionLogMessage {
-	return FunctionLogMessage{
-		Message:   message,
-		Timestamp: timestamp,
-		Attributes: map[string]interface{}{
-			"aws": map[string]string{
-				"lambda_request_id": requestId,
-			},
-			"faas.execution": requestId,
-			"trace.id":       traceId,
+	attributes := map[string]interface{}{
+		"aws": map[string]string{
+			"lambda_request_id": requestId,
 		},
+		"faas.execution": requestId,
+	}
+
+	if traceId != "" {
+		attributes["trace.id"] = traceId
+	}
+
+	return FunctionLogMessage{
+		Message:    message,
+		Timestamp:  timestamp,
+		Attributes: attributes,
 	}
 }
 

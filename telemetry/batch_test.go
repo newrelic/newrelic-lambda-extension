@@ -181,3 +181,23 @@ func TestBatchAsync(t *testing.T) {
 	go assert.Equal(t, testRequestId, harvested[0].RequestId)
 	go assert.Equal(t, 2, len(harvested[0].Telemetry))
 }
+
+func TestBatch_RetrieveTraceID(t *testing.T) {
+	batch := NewBatch(ripe, rot, false)
+
+	// Add a trace ID to the batch
+	requestId := "testRequestId"
+	expectedTraceID := "testTraceID"
+	storeTraceID.SetTraceIDValue(requestId, expectedTraceID)
+
+	// Retrieve the trace ID
+	traceID := batch.RetrieveTraceID(requestId)
+	assert.Equal(t, expectedTraceID, traceID)
+	storeTraceID.SetTraceIDValue(requestId, "")
+	traceID = batch.RetrieveTraceID(requestId)
+	assert.Empty(t, traceID)
+	// Test for a non-existent request ID
+	nonExistentRequestId := "nonExistentRequestId"
+	traceID = batch.RetrieveTraceID(nonExistentRequestId)
+	assert.Equal(t, "", traceID)
+}

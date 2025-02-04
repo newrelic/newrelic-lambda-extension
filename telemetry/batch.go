@@ -1,6 +1,7 @@
 package telemetry
 
 import (
+	"encoding/base64"
 	"math"
 	"sync"
 	"time"
@@ -10,6 +11,27 @@ import (
 
 // The Unix epoch instant; used as a nil time for eldest and lastHarvest
 var epochStart = time.Unix(0, 0)
+
+var storeTraceID = &TraceIDStore{
+	store: make(map[string]string),
+}
+
+type TraceIDStore struct {
+	store map[string]string
+	mutex sync.RWMutex
+}
+
+func (t *TraceIDStore) SetTraceIDValue(key string, value string) {
+	t.mutex.Lock()
+	defer t.mutex.Unlock()
+	t.store[key] = value
+}
+func (t *TraceIDStore) GetTraceIDValue(key string) (string, bool) {
+	t.mutex.RLock()
+	defer t.mutex.RUnlock()
+	value, exists := t.store[key]
+	return value, exists
+}
 
 // Batch represents the unsent invocations and their telemetry, along with timing data.
 type Batch struct {
@@ -56,13 +78,16 @@ func (b *Batch) AddTelemetry(requestId string, telemetry []byte) *Invocation {
 			b.eldest = inv.Start
 		}
 		if b.extractTraceID {
-			traceId, err := ExtractTraceID(telemetry)
+			telemetryBytesEncoded := []byte(base64.StdEncoding.EncodeToString(telemetry))
+			traceId, err := ExtractTraceID(telemetryBytesEncoded)
 			if err != nil {
 				util.Debugln(err)
 			}
+
 			// We don't want to unset a previously set trace ID
 			if traceId != "" {
 				inv.TraceId = traceId
+				storeTraceID.SetTraceIDValue(requestId, traceId)
 			}
 		}
 		return inv
@@ -142,9 +167,8 @@ func (b *Batch) RetrieveTraceID(requestId string) string {
 	b.lock.RLock()
 	defer b.lock.RUnlock()
 
-	inv, ok := b.invocations[requestId]
-	if ok {
-		return inv.TraceId
+	if traceId, exists := storeTraceID.GetTraceIDValue(requestId); exists {
+		return traceId
 	}
 	return ""
 }

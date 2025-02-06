@@ -7,13 +7,16 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"testing"
 	"time"
 
+	"github.com/newrelic/newrelic-lambda-extension/config"
 	"github.com/newrelic/newrelic-lambda-extension/lambda/extension/api"
+	"github.com/newrelic/newrelic-lambda-extension/telemetry"
 	"github.com/newrelic/newrelic-lambda-extension/util"
 
 	"github.com/stretchr/testify/assert"
@@ -750,4 +753,243 @@ func TestMainTimeoutNoPipeWrite(t *testing.T) {
 
 func overrideContext(ctx context.Context) {
 	rootCtx = ctx
+}
+
+func TestMainTimeoutAddTelemetry(t *testing.T) {
+	var (
+		registerRequestCount    int
+		initErrorRequestCount   int
+		exitErrorRequestCount   int
+		logRegisterRequestCount int
+		nextEventRequestCount   int
+	)
+	ctx, cancel := context.WithCancel(context.Background())
+	overrideContext(ctx)
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		defer util.Close(r.Body)
+
+		if r.URL.Path == "/2020-01-01/extension/register" {
+			registerRequestCount++
+
+			w.Header().Add(api.ExtensionIdHeader, "test-ext-id")
+			w.WriteHeader(200)
+			res, err := json.Marshal(api.RegistrationResponse{
+				FunctionName:    "foobar",
+				FunctionVersion: "latest",
+				Handler:         "lambda.handler",
+			})
+			assert.Nil(t, err)
+			_, _ = w.Write(res)
+		}
+
+		if r.URL.Path == "/2020-01-01/extension/init/error" {
+			initErrorRequestCount++
+
+			w.WriteHeader(200)
+			_, _ = w.Write([]byte(""))
+		}
+
+		if r.URL.Path == "/2020-01-01/extension/exit/error" {
+			exitErrorRequestCount++
+
+			w.WriteHeader(200)
+			_, _ = w.Write([]byte(""))
+		}
+
+		if r.URL.Path == "/2020-08-15/logs" {
+			logRegisterRequestCount++
+
+			w.WriteHeader(200)
+			_, _ = w.Write(nil)
+
+		}
+
+		if r.URL.Path == "/2020-01-01/extension/event/next" {
+			nextEventRequestCount++
+
+			w.WriteHeader(200)
+			res, err := json.Marshal(api.InvocationEvent{
+				EventType:          api.Invoke,
+				DeadlineMs:         1000,
+				RequestID:          "12345",
+				InvokedFunctionARN: "arn:aws:lambda:us-east-1:12345:foobar",
+				ShutdownReason:     api.Timeout,
+				Tracing:            nil,
+			})
+			assert.Nil(t, err)
+			_, _ = w.Write(res)
+
+			cancel()
+		}
+	}))
+	defer srv.Close()
+
+	url := srv.URL[7:]
+
+	_ = os.Setenv(api.LambdaHostPortEnvVar, url)
+	defer os.Unsetenv(api.LambdaHostPortEnvVar)
+
+	_ = os.Setenv("NEW_RELIC_LICENSE_KEY", "foobar")
+	defer os.Unsetenv("NEW_RELIC_LICENSE_KEY")
+
+	_ = os.Setenv("NEW_RELIC_COLLECT_TRACE_ID", "true")
+	defer os.Unsetenv("NEW_RELIC_COLLECT_TRACE_ID")
+
+	_ = os.Setenv("NEW_RELIC_LOG_SERVER_HOST", "localhost")
+	defer os.Unsetenv("NEW_RELIC_LOG_SERVER_HOST")
+
+	_ = os.Setenv("NEW_RELIC_EXTENSION_LOG_LEVEL", "DEBUG")
+	defer os.Unsetenv("NEW_RELIC_EXTENSION_LOG_LEVEL")
+
+	lastRequestId := "12345"
+	timeoutMessage := "2025-02-11T09:19:31Z 0dffa608-e35a-45e8-89fe-f97093ae8c0d Task timed out after 9223372036.85 seconds"
+	isAPMTelemetry := false
+	conf := config.ConfigurationFromEnvironment()
+
+	batch := telemetry.NewBatch(int64(conf.RipeMillis), int64(conf.RotMillis), conf.CollectTraceID)
+
+	assert.Nil(t, batch.AddTelemetry(lastRequestId, []byte(timeoutMessage), isAPMTelemetry))
+	assert.NotPanics(t, main)
+
+	assert.Equal(t, 1, registerRequestCount)
+	assert.Equal(t, 0, initErrorRequestCount)
+	assert.Equal(t, 0, exitErrorRequestCount)
+	assert.Equal(t, 1, logRegisterRequestCount)
+	assert.Equal(t, 1, nextEventRequestCount)
+}
+
+func TestMainPlatformErrorAddTelemetry(t *testing.T) {
+	var (
+		registerRequestCount    int
+		initErrorRequestCount   int
+		exitErrorRequestCount   int
+		logRegisterRequestCount int
+		nextEventRequestCount   int
+	)
+	ctx, cancel := context.WithCancel(context.Background())
+	overrideContext(ctx)
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		defer util.Close(r.Body)
+
+		if r.URL.Path == "/2020-01-01/extension/register" {
+			registerRequestCount++
+
+			w.Header().Add(api.ExtensionIdHeader, "test-ext-id")
+			w.WriteHeader(200)
+			res, err := json.Marshal(api.RegistrationResponse{
+				FunctionName:    "foobar",
+				FunctionVersion: "latest",
+				Handler:         "lambda.handler",
+			})
+			assert.Nil(t, err)
+			_, _ = w.Write(res)
+		}
+
+		if r.URL.Path == "/2020-01-01/extension/init/error" {
+			initErrorRequestCount++
+
+			w.WriteHeader(200)
+			_, _ = w.Write([]byte(""))
+		}
+
+		if r.URL.Path == "/2020-01-01/extension/exit/error" {
+			exitErrorRequestCount++
+
+			w.WriteHeader(200)
+			_, _ = w.Write([]byte(""))
+		}
+
+		if r.URL.Path == "/2020-08-15/logs" {
+			logRegisterRequestCount++
+
+			w.WriteHeader(200)
+			_, _ = w.Write(nil)
+
+		}
+
+		if r.URL.Path == "/2020-01-01/extension/event/next" {
+			nextEventRequestCount++
+
+			w.WriteHeader(200)
+			res, err := json.Marshal(api.InvocationEvent{
+				EventType:          api.Invoke,
+				DeadlineMs:         1000,
+				RequestID:          "12345",
+				InvokedFunctionARN: "arn:aws:lambda:us-east-1:12345:foobar",
+				ShutdownReason:     api.Failure,
+				Tracing:            nil,
+			})
+			assert.Nil(t, err)
+			_, _ = w.Write(res)
+
+			cancel()
+		}
+	}))
+	defer srv.Close()
+
+	url := srv.URL[7:]
+
+	_ = os.Setenv(api.LambdaHostPortEnvVar, url)
+	defer os.Unsetenv(api.LambdaHostPortEnvVar)
+
+	_ = os.Setenv("NEW_RELIC_LICENSE_KEY", "foobar")
+	defer os.Unsetenv("NEW_RELIC_LICENSE_KEY")
+
+	_ = os.Setenv("NEW_RELIC_COLLECT_TRACE_ID", "true")
+	defer os.Unsetenv("NEW_RELIC_COLLECT_TRACE_ID")
+
+	_ = os.Setenv("NEW_RELIC_LOG_SERVER_HOST", "localhost")
+	defer os.Unsetenv("NEW_RELIC_LOG_SERVER_HOST")
+
+	_ = os.Setenv("NEW_RELIC_EXTENSION_LOG_LEVEL", "DEBUG")
+	defer os.Unsetenv("NEW_RELIC_EXTENSION_LOG_LEVEL")
+
+	lastRequestId := "12345"
+	errorMessage := "RequestId: 0dffa608-e35a-45e8-89fe-f97093ae8c0d AWS Lambda platform fault caused a shutdown"
+	isAPMTelemetry := false
+	conf := config.ConfigurationFromEnvironment()
+
+	batch := telemetry.NewBatch(int64(conf.RipeMillis), int64(conf.RotMillis), conf.CollectTraceID)
+
+	assert.Nil(t, batch.AddTelemetry(lastRequestId, []byte(errorMessage), isAPMTelemetry))
+	assert.NotPanics(t, main)
+
+	assert.Equal(t, 1, registerRequestCount)
+	assert.Equal(t, 0, initErrorRequestCount)
+	assert.Equal(t, 0, exitErrorRequestCount)
+	assert.Equal(t, 1, logRegisterRequestCount)
+	assert.Equal(t, 1, nextEventRequestCount)
+}
+
+func TestPollLogServerAddTelemetry(t *testing.T) {
+	pollLogContent := "REPORT RequestId: f2b3bcc1-a9e1-418d-9709-34402bb218a7 Duration: 3000.00 ms Billed Duration: 3000 ms Memory Size: 128 MB Max Memory Used: 89 MB Init Duration: 836.96 ms"
+	pollLogRequestId := "f2b3bcc1-a9e1-418d-9709-34402bb218a7"
+	isAPMTelemetry := false
+	conf := config.ConfigurationFromEnvironment()
+	batch := telemetry.NewBatch(int64(conf.RipeMillis), int64(conf.RotMillis), conf.CollectTraceID)
+	assert.Nil(t, batch.AddTelemetry(pollLogRequestId, []byte(pollLogContent), isAPMTelemetry))
+}
+
+func TestTelemetryChannelAddTelemetry(t *testing.T) {
+
+	telemetryRequestId := "a89efeea-261f-47c1-8d7d-250e40ad9670"
+	isAPMTelemetry := true
+	data := []interface{}{1, "NR_LAMBDA_MONITORING", "H4sIAEUlq2cC/+VYa2/bNhT9K4Wwj7ZEUhIl+luatmiHFAvqZB0QBAItMY5WWVRJKqkb5L/vUrJjJ5Zdx3a7YIMhW+bj8PDecy8fd85EGJ5xw53BnVMpaWQqi+RGKJ3L0hngqOeIbyKtDfxNRHmTK1lORGmcgXP0eZic8Mko40k1Ndey9F1MnJ7Dx1C/gHAwcqmLHioKXo5reIWatputUbYhfA/4rR4UDeig1n3BtenjQUBpRGMWYhwHg6u6TC2bQdu7bxRPRZ71fUz6RkD796Io5GepiuzdrGmfi9uT0ft3H7/+dR3CcHOIJZK/nRydvR2eOfc9Z26NuoI3kRSSZyJLJjKrC6GdwYXzO1fa6V1cOEC25aryFGCJS+w87+4vexeOzidVIf7WzfzAMsz151WqLk0+EUla5NaSTzqW4laJogGcW+5xhXst5RftTgqgJIpEfymEtV/PefW0ZdKygyrkYjdeA5RKJcG/pdAJ19MyzWUX1qxxIcdjoRL7k5fjDQ3FNyNUyYvk2piqyEcPTS8vwd9QMTVAUNxYSbQWvyjroujdOUpooW5krhKdfweZYIIQqNC21IkWwsryHsx/54zrPAPfjfyUsiDjI0ZEcMUEDKW5tT5UGlWLHgg7lyo3U+jpEkbjgPacRjcfuvqno4xQGlJGKMFBSgHP+ksbALUh4UMFCwI/CGNQS624aTSEXESQlWgUMIp8EuEQOk4rq/QzxUvNG9EBWskntvAPcy3UUo0316u3u7SNNLw4yy1+B597cABYGHTrKvG1BsjGADxm4koI3icUX/WDKMX9OIuyPgmRCBDPGI2a+IVuraLcXxywSyPP0f5cCd1HzSCLZUPDlWkl0MpOV7zcSnKguDWSMwt3fVijvWcJaxuhthIaAvmFdg4glVn0+FEorhiiLESMjYK91J5CwhxLBfQdyPWiTYtLJnN/ovJL5YK71PRU5uXc6/9vucPSDh54JPWFO92AEAROXRSFLqEoApqN0GeeGtZVJZXho7wAWXqnzZy8owpSetoowfskxrk2rSy8N3N9gLJT2egWltQL3LNy8X2EKcIB6AwTvHcZQmEAMRJQEkNUBTiGOe9M/MgYMamMXiH+8NmEftIuh947qW65yuzrbEBR8pGN771gT2TKizcCFmogu8DOcn0A8I+NSvRhCfORKPSOPH9GclgV49PctWcZQgEKotCHkIoI8zEK6OZJ8aJ4ibzO5vuH/6TVH2b3EsjNc+Xr6TGIQSjvvPxSytty7e8LkcwuvBtHvATy3cvCJ5tbs+XwtFPTnmrKu3gjRGBNYjFBMcUxpgGihykOXAabsShkFPuxnYroo21Wtvdc3UBUzohfFeJbDjl3hbrvshiHDJEIVlKKWADw4QFKsRvGYHWKYSqIoSiIoJg94n18eu6dwz771boAfPp09vbODcz7+9pdxg9BhlMNS/3uJNr+e9NoUtHuLJrue5H4KCawU/dOr6cadkSrmcUPXUbCKMYk3OodE4ZcSnEUxrC1jENMNw33A+o4jkBCIWaUwbkkZPGeZcgPScCwj3Ho+5j6bCM39i8ao2PwX22ODyUc/spUQFq0iaa953lCaf7ZIjMdS1glUiOV13mj5v1Rm6o23usp7CpWDU/IowcjH07Fzxp1A77fw5SS9suiR74dATEcka1WjeZMOWyO8MqbHTF3PEJ0Y7bXA/tBLizRce222foUxY8enzI4aT1rzCd3LpvHs/ZffkI/jMnG8eytyFuL3mbE5lUP7Y3Nc/PhdsDNfe1ewC2St7TZeKsUGKqDNDoc9grvXbGPa23kRByU7xLm/jw7zuKHoNoJuwPbDpw3SlbVyvF4DdTl5f39P0toy3q2GQAA"}
+	jsonData, err := json.Marshal(data)
+	if err != nil {
+		log.Fatalf("Error marshalling data: %v", err)
+	}
+
+	// Convert JSON to a byte slice
+	byteArray := []byte(jsonData)
+	conf := config.ConfigurationFromEnvironment()
+	conf.CollectTraceID = true
+	batch := telemetry.NewBatch(int64(conf.RipeMillis), int64(conf.RotMillis), conf.CollectTraceID)
+
+	batch.AddInvocation("a89efeea-261f-47c1-8d7d-250e40ad9670", time.Now())
+
+	inv := batch.AddTelemetry(telemetryRequestId, byteArray, isAPMTelemetry)
+	assert.NotNil(t, inv)
 }

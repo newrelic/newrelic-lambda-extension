@@ -2,6 +2,7 @@ package telemetry
 
 import (
 	"bytes"
+	"encoding/base64"
 	"sync"
 	"testing"
 	"time"
@@ -18,6 +19,7 @@ const (
 	testNoSuchRequestId = "test_z"
 	ripe                = 1000
 	rot                 = 10000
+	isAPMTelemetry      = true
 )
 
 var (
@@ -36,7 +38,7 @@ func generateNLengthTelemetryString(length int) string {
 func TestMissingInvocation(t *testing.T) {
 	batch := NewBatch(ripe, rot, false)
 
-	invocation := batch.AddTelemetry(testNoSuchRequestId, bytes.NewBufferString(testTelemetry).Bytes())
+	invocation := batch.AddTelemetry(testNoSuchRequestId, bytes.NewBufferString(testTelemetry).Bytes(), isAPMTelemetry)
 	assert.Nil(t, invocation)
 }
 
@@ -77,13 +79,13 @@ func TestWithInvocationRipeHarvest(t *testing.T) {
 	batch.AddInvocation(testRequestId2, requestStart.Add(100*time.Millisecond))
 	batch.AddInvocation(testRequestId3, requestStart.Add(200*time.Millisecond))
 
-	invocation := batch.AddTelemetry(testRequestId, bytes.NewBufferString(testTelemetry).Bytes())
+	invocation := batch.AddTelemetry(testRequestId, bytes.NewBufferString(testTelemetry).Bytes(), isAPMTelemetry)
 	assert.NotNil(t, invocation)
 
-	invocation2 := batch.AddTelemetry(testRequestId, []byte(testTelemetry))
+	invocation2 := batch.AddTelemetry(testRequestId, []byte(testTelemetry), isAPMTelemetry)
 	assert.Equal(t, invocation, invocation2)
 
-	batch.AddTelemetry(testRequestId2, bytes.NewBufferString(testTelemetry).Bytes())
+	batch.AddTelemetry(testRequestId2, bytes.NewBufferString(testTelemetry).Bytes(), isAPMTelemetry)
 
 	harvested := batch.Harvest(requestStart.Add(ripe*time.Millisecond + time.Millisecond))
 	assert.Equal(t, 1, len(harvested))
@@ -98,13 +100,13 @@ func TestWithInvocationAggressiveHarvest(t *testing.T) {
 	batch.AddInvocation(testRequestId2, requestStart.Add(100*time.Millisecond))
 	batch.AddInvocation(testRequestId3, requestStart.Add(200*time.Millisecond))
 
-	invocation := batch.AddTelemetry(testRequestId, bytes.NewBufferString(testTelemetry).Bytes())
+	invocation := batch.AddTelemetry(testRequestId, bytes.NewBufferString(testTelemetry).Bytes(), isAPMTelemetry)
 	assert.NotNil(t, invocation)
 
-	invocation2 := batch.AddTelemetry(testRequestId, bytes.NewBufferString(testTelemetry).Bytes())
+	invocation2 := batch.AddTelemetry(testRequestId, bytes.NewBufferString(testTelemetry).Bytes(), isAPMTelemetry)
 	assert.Equal(t, invocation, invocation2)
 
-	batch.AddTelemetry(testRequestId2, bytes.NewBufferString(testTelemetry).Bytes())
+	batch.AddTelemetry(testRequestId2, bytes.NewBufferString(testTelemetry).Bytes(), isAPMTelemetry)
 
 	harvested := batch.Harvest(requestStart.Add(ripe*time.Millisecond + time.Millisecond))
 	assert.Equal(t, 2, len(harvested))
@@ -117,13 +119,13 @@ func TestBatch_Close(t *testing.T) {
 	batch.AddInvocation(testRequestId2, requestStart.Add(100*time.Millisecond))
 	batch.AddInvocation(testRequestId3, requestStart.Add(200*time.Millisecond))
 
-	invocation := batch.AddTelemetry(testRequestId, bytes.NewBufferString(testTelemetry).Bytes())
+	invocation := batch.AddTelemetry(testRequestId, bytes.NewBufferString(testTelemetry).Bytes(), isAPMTelemetry)
 	assert.NotNil(t, invocation)
 
-	invocation2 := batch.AddTelemetry(testRequestId, bytes.NewBufferString(testTelemetry).Bytes())
+	invocation2 := batch.AddTelemetry(testRequestId, bytes.NewBufferString(testTelemetry).Bytes(), isAPMTelemetry)
 	assert.Equal(t, invocation, invocation2)
 
-	batch.AddTelemetry(testRequestId2, bytes.NewBufferString(testTelemetry).Bytes())
+	batch.AddTelemetry(testRequestId2, bytes.NewBufferString(testTelemetry).Bytes(), isAPMTelemetry)
 
 	harvested := batch.Close()
 	assert.Equal(t, 2, len(harvested))
@@ -159,11 +161,11 @@ func TestBatchAsync(t *testing.T) {
 	wg.Add(2)
 
 	go func() {
-		invocation = batch.AddTelemetry(testRequestId, bytes.NewBufferString(testTelemetry).Bytes())
+		invocation = batch.AddTelemetry(testRequestId, bytes.NewBufferString(testTelemetry).Bytes(), isAPMTelemetry)
 		wg.Done()
 	}()
 	go func() {
-		invocation2 = batch.AddTelemetry(testRequestId, bytes.NewBufferString(moreTestTelemetry).Bytes())
+		invocation2 = batch.AddTelemetry(testRequestId, bytes.NewBufferString(moreTestTelemetry).Bytes(), isAPMTelemetry)
 		wg.Done()
 	}()
 
@@ -174,7 +176,7 @@ func TestBatchAsync(t *testing.T) {
 	assert.NotNil(t, invocation)
 	assert.Equal(t, invocation, invocation2)
 
-	batch.AddTelemetry(testRequestId2, bytes.NewBufferString(testTelemetry).Bytes())
+	batch.AddTelemetry(testRequestId2, bytes.NewBufferString(testTelemetry).Bytes(), isAPMTelemetry)
 
 	harvested := batch.Harvest(requestStart.Add(ripe*time.Millisecond + time.Millisecond))
 	go assert.Equal(t, 1, len(harvested))
@@ -188,16 +190,46 @@ func TestBatch_RetrieveTraceID(t *testing.T) {
 	// Add a trace ID to the batch
 	requestId := "testRequestId"
 	expectedTraceID := "testTraceID"
-	storeTraceID.SetTraceIDValue(requestId, expectedTraceID)
+	batch.SetTraceIDValue(requestId, expectedTraceID)
 
 	// Retrieve the trace ID
 	traceID := batch.RetrieveTraceID(requestId)
 	assert.Equal(t, expectedTraceID, traceID)
-	storeTraceID.SetTraceIDValue(requestId, "")
+	batch.SetTraceIDValue(requestId, "")
 	traceID = batch.RetrieveTraceID(requestId)
 	assert.Empty(t, traceID)
 	// Test for a non-existent request ID
 	nonExistentRequestId := "nonExistentRequestId"
 	traceID = batch.RetrieveTraceID(nonExistentRequestId)
 	assert.Equal(t, "", traceID)
+}
+func TestAddTelemetry(t *testing.T) {
+	batch := NewBatch(ripe, rot, true)
+
+	batch.AddInvocation(testRequestId, requestStart)
+	inv := batch.AddTelemetry(testRequestId, bytes.NewBufferString(testTelemetry).Bytes(), isAPMTelemetry)
+	assert.NotNil(t, inv)
+	assert.Equal(t, 1, len(inv.Telemetry))
+	assert.Equal(t, testTelemetry, string(inv.Telemetry[0]))
+
+	inv2 := batch.AddTelemetry(testRequestId, bytes.NewBufferString(moreTestTelemetry).Bytes(), isAPMTelemetry)
+	assert.NotNil(t, inv2)
+	assert.Equal(t, 2, len(inv2.Telemetry))
+	assert.Equal(t, moreTestTelemetry, string(inv2.Telemetry[1]))
+
+	assert.Equal(t, requestStart, batch.eldest)
+
+	traceId := "testTraceId"
+	encodedTelemetry := base64.StdEncoding.EncodeToString([]byte(traceId))
+
+	inv3 := batch.AddTelemetry(testRequestId, []byte(encodedTelemetry), isAPMTelemetry)
+	assert.NotNil(t, inv3)
+	assert.Equal(t, "", inv3.TraceId)
+	assert.Equal(t, "", batch.RetrieveTraceID(testRequestId))
+
+	inv4 := batch.AddTelemetry(testNoSuchRequestId, bytes.NewBufferString(testTelemetry).Bytes(), isAPMTelemetry)
+	assert.Nil(t, inv4)
+
+	inv5 := batch.AddTelemetry(testRequestId2, bytes.NewBufferString(testTelemetry).Bytes(), false)
+	assert.Nil(t, inv5)
 }

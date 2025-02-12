@@ -37,13 +37,7 @@ jobs:
       - run:
           name: Generate coverage report
           command: make coverage
-      - run:
-          name: Upload Coverage to Codecov
-          uses: codecov/codecov-action@v5.3.1
-          with: 
-            token: ${{ secrets.CODECOV_TOKEN }}
-            fail_ci_if_error: true  
-            files: coverage.txt
+      - codecov/upload
 
 workflows:
   version: 2

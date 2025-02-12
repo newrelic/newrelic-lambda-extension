@@ -38,8 +38,11 @@ jobs:
           name: Generate coverage report
           command: make coverage
       - run:
-          name: Upload coverage report
-          command: bash <(curl -s https://codecov.io/bash)
+          name: Upload Coverage to Codecov
+          uses: codecov/codecov-action@v5.3.1
+          with: 
+            token: ${{ secrets.CODECOV_TOKEN }}
+            fail_ci_if_error: true  
 
 workflows:
   version: 2

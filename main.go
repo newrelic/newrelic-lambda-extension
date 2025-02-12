@@ -11,6 +11,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/newrelic/newrelic-lambda-extension/apm"
 	"github.com/newrelic/newrelic-lambda-extension/checks"
 	"github.com/newrelic/newrelic-lambda-extension/lambda/logserver"
 	"github.com/newrelic/newrelic-lambda-extension/util"
@@ -27,6 +28,7 @@ var (
 	lastEventStart     time.Time
 	lastRequestId      string
 	rootCtx            context.Context
+	LambadFunctionName string
 )
 
 func init() {
@@ -74,6 +76,7 @@ func main() {
 	}
 
 	invocationClient, registrationResponse, err := registrationClient.Register(ctx, regReq)
+	LambadFunctionName = registrationResponse.FunctionName
 	if err != nil {
 		util.Panic(err)
 	}
@@ -96,9 +99,6 @@ func main() {
 		noopLoop(ctx, invocationClient)
 		return
 	}
-
-	// Set up the telemetry buffer
-	batch := telemetry.NewBatch(int64(conf.RipeMillis), int64(conf.RotMillis), conf.CollectTraceID)
 
 	// Start the Logs API server, and register it
 	logServer, err := logserver.Start(conf)
@@ -128,7 +128,6 @@ func main() {
 	}
 
 	// Init the telemetry sending client
-	telemetryClient := telemetry.New(registrationResponse.FunctionName, licenseKey, conf.TelemetryEndpoint, conf.LogEndpoint, batch, conf.CollectTraceID, conf.ClientTimeout)
 	telemetryChan, err := telemetry.InitTelemetryChannel()
 	if err != nil {
 		err2 := invocationClient.InitError(ctx, "telemetryClient.init", err)
@@ -137,10 +136,20 @@ func main() {
 		}
 		util.Panic("telemetry pipe init failed: ", err)
 	}
+	var batch *telemetry.Batch
+	var telemetryClient *telemetry.Client
+	if !conf.APMLambdaMode {
+		// Set up the telemetry buffer
+		batch = telemetry.NewBatch(int64(conf.RipeMillis), int64(conf.RotMillis), conf.CollectTraceID)
+		// In APM Lambda mode, we don't send telemetry
+		telemetryClient = telemetry.New(registrationResponse.FunctionName, licenseKey, conf.TelemetryEndpoint, conf.LogEndpoint, batch, conf.CollectTraceID, conf.ClientTimeout)
+	}
+	
 
 	// Run startup checks
 	go func() {
-		if conf.IgnoreExtensionChecks["all"] {
+		if conf.IgnoreExtensionChecks["all"] && conf.APMLambdaMode{
+			// Ignore extension checks in APM Mode
 			util.Debugf("Ignoring all extension checks")
 			return
 		}
@@ -153,29 +162,51 @@ func main() {
 
 	go func() {
 		defer backgroundTasks.Done()
-		logShipLoop(ctx, logServer, telemetryClient)
+		if conf.APMLambdaMode {
+			APMlogShipLoop(ctx, logServer)
+		} else {
+			logShipLoop(ctx, logServer, telemetryClient)
+		}
 	}()
 
 	// Call next, and process telemetry, until we're shut down
-	eventCounter := mainLoop(ctx, invocationClient, batch, telemetryChan, logServer, telemetryClient)
+	eventCounter := mainLoop(ctx, invocationClient, batch, telemetryChan, logServer, conf, telemetryClient)
 
 	util.Logf("New Relic Extension shutting down after %v events\n", eventCounter)
-
-	pollLogServer(logServer, batch)
+	if conf.APMLambdaMode {
+		pollLogAPMServer(logServer, conf)
+	} else {
+		pollLogServer(logServer, batch)
+	}
 	err = logServer.Close()
 	if err != nil {
 		util.Logln("Error shutting down Log API server", err)
 	}
-
-	finalHarvest := batch.Close()
-	shipHarvest(ctx, finalHarvest, telemetryClient)
-
+	if !conf.APMLambdaMode {
+		finalHarvest := batch.Close()
+		shipHarvest(ctx, finalHarvest, telemetryClient)
+	}
 	util.Debugln("Waiting for background tasks to complete")
 	backgroundTasks.Wait()
 
 	shutdownAt := time.Now()
 	ranFor := shutdownAt.Sub(extensionStartup)
 	util.Logf("Extension shutdown after %vms", ranFor.Milliseconds())
+}
+// APMlogShipLoop ships function logs to New Relic as APM logs.
+func APMlogShipLoop(ctx context.Context, logServer *logserver.LogServer) {
+	<-apm.ConnectDone
+	entityGuid := apm.GetEntityGuid()
+	for {
+		functionLogs, more := logServer.AwaitFunctionLogs()
+		if !more {
+			return
+		}
+		// TODO: Send Logs to APM
+		fmt.Print(entityGuid)
+		fmt.Print(functionLogs)
+
+	}
 }
 
 // logShipLoop ships function logs to New Relic as they arrive.
@@ -185,7 +216,6 @@ func logShipLoop(ctx context.Context, logServer *logserver.LogServer, telemetryC
 		if !more {
 			return
 		}
-
 		err := telemetryClient.SendFunctionLogs(ctx, invokedFunctionARN, functionLogs)
 		if err != nil {
 			util.Logf("Failed to send %d function logs", len(functionLogs))
@@ -194,10 +224,11 @@ func logShipLoop(ctx context.Context, logServer *logserver.LogServer, telemetryC
 }
 
 // mainLoop repeatedly calls the /next api, and processes telemetry and platform logs. The timing is rather complicated.
-func mainLoop(ctx context.Context, invocationClient *client.InvocationClient, batch *telemetry.Batch, telemetryChan chan []byte, logServer *logserver.LogServer, telemetryClient *telemetry.Client) int {
+func mainLoop(ctx context.Context, invocationClient *client.InvocationClient, batch *telemetry.Batch, telemetryChan chan []byte, logServer *logserver.LogServer, conf *config.Configuration, telemetryClient *telemetry.Client) int {
 	eventCounter := 0
 	probablyTimeout := false
-
+	apmCmd := apm.RpmCmd{}
+	apmControls := &apm.RpmControls{}
 	for {
 		select {
 		case <-ctx.Done():
@@ -207,7 +238,11 @@ func mainLoop(ctx context.Context, invocationClient *client.InvocationClient, ba
 			// Our call to next blocks. It is likely that the container is frozen immediately after we call NextEvent.
 			util.Debugln("mainLoop: waiting for next lambda invocation event...")
 			event, err := invocationClient.NextEvent(ctx)
-
+			if conf.APMLambdaMode {
+				apm.Once.Do(func() {
+					apmCmd, apmControls = apm.NewAPMClient(conf, LambadFunctionName)
+				})
+			}
 			// We've thawed.
 			eventStart := time.Now()
 
@@ -229,10 +264,14 @@ func mainLoop(ctx context.Context, invocationClient *client.InvocationClient, ba
 				// timed out, this will catch us up to the current state of telemetry, allowing us to resume.
 				select {
 				case telemetryBytes := <-telemetryChan:
-					// We received telemetry
-					util.Debugf("Agent telemetry bytes: %s", base64.URLEncoding.EncodeToString(telemetryBytes))
-					batch.AddTelemetry(lastRequestId, telemetryBytes)
-					util.Logf("We suspected a timeout for request %s but got telemetry anyway", lastRequestId)
+					if conf.APMLambdaMode {
+						shipAPMHarvest(ctx, telemetryBytes, conf, apmCmd, apmControls)
+					} else {
+						// We received telemetry
+						util.Debugf("Agent telemetry bytes: %s", base64.URLEncoding.EncodeToString(telemetryBytes))
+						batch.AddTelemetry(lastRequestId, telemetryBytes)
+						util.Logf("We suspected a timeout for request %s but got telemetry anyway", lastRequestId)
+					}
 				default:
 				}
 			}
@@ -248,11 +287,16 @@ func mainLoop(ctx context.Context, invocationClient *client.InvocationClient, ba
 						lastRequestId,
 						timeoutSecs,
 					)
-					batch.AddTelemetry(lastRequestId, []byte(timeoutMessage))
+					if !conf.APMLambdaMode {
+						batch.AddTelemetry(lastRequestId, []byte(timeoutMessage))
+					}
 				} else if event.ShutdownReason == api.Failure && lastRequestId != "" {
-					// Synthesize a generic platform error. Probably an OOM, though it could be any runtime crash.
-					errorMessage := fmt.Sprintf("RequestId: %s AWS Lambda platform fault caused a shutdown", lastRequestId)
-					batch.AddTelemetry(lastRequestId, []byte(errorMessage))
+					// TODO: For APM this needs to be converted to error_event_data
+					if !conf.APMLambdaMode {
+						// Synthesize a generic platform error. Probably an OOM, though it could be any runtime crash.
+						errorMessage := fmt.Sprintf("RequestId: %s AWS Lambda platform fault caused a shutdown", lastRequestId)
+						batch.AddTelemetry(lastRequestId, []byte(errorMessage))
+					}
 				}
 
 				return eventCounter
@@ -260,15 +304,16 @@ func mainLoop(ctx context.Context, invocationClient *client.InvocationClient, ba
 				// Reset probablyTimeout if the event after the suspected timeout wasn't a timeout shutdown.
 				probablyTimeout = false
 			}
+			if !conf.APMLambdaMode {
+				// Note: shutdown events do not have these properties; we now know this is an invocation event.
+				invokedFunctionARN = event.InvokedFunctionARN
+				lastRequestId = event.RequestID
 
-			// Note: shutdown events do not have these properties; we now know this is an invocation event.
-			invokedFunctionARN = event.InvokedFunctionARN
-			lastRequestId = event.RequestID
+				// Create an invocation record to hold telemetry
+				batch.AddInvocation(lastRequestId, eventStart)
 
-			// Create an invocation record to hold telemetry
-			batch.AddInvocation(lastRequestId, eventStart)
-
-			// Await agent telemetry, which may time out.
+				// Await agent telemetry, which may time out.
+			}
 
 			// timeoutInstant is when the invocation will time out
 			timeoutInstant := time.Unix(0, event.DeadlineMs*int64(time.Millisecond))
@@ -276,12 +321,15 @@ func mainLoop(ctx context.Context, invocationClient *client.InvocationClient, ba
 			// Set the timeout timer for a smidge before the actual timeout; we can recover from false timeouts.
 			timeoutWatchBegins := 200 * time.Millisecond
 			timeLimitContext, timeLimitCancel := context.WithDeadline(ctx, timeoutInstant.Add(-timeoutWatchBegins))
-
-			// Before we begin to await telemetry, harvest and ship. Ripe telemetry will mostly be handled here. Even that is a
-			// minority of invocations. Putting this here lets us run the HTTP request to send to NR in parallel with the Lambda
-			// handler, reducing or eliminating our latency impact.
-			pollLogServer(logServer, batch)
-			shipHarvest(ctx, batch.Harvest(time.Now()), telemetryClient)
+			if conf.APMLambdaMode {
+				pollLogAPMServer(logServer, conf)
+			} else {
+				// Before we begin to await telemetry, harvest and ship. Ripe telemetry will mostly be handled here. Even that is a
+				// minority of invocations. Putting this here lets us run the HTTP request to send to NR in parallel with the Lambda
+				// handler, reducing or eliminating our latency impact.
+				pollLogServer(logServer, batch)
+				shipHarvest(ctx, batch.Harvest(time.Now()), telemetryClient)
+			}
 
 			select {
 			case <-timeLimitContext.Done():
@@ -292,22 +340,42 @@ func mainLoop(ctx context.Context, invocationClient *client.InvocationClient, ba
 				continue
 			case telemetryBytes := <-telemetryChan:
 				timeLimitCancel()
-
-				// We received telemetry
-				util.Debugf("Agent telemetry bytes: %s", base64.URLEncoding.EncodeToString(telemetryBytes))
-				inv := batch.AddTelemetry(lastRequestId, telemetryBytes)
-				if inv == nil {
-					util.Logf("Failed to add telemetry for request %v", lastRequestId)
+				if conf.APMLambdaMode {
+					pollLogAPMServer(logServer, conf)
+					shipAPMHarvest(ctx, telemetryBytes, conf, apmCmd, apmControls)
+				} else {
+					// We received telemetry
+					util.Debugf("Agent telemetry bytes: %s", base64.URLEncoding.EncodeToString(telemetryBytes))
+					inv := batch.AddTelemetry(lastRequestId, telemetryBytes)
+					if inv == nil {
+						util.Logf("Failed to add telemetry for request %v", lastRequestId)
+					}
+					// Opportunity for an aggressive harvest, in which case, we definitely want to wait for the HTTP POST
+					// to complete. Mostly, nothing really happens here.
+					pollLogServer(logServer, batch)
+					shipHarvest(ctx, batch.Harvest(time.Now()), telemetryClient)
 				}
-
-				// Opportunity for an aggressive harvest, in which case, we definitely want to wait for the HTTP POST
-				// to complete. Mostly, nothing really happens here.
-				pollLogServer(logServer, batch)
-				shipHarvest(ctx, batch.Harvest(time.Now()), telemetryClient)
+				
 			}
 
 			lastEventStart = eventStart
 		}
+	}
+}
+
+// pollLogAPMServer polls for platform logs, and send as APM telemetry
+func pollLogAPMServer(logServer *logserver.LogServer, conf *config.Configuration) {
+	<-apm.ConnectDone
+	entityGuid := apm.GetEntityGuid()
+	for _, platformLog := range logServer.PollPlatformChannel() {
+		lambdaMetrics, _ := apm.ParseLambdaReportLog(string(platformLog.Content))
+		metrics := lambdaMetrics.ConvertToMetrics("apm.lambda.transaction", entityGuid, LambadFunctionName)
+		statusCode, responseBody, err := apm.SendMetrics(conf.LicenseKey, metrics, true)
+		if err != nil {
+			util.Logf("Error sending metric: %v", err)
+		}
+		util.Logf("Response Status: %d\n", statusCode)
+		util.Logf("Response Body: %s\n", responseBody)
 	}
 }
 
@@ -318,6 +386,14 @@ func pollLogServer(logServer *logserver.LogServer, batch *telemetry.Batch) {
 		if inv == nil {
 			util.Debugf("Skipping platform log for request %v", platformLog.RequestID)
 		}
+	}
+}
+
+func shipAPMHarvest(ctx context.Context, payload []byte, conf *config.Configuration, cmd apm.RpmCmd, cs *apm.RpmControls) {
+	<-apm.ConnectDone
+	apmErr, _ := apm.SendAPMTelemetry(ctx, invokedFunctionARN, payload, conf, cmd, cs)
+	if apmErr != nil {
+		util.Logf("Failed to send APM telemetry for invocations %s", apmErr)
 	}
 }
 

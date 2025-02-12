@@ -43,7 +43,7 @@ jobs:
           with: 
             token: ${{ secrets.CODECOV_TOKEN }}
             fail_ci_if_error: true  
-            files: ./coverage.txt
+            files: coverage.txt
 
 workflows:
   version: 2

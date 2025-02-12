@@ -87,3 +87,28 @@ func TestExtractTraceIDInvalid(t *testing.T) {
 	assert.Error(t, err)
 	assert.Empty(t, traceId)
 }
+
+func TestExtractTraceIDNull(t *testing.T) {
+	payload := []byte("")
+	payload = []byte(base64.StdEncoding.EncodeToString(payload))
+
+	traceId, err := ExtractTraceID(payload)
+
+	assert.Nil(t, err)
+	assert.Empty(t, traceId)
+
+	payload2 := []byte("[foobar]")
+	payload2 = []byte(base64.StdEncoding.EncodeToString(payload))
+
+	traceId, err = ExtractTraceID(payload2)
+
+	assert.Nil(t, err)
+	assert.Empty(t, traceId)
+
+	payload3 := []byte("[foobar]")
+
+	traceId, err = ExtractTraceID(payload3)
+
+	assert.Error(t, err)
+	assert.Empty(t, traceId)
+}

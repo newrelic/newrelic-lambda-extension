@@ -5,6 +5,7 @@ package main
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -982,7 +983,6 @@ func TestTelemetryChannelAddTelemetry(t *testing.T) {
 		log.Fatalf("Error marshalling data: %v", err)
 	}
 
-	// Convert JSON to a byte slice
 	byteArray := []byte(jsonData)
 	conf := config.ConfigurationFromEnvironment()
 	conf.CollectTraceID = true
@@ -992,4 +992,27 @@ func TestTelemetryChannelAddTelemetry(t *testing.T) {
 
 	inv := batch.AddTelemetry(telemetryRequestId, byteArray, isAPMTelemetry)
 	assert.NotNil(t, inv)
+}
+func TestTelemetryChannelHandling(t *testing.T) {
+
+	telemetryChan := make(chan []byte, 1)
+
+	telemetryBytes := []byte("test-telemetry-data")
+	lastRequestId := "a89efeea-261f-47c1-8d7d-250e40ad9670"
+	conf := config.ConfigurationFromEnvironment()
+
+	batch := telemetry.NewBatch(int64(conf.RipeMillis), int64(conf.RotMillis), conf.CollectTraceID)
+	batch.AddInvocation("a89efeea-261f-47c1-8d7d-250e40ad9670", time.Now())
+	telemetryChan <- telemetryBytes
+
+	receivedTelemetryBytes := <-telemetryChan
+
+	util.Debugf("Agent telemetry bytes: %s", base64.URLEncoding.EncodeToString(receivedTelemetryBytes))
+	inv := batch.AddTelemetry(lastRequestId, receivedTelemetryBytes, true)
+	util.Logf("We suspected a timeout for request %s but got telemetry anyway", lastRequestId)
+
+	assert.NotNil(t, inv)
+
+	assert.Equal(t, telemetryBytes, inv.Telemetry[0])
+
 }

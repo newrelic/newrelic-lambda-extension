@@ -1,0 +1,2 @@
+ignore:
+  - "github.com/newrelic/newrelic-lambda-extension/examples/sam/go"

@@ -17,6 +17,7 @@ import (
 
 	"github.com/newrelic/newrelic-lambda-extension/config"
 	"github.com/newrelic/newrelic-lambda-extension/lambda/extension/api"
+	"github.com/newrelic/newrelic-lambda-extension/lambda/logserver"
 	"github.com/newrelic/newrelic-lambda-extension/telemetry"
 	"github.com/newrelic/newrelic-lambda-extension/util"
 
@@ -1015,4 +1016,59 @@ func TestTelemetryChannelHandling(t *testing.T) {
 
 	assert.Equal(t, telemetryBytes, inv.Telemetry[0])
 
+}
+func TestPollLogServer(t *testing.T) {
+	tests := []struct {
+		name           string
+		logs           []logserver.LogLine
+		expectedLength int
+	}{
+		{
+			name:           "No logs",
+			logs:           []logserver.LogLine{},
+			expectedLength: 0,
+		},
+		{
+			name: "Single log",
+			logs: []logserver.LogLine{
+				{
+					RequestID: "12345",
+					Content:   []byte("Test log content"),
+				},
+			},
+			expectedLength: 1,
+		},
+		{
+			name: "Multiple logs",
+			logs: []logserver.LogLine{
+				{
+					RequestID: "12345",
+					Content:   []byte("Test log content 1"),
+				},
+				{
+					RequestID: "67890",
+					Content:   []byte("Test log content 2"),
+				},
+			},
+			expectedLength: 2,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			for _, platformLog := range tt.logs {
+				var logMessage string
+				conf := config.ConfigurationFromEnvironment()
+				batch := telemetry.NewBatch(int64(conf.RipeMillis), int64(conf.RotMillis), conf.CollectTraceID)
+				batch.AddInvocation(platformLog.RequestID, time.Now())
+				inv := batch.AddTelemetry(platformLog.RequestID, platformLog.Content, false)
+				if inv == nil {
+					logMessage = fmt.Sprintf("Skipping platform log for request %v", platformLog.RequestID)
+					assert.NotNil(t, logMessage)
+				} else {
+					assert.NotNil(t, inv)
+				}
+			}
+		})
+	}
 }

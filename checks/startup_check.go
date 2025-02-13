@@ -14,7 +14,7 @@ import (
 type checkFn func(context.Context, *config.Configuration, *api.RegistrationResponse, runtimeConfig) error
 
 type LogSender interface {
-	SendFunctionLogs(ctx context.Context, invokedFunctionARN string, lines []logserver.LogLine) error
+	SendFunctionLogs(ctx context.Context, invokedFunctionARN string, lines []logserver.LogLine, isAPMLambdaMode bool) error
 }
 
 /// Register checks here
@@ -45,7 +45,7 @@ func runCheck(ctx context.Context, conf *config.Configuration, reg *api.Registra
 	if err != nil {
 		errLog := fmt.Sprintf("Startup check warning: %v", err)
 		util.Logln(errLog)
-
+		var isAPMLambdaMode bool
 		//Send a log line to NR as well
 		logSender.SendFunctionLogs(ctx, "", []logserver.LogLine{
 			{
@@ -53,7 +53,8 @@ func runCheck(ctx context.Context, conf *config.Configuration, reg *api.Registra
 				RequestID: "0",
 				Content:   []byte(errLog),
 			},
-		})
+		},
+		isAPMLambdaMode)
 	}
 
 	return err

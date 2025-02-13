@@ -136,14 +136,10 @@ func main() {
 		}
 		util.Panic("telemetry pipe init failed: ", err)
 	}
-	var batch *telemetry.Batch
-	var telemetryClient *telemetry.Client
-	if !conf.APMLambdaMode {
-		// Set up the telemetry buffer
-		batch = telemetry.NewBatch(int64(conf.RipeMillis), int64(conf.RotMillis), conf.CollectTraceID)
-		// In APM Lambda mode, we don't send telemetry
-		telemetryClient = telemetry.New(registrationResponse.FunctionName, licenseKey, conf.TelemetryEndpoint, conf.LogEndpoint, batch, conf.CollectTraceID, conf.ClientTimeout)
-	}
+	// Set up the telemetry buffer
+	batch := telemetry.NewBatch(int64(conf.RipeMillis), int64(conf.RotMillis), conf.CollectTraceID)
+	// In APM Lambda mode, we don't send telemetry
+	telemetryClient := telemetry.New(registrationResponse.FunctionName, licenseKey, conf.TelemetryEndpoint, conf.LogEndpoint, batch, conf.CollectTraceID, conf.ClientTimeout)
 	
 
 	// Run startup checks
@@ -162,11 +158,7 @@ func main() {
 
 	go func() {
 		defer backgroundTasks.Done()
-		if conf.APMLambdaMode {
-			APMlogShipLoop(ctx, logServer)
-		} else {
-			logShipLoop(ctx, logServer, telemetryClient)
-		}
+		logShipLoop(ctx, logServer, telemetryClient, conf.APMLambdaMode)
 	}()
 
 	// Call next, and process telemetry, until we're shut down
@@ -193,30 +185,15 @@ func main() {
 	ranFor := shutdownAt.Sub(extensionStartup)
 	util.Logf("Extension shutdown after %vms", ranFor.Milliseconds())
 }
-// APMlogShipLoop ships function logs to New Relic as APM logs.
-func APMlogShipLoop(ctx context.Context, logServer *logserver.LogServer) {
-	<-apm.ConnectDone
-	entityGuid := apm.GetEntityGuid()
-	for {
-		functionLogs, more := logServer.AwaitFunctionLogs()
-		if !more {
-			return
-		}
-		// TODO: Send Logs to APM
-		fmt.Print(entityGuid)
-		fmt.Print(functionLogs)
-
-	}
-}
 
 // logShipLoop ships function logs to New Relic as they arrive.
-func logShipLoop(ctx context.Context, logServer *logserver.LogServer, telemetryClient *telemetry.Client) {
+func logShipLoop(ctx context.Context, logServer *logserver.LogServer, telemetryClient *telemetry.Client, isAPMLambdaMode bool) {
 	for {
 		functionLogs, more := logServer.AwaitFunctionLogs()
 		if !more {
 			return
 		}
-		err := telemetryClient.SendFunctionLogs(ctx, invokedFunctionARN, functionLogs)
+		err := telemetryClient.SendFunctionLogs(ctx, invokedFunctionARN, functionLogs, isAPMLambdaMode)
 		if err != nil {
 			util.Logf("Failed to send %d function logs", len(functionLogs))
 		}

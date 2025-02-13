@@ -3,10 +3,13 @@ package telemetry
 import (
 	"bytes"
 	"encoding/base64"
+	"encoding/json"
+	"log"
 	"sync"
 	"testing"
 	"time"
 
+	"github.com/newrelic/newrelic-lambda-extension/config"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -237,6 +240,39 @@ func TestAddTelemetry(t *testing.T) {
 	inv4 := batch.AddTelemetry(testNoSuchRequestId, bytes.NewBufferString(testTelemetry).Bytes(), isAPMTelemetry)
 	assert.Nil(t, inv4)
 
-	inv5 := batch.AddTelemetry(testRequestId2, bytes.NewBufferString(testTelemetry).Bytes(), false)
+	inv5 := batch.AddTelemetry(testRequestId2, bytes.NewBufferString(testTelemetry).Bytes(), !isAPMTelemetry)
 	assert.Nil(t, inv5)
+}
+func TestAddTelemetryWithTraceIDExtraction(t *testing.T) {
+	telemetryRequestId := "a89efeea-261f-47c1-8d7d-250e40ad9670"
+	isAPMTelemetry := true
+	expectedTraceID := "b3c694dab92e4f9ecbd26656926214c6"
+	data := []interface{}{1, "NR_LAMBDA_MONITORING", "H4sIAEUlq2cC/+VYa2/bNhT9K4Wwj7ZEUhIl+luatmiHFAvqZB0QBAItMY5WWVRJKqkb5L/vUrJjJ5Zdx3a7YIMhW+bj8PDecy8fd85EGJ5xw53BnVMpaWQqi+RGKJ3L0hngqOeIbyKtDfxNRHmTK1lORGmcgXP0eZic8Mko40k1Ndey9F1MnJ7Dx1C/gHAwcqmLHioKXo5reIWatputUbYhfA/4rR4UDeig1n3BtenjQUBpRGMWYhwHg6u6TC2bQdu7bxRPRZ71fUz6RkD796Io5GepiuzdrGmfi9uT0ft3H7/+dR3CcHOIJZK/nRydvR2eOfc9Z26NuoI3kRSSZyJLJjKrC6GdwYXzO1fa6V1cOEC25aryFGCJS+w87+4vexeOzidVIf7WzfzAMsz151WqLk0+EUla5NaSTzqW4laJogGcW+5xhXst5RftTgqgJIpEfymEtV/PefW0ZdKygyrkYjdeA5RKJcG/pdAJ19MyzWUX1qxxIcdjoRL7k5fjDQ3FNyNUyYvk2piqyEcPTS8vwd9QMTVAUNxYSbQWvyjroujdOUpooW5krhKdfweZYIIQqNC21IkWwsryHsx/54zrPAPfjfyUsiDjI0ZEcMUEDKW5tT5UGlWLHgg7lyo3U+jpEkbjgPacRjcfuvqno4xQGlJGKMFBSgHP+ksbALUh4UMFCwI/CGNQS624aTSEXESQlWgUMIp8EuEQOk4rq/QzxUvNG9EBWskntvAPcy3UUo0316u3u7SNNLw4yy1+B597cABYGHTrKvG1BsjGADxm4koI3icUX/WDKMX9OIuyPgmRCBDPGI2a+IVuraLcXxywSyPP0f5cCd1HzSCLZUPDlWkl0MpOV7zcSnKguDWSMwt3fVijvWcJaxuhthIaAvmFdg4glVn0+FEorhiiLESMjYK91J5CwhxLBfQdyPWiTYtLJnN/ovJL5YK71PRU5uXc6/9vucPSDh54JPWFO92AEAROXRSFLqEoApqN0GeeGtZVJZXho7wAWXqnzZy8owpSetoowfskxrk2rSy8N3N9gLJT2egWltQL3LNy8X2EKcIB6AwTvHcZQmEAMRJQEkNUBTiGOe9M/MgYMamMXiH+8NmEftIuh947qW65yuzrbEBR8pGN771gT2TKizcCFmogu8DOcn0A8I+NSvRhCfORKPSOPH9GclgV49PctWcZQgEKotCHkIoI8zEK6OZJ8aJ4ibzO5vuH/6TVH2b3EsjNc+Xr6TGIQSjvvPxSytty7e8LkcwuvBtHvATy3cvCJ5tbs+XwtFPTnmrKu3gjRGBNYjFBMcUxpgGihykOXAabsShkFPuxnYroo21Wtvdc3UBUzohfFeJbDjl3hbrvshiHDJEIVlKKWADw4QFKsRvGYHWKYSqIoSiIoJg94n18eu6dwz771boAfPp09vbODcz7+9pdxg9BhlMNS/3uJNr+e9NoUtHuLJrue5H4KCawU/dOr6cadkSrmcUPXUbCKMYk3OodE4ZcSnEUxrC1jENMNw33A+o4jkBCIWaUwbkkZPGeZcgPScCwj3Ho+5j6bCM39i8ao2PwX22ODyUc/spUQFq0iaa953lCaf7ZIjMdS1glUiOV13mj5v1Rm6o23usp7CpWDU/IowcjH07Fzxp1A77fw5SS9suiR74dATEcka1WjeZMOWyO8MqbHTF3PEJ0Y7bXA/tBLizRce222foUxY8enzI4aT1rzCd3LpvHs/ZffkI/jMnG8eytyFuL3mbE5lUP7Y3Nc/PhdsDNfe1ewC2St7TZeKsUGKqDNDoc9grvXbGPa23kRByU7xLm/jw7zuKHoNoJuwPbDpw3SlbVyvF4DdTl5f39P0toy3q2GQAA"}
+	jsonData, err := json.Marshal(data)
+	if err != nil {
+		log.Fatalf("Error marshalling data: %v", err)
+	}
+
+	byteArray := []byte(jsonData)
+	conf := config.ConfigurationFromEnvironment()
+	conf.CollectTraceID = true
+	batch := NewBatch(int64(conf.RipeMillis), int64(conf.RotMillis), conf.CollectTraceID)
+
+	batch.AddInvocation("a89efeea-261f-47c1-8d7d-250e40ad9670", time.Now())
+
+	inv := batch.invocations[telemetryRequestId]
+	if conf.CollectTraceID && isAPMTelemetry {
+		telemetryBytesEncoded := []byte(base64.StdEncoding.EncodeToString(byteArray))
+		traceId, err := ExtractTraceID(telemetryBytesEncoded)
+		if err != nil {
+			assert.NotNil(t, err)
+		}
+		if traceId != "" {
+			inv.TraceId = traceId
+			assert.Equal(t, inv.TraceId, expectedTraceID)
+			batch.SetTraceIDValue(telemetryRequestId, traceId)
+			assert.Equal(t, batch.RetrieveTraceID(telemetryRequestId), expectedTraceID)
+		}
+	}
+
 }

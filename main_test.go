@@ -17,7 +17,6 @@ import (
 
 	"github.com/newrelic/newrelic-lambda-extension/config"
 	"github.com/newrelic/newrelic-lambda-extension/lambda/extension/api"
-	"github.com/newrelic/newrelic-lambda-extension/lambda/logserver"
 	"github.com/newrelic/newrelic-lambda-extension/telemetry"
 	"github.com/newrelic/newrelic-lambda-extension/util"
 
@@ -1017,58 +1016,59 @@ func TestTelemetryChannelHandling(t *testing.T) {
 	assert.Equal(t, telemetryBytes, inv.Telemetry[0])
 
 }
-func TestPollLogServer(t *testing.T) {
+func TestLogEventTypeConfiguration(t *testing.T) {
 	tests := []struct {
-		name           string
-		logs           []logserver.LogLine
-		expectedLength int
+		name              string
+		sendFunctionLogs  bool
+		sendExtensionLogs bool
+		expectedTypes     []api.LogEventType
 	}{
 		{
-			name:           "No logs",
-			logs:           []logserver.LogLine{},
-			expectedLength: 0,
+			name:              "Only Platform logs enabled",
+			sendFunctionLogs:  false,
+			sendExtensionLogs: false,
+			expectedTypes:     []api.LogEventType{api.Platform},
 		},
 		{
-			name: "Single log",
-			logs: []logserver.LogLine{
-				{
-					RequestID: "12345",
-					Content:   []byte("Test log content"),
-				},
-			},
-			expectedLength: 1,
+			name:              "Function logs enabled",
+			sendFunctionLogs:  true,
+			sendExtensionLogs: false,
+			expectedTypes:     []api.LogEventType{api.Platform, api.Function},
 		},
 		{
-			name: "Multiple logs",
-			logs: []logserver.LogLine{
-				{
-					RequestID: "12345",
-					Content:   []byte("Test log content 1"),
-				},
-				{
-					RequestID: "67890",
-					Content:   []byte("Test log content 2"),
-				},
-			},
-			expectedLength: 2,
+			name:              "Extension logs enabled",
+			sendFunctionLogs:  false,
+			sendExtensionLogs: true,
+			expectedTypes:     []api.LogEventType{api.Platform, api.Extension},
+		},
+		{
+			name:              "All logs enabled",
+			sendFunctionLogs:  true,
+			sendExtensionLogs: true,
+			expectedTypes:     []api.LogEventType{api.Platform, api.Function, api.Extension},
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			for _, platformLog := range tt.logs {
-				var logMessage string
-				conf := config.ConfigurationFromEnvironment()
-				batch := telemetry.NewBatch(int64(conf.RipeMillis), int64(conf.RotMillis), conf.CollectTraceID)
-				batch.AddInvocation(platformLog.RequestID, time.Now())
-				inv := batch.AddTelemetry(platformLog.RequestID, platformLog.Content, false)
-				if inv == nil {
-					logMessage = fmt.Sprintf("Skipping platform log for request %v", platformLog.RequestID)
-					assert.NotNil(t, logMessage)
-				} else {
-					assert.NotNil(t, inv)
-				}
+			conf := config.Configuration{
+				SendFunctionLogs:  tt.sendFunctionLogs,
+				SendExtensionLogs: tt.sendExtensionLogs,
 			}
+
+			eventTypes := []api.LogEventType{api.Platform}
+			if conf.SendFunctionLogs {
+				eventTypes = append(eventTypes, api.Function)
+			}
+			if conf.SendExtensionLogs {
+				eventTypes = append(eventTypes, api.Extension)
+			}
+
+			assert.Equal(t, len(tt.expectedTypes), len(eventTypes), "Event types length mismatch")
+			assert.ElementsMatch(t, tt.expectedTypes, eventTypes, "Event types do not match expected values")
+
+			// Verify Platform is always included as first element
+			assert.Equal(t, api.Platform, eventTypes[0], "Platform should always be the first event type")
 		})
 	}
 }

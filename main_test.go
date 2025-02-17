@@ -1108,12 +1108,17 @@ func TestTelemetryChannelSelect(t *testing.T) {
 	testData := []byte("test-telemetry-data")
 	telemetryChan <- testData
 
+	var telemetryBytes []byte
+	var inv *telemetry.Invocation
 	select {
-	case telemetryBytes := <-telemetryChan:
-		inv := batch.AddTelemetry(lastRequestId, telemetryBytes, true)
-		assert.NotNil(t, inv)
-		assert.Equal(t, testData, inv.Telemetry[0])
+	case telemetryBytes = <-telemetryChan:
+		util.Debugf("Agent telemetry bytes: %s", base64.URLEncoding.EncodeToString(telemetryBytes))
+		inv = batch.AddTelemetry(lastRequestId, telemetryBytes, true)
+		util.Logf("We suspected a timeout for request %s but got telemetry anyway", lastRequestId)
 	default:
-		t.Error("Expected to receive telemetry data but channel was empty")
+		t.Fatal("Expected to receive telemetry data but channel was empty")
 	}
+
+	assert.NotNil(t, inv)
+	assert.Equal(t, testData, inv.Telemetry[0])
 }

@@ -1072,3 +1072,30 @@ func TestLogEventTypeConfiguration(t *testing.T) {
 		})
 	}
 }
+func TestTelemetryChannelSelect(t *testing.T) {
+	telemetryChan := make(chan []byte, 1)
+	lastRequestId := "test-request-123"
+
+	conf := config.ConfigurationFromEnvironment()
+	batch := telemetry.NewBatch(int64(conf.RipeMillis), int64(conf.RotMillis), conf.CollectTraceID)
+	batch.AddInvocation(lastRequestId, time.Now())
+
+	testData := []byte("test-telemetry-data")
+	telemetryChan <- testData
+
+	select {
+	case telemetryBytes := <-telemetryChan:
+		inv := batch.AddTelemetry(lastRequestId, telemetryBytes, true)
+		assert.NotNil(t, inv)
+		assert.Equal(t, testData, inv.Telemetry[0])
+	default:
+		t.Error("Expected to receive telemetry data but channel was empty")
+	}
+
+	select {
+	case <-telemetryChan:
+		t.Error("Expected empty channel but received data")
+	default:
+
+	}
+}

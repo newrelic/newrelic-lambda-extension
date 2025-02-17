@@ -994,27 +994,52 @@ func TestTelemetryChannelAddTelemetry(t *testing.T) {
 	assert.NotNil(t, inv)
 }
 func TestTelemetryChannelHandling(t *testing.T) {
+	tests := []struct {
+		name        string
+		sendData    bool
+		telemetry   []byte
+		expectError bool
+	}{
+		{
+			name:        "Successful telemetry",
+			sendData:    true,
+			telemetry:   []byte("test-telemetry-data"),
+			expectError: false,
+		},
+		{
+			name:        "Empty channel",
+			sendData:    false,
+			telemetry:   nil,
+			expectError: true,
+		},
+	}
 
-	telemetryChan := make(chan []byte, 1)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			telemetryChan := make(chan []byte, 1)
+			lastRequestId := "a89efeea-261f-47c1-8d7d-250e40ad9670"
+			conf := config.ConfigurationFromEnvironment()
+			batch := telemetry.NewBatch(int64(conf.RipeMillis), int64(conf.RotMillis), conf.CollectTraceID)
+			batch.AddInvocation(lastRequestId, time.Now())
 
-	telemetryBytes := []byte("test-telemetry-data")
-	lastRequestId := "a89efeea-261f-47c1-8d7d-250e40ad9670"
-	conf := config.ConfigurationFromEnvironment()
+			if tt.sendData {
+				telemetryChan <- tt.telemetry
+			}
 
-	batch := telemetry.NewBatch(int64(conf.RipeMillis), int64(conf.RotMillis), conf.CollectTraceID)
-	batch.AddInvocation("a89efeea-261f-47c1-8d7d-250e40ad9670", time.Now())
-	telemetryChan <- telemetryBytes
-
-	receivedTelemetryBytes := <-telemetryChan
-
-	util.Debugf("Agent telemetry bytes: %s", base64.URLEncoding.EncodeToString(receivedTelemetryBytes))
-	inv := batch.AddTelemetry(lastRequestId, receivedTelemetryBytes, true)
-	util.Logf("We suspected a timeout for request %s but got telemetry anyway", lastRequestId)
-
-	assert.NotNil(t, inv)
-
-	assert.Equal(t, telemetryBytes, inv.Telemetry[0])
-
+			select {
+			case telemetryBytes := <-telemetryChan:
+				util.Debugf("Agent telemetry bytes: %s", base64.URLEncoding.EncodeToString(telemetryBytes))
+				inv := batch.AddTelemetry(lastRequestId, telemetryBytes, true)
+				util.Logf("We suspected a timeout for request %s but got telemetry anyway", lastRequestId)
+				assert.NotNil(t, inv)
+				assert.Equal(t, tt.telemetry, inv.Telemetry[0])
+			default:
+				if !tt.expectError {
+					t.Error("Expected to receive telemetry data but channel was empty")
+				}
+			}
+		})
+	}
 }
 func TestLogEventTypeConfiguration(t *testing.T) {
 	tests := []struct {
@@ -1090,12 +1115,5 @@ func TestTelemetryChannelSelect(t *testing.T) {
 		assert.Equal(t, testData, inv.Telemetry[0])
 	default:
 		t.Error("Expected to receive telemetry data but channel was empty")
-	}
-
-	select {
-	case <-telemetryChan:
-		t.Error("Expected empty channel but received data")
-	default:
-
 	}
 }

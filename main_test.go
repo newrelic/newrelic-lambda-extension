@@ -1122,3 +1122,74 @@ func TestTelemetryChannelSelect(t *testing.T) {
 	assert.NotNil(t, inv)
 	assert.Equal(t, testData, inv.Telemetry[0])
 }
+
+func TestTimeoutTelemetryHandling(t *testing.T) {
+	lastRequestId := "test-request-123"
+	eventStart := time.Now()
+	lastEventStart := eventStart.Add(-5 * time.Second)
+
+	conf := config.ConfigurationFromEnvironment()
+	batch := telemetry.NewBatch(int64(conf.RipeMillis), int64(conf.RotMillis), conf.CollectTraceID)
+	batch.AddInvocation(lastRequestId, lastEventStart)
+
+	timeoutMessage := fmt.Sprintf(
+		"%s %s Task timed out after %.2f seconds",
+		eventStart.UTC().Format(time.RFC3339),
+		lastRequestId,
+		eventStart.Sub(lastEventStart).Seconds(),
+	)
+
+	inv := batch.AddTelemetry(lastRequestId, []byte(timeoutMessage), false)
+
+	assert.NotNil(t, inv)
+	assert.Equal(t, timeoutMessage, string(inv.Telemetry[0]))
+	assert.Equal(t, lastRequestId, inv.RequestId)
+}
+func TestShutdownTelemetryHandling(t *testing.T) {
+	tests := []struct {
+		name           string
+		shutdownReason api.ShutdownReason
+		expectedMsg    string
+	}{
+		{
+			name:           "Timeout shutdown",
+			shutdownReason: api.Timeout,
+			expectedMsg:    "",
+		},
+		{
+			name:           "Failure shutdown",
+			shutdownReason: api.Failure,
+			expectedMsg:    "",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			lastRequestId := "test-request-123"
+			eventStart := time.Now()
+			lastEventStart := eventStart.Add(-5 * time.Second)
+
+			conf := config.ConfigurationFromEnvironment()
+			batch := telemetry.NewBatch(int64(conf.RipeMillis), int64(conf.RotMillis), conf.CollectTraceID)
+			batch.AddInvocation(lastRequestId, lastEventStart)
+
+			var expectedMsg string
+			if tt.shutdownReason == api.Timeout {
+				expectedMsg = fmt.Sprintf(
+					"%s %s Task timed out after %.2f seconds",
+					eventStart.UTC().Format(time.RFC3339),
+					lastRequestId,
+					eventStart.Sub(lastEventStart).Seconds(),
+				)
+			} else {
+				expectedMsg = fmt.Sprintf("RequestId: %s AWS Lambda platform fault caused a shutdown", lastRequestId)
+			}
+
+			inv := batch.AddTelemetry(lastRequestId, []byte(expectedMsg), false)
+
+			assert.NotNil(t, inv)
+			assert.Equal(t, expectedMsg, string(inv.Telemetry[0]))
+			assert.Equal(t, lastRequestId, inv.RequestId)
+		})
+	}
+}

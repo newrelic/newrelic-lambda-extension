@@ -245,12 +245,12 @@ echo "Building and publishing for Python 3.12 x86_64..."
 build_python_version "3.12" "x86_64" $PY312_DIST_X86_64
 publish_python_version $PY312_DIST_X86_64 "x86_64" "3.12" "${REGIONS_X86[@]}"
 
-# Build and publish for Extension x86_64
-echo "Building and publishing for Extension x86_64..."
+# Build and publish for Extension ARM64
+echo "Building and publishing for Extension ARM64..."
 build_extension_version "arm64" $EXTENSION_DIST_ZIP_ARM64
 publish_extension_version $EXTENSION_DIST_ZIP_ARM64 "arm64" "${REGIONS_ARM[@]}"
 
-# Build and publish for Extension arm64
-echo "Building and publishing for Extension ARM64..."
+# Build and publish for Extension x86_64
+echo "Building and publishing for Extension x86_64..."
 build_extension_version "x86_64" $EXTENSION_DIST_ZIP_X86_64
 publish_extension_version $EXTENSION_DIST_ZIP_X86_64 "x86_64" "${REGIONS_X86[@]}"

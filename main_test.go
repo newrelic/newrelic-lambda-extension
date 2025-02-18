@@ -1193,3 +1193,17 @@ func TestShutdownTelemetryHandling(t *testing.T) {
 		})
 	}
 }
+
+func TestBatchAddTelemetry(t *testing.T) {
+	lastRequestId := "test-123"
+	telemetryBytes := []byte("test telemetry")
+	conf := config.ConfigurationFromEnvironment()
+	batch := telemetry.NewBatch(int64(conf.RipeMillis), int64(conf.RotMillis), conf.CollectTraceID)
+
+	batch.AddInvocation(lastRequestId, time.Now())
+	inv := batch.AddTelemetry(lastRequestId, telemetryBytes, true)
+
+	assert.NotNil(t, inv)
+	assert.Equal(t, lastRequestId, inv.RequestId)
+	assert.Equal(t, telemetryBytes, inv.Telemetry[0])
+}

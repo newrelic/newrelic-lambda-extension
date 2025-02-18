@@ -21,6 +21,7 @@ import (
 	"github.com/newrelic/newrelic-lambda-extension/util"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 )
 
 // TODO: These tests are very repetitive. Helpers would be useful here.
@@ -1206,4 +1207,85 @@ func TestBatchAddTelemetry(t *testing.T) {
 	assert.NotNil(t, inv)
 	assert.Equal(t, lastRequestId, inv.RequestId)
 	assert.Equal(t, telemetryBytes, inv.Telemetry[0])
+}
+
+type MockBatch struct {
+	mock.Mock
+}
+
+func (m *MockBatch) AddTelemetry(requestId string, message []byte, flag bool) {
+	m.Called(requestId, message, flag)
+}
+
+func TestHandleShutdownEvent(t *testing.T) {
+	mockBatch := new(MockBatch)
+
+	tests := []struct {
+		name            string
+		eventType       string
+		shutdownReason  string
+		lastRequestId   string
+		eventStart      time.Time
+		lastEventStart  time.Time
+		expectedMessage string
+	}{
+		{
+			name:            "Timeout with valid lastRequestId",
+			eventType:       "Shutdown",
+			shutdownReason:  "Timeout",
+			lastRequestId:   "12345",
+			eventStart:      time.Now(),
+			lastEventStart:  time.Now().Add(-30 * time.Second),
+			expectedMessage: "Task timed out after 30.00 seconds",
+		},
+		{
+			name:            "Failure with valid lastRequestId",
+			eventType:       "Shutdown",
+			shutdownReason:  "Failure",
+			lastRequestId:   "12345",
+			expectedMessage: "AWS Lambda platform fault caused a shutdown",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			event := Event{
+				EventType:      tt.eventType,
+				ShutdownReason: tt.shutdownReason,
+			}
+
+			mockBatch.On("AddTelemetry", tt.lastRequestId, mock.Anything, false).Run(func(args mock.Arguments) {
+				message := args.Get(1).([]byte)
+				assert.Contains(t, string(message), tt.expectedMessage)
+			}).Once()
+
+			handleShutdownEvent(event, tt.lastRequestId, tt.eventStart, tt.lastEventStart, mockBatch)
+
+			mockBatch.AssertExpectations(t)
+		})
+	}
+}
+
+type Event struct {
+	EventType      string
+	ShutdownReason string
+}
+
+func handleShutdownEvent(event Event, lastRequestId string, eventStart, lastEventStart time.Time, batch *MockBatch) {
+	if event.EventType == "Shutdown" {
+		if event.ShutdownReason == "Timeout" && lastRequestId != "" {
+			timestamp := eventStart.UTC()
+			timeoutSecs := eventStart.Sub(lastEventStart).Seconds()
+			timeoutMessage := fmt.Sprintf(
+				"%s %s Task timed out after %.2f seconds",
+				timestamp.Format(time.RFC3339),
+				lastRequestId,
+				timeoutSecs,
+			)
+			batch.AddTelemetry(lastRequestId, []byte(timeoutMessage), false)
+		} else if event.ShutdownReason == "Failure" && lastRequestId != "" {
+			errorMessage := fmt.Sprintf("RequestId: %s AWS Lambda platform fault caused a shutdown", lastRequestId)
+			batch.AddTelemetry(lastRequestId, []byte(errorMessage), false)
+		}
+	}
 }

@@ -11,27 +11,45 @@ import (
 	"strings"
 )
 
-type uncompressedData map[string]map[string]json.RawMessage
+type uncompressedDataVersion2 map[string]json.RawMessage
+type uncompressedDataVersion1 map[string]map[string]json.RawMessage
 
-func parsePayload(data []byte) (uncompressedData uncompressedData, err error) {
-	var arr [3]json.RawMessage
+func parsePayload(data []byte) (uncompressedData map[string]json.RawMessage, err error) {
+	var arr [4]json.RawMessage
 
 	if err = json.Unmarshal(data, &arr); err != nil {
 		err = fmt.Errorf("unable to unmarshal payload data array: %v", err)
 		return
 	}
-
+	payloadVersion := strings.Trim(string(arr[0]), `"`)
+	var dataCompressed string
+	if payloadVersion == "2" {
+		dataCompressed = string(arr[3])
+	} else {
+		dataCompressed = string(arr[2])
+	}
 	var dataJSON []byte
-	compressed := strings.Trim(string(arr[2]), `"`)
+	compressed := strings.Trim(dataCompressed, `"`)
 
 	if dataJSON, err = decodeUncompress(compressed); err != nil {
 		err = fmt.Errorf("unable to uncompress payload: %v", err)
 		return
 	}
 
-	if err = json.Unmarshal(dataJSON, &uncompressedData); err != nil {
-		err = fmt.Errorf("unable to unmarshal uncompressed payload: %v", err)
-		return
+	if payloadVersion == "2" {
+		var uncompressed uncompressedDataVersion2
+		if err = json.Unmarshal(dataJSON, &uncompressed); err != nil {
+			fmt.Printf("unable to unmarshal uncompressed payload: %v", err)
+			return nil, err
+		}
+		uncompressedData = uncompressed
+	} else {
+		var uncompressed uncompressedDataVersion1
+		if err = json.Unmarshal(dataJSON, &uncompressed); err != nil {
+			fmt.Printf("unable to unmarshal uncompressed payload: %v", err)
+			return nil, err
+		}
+		uncompressedData = uncompressed["data"]
 	}
 
 	return
@@ -67,15 +85,11 @@ func ExtractTraceID(data []byte) (string, error) {
 		return "", nil
 	}
 
-	segments, err := parsePayload(decoded)
+	dataSegment, err := parsePayload(decoded)
 	if err != nil {
 		return "", err
 	}
 
-	dataSegment, ok := segments["data"]
-	if !ok {
-		return "", errors.New("No trace ID found in payload")
-	}
 
 	analyticEvents, ok := dataSegment["analytic_event_data"]
 	if ok {

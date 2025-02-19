@@ -53,16 +53,6 @@ func TestExtractTraceIDAnalyticEvent(t *testing.T) {
 	assert.Equal(t, "24d071916e1f00ee", traceId)
 }
 
-func TestExtractTraceIDPayloadVersion2AnalyticEvent(t *testing.T) {
-	payload := []byte(`[2,"NR_LAMBDA_MONITORING",{"metadata_version":2,"arn":"arn:aws:lambda:us-east-1:466768951184:function:go-ext-test-HelloWorldFunction-OzWnlEPQ09ra","protocol_version":17,"agent_version":"3.36.0","agent_language":"go"},"H4sIAAAAAAAA/+xWS3PbNhD+L3sGSfBN4tRXmvTQSTpxmoNH41kRKwoTEGAB0K7s0X/vUKITO7UTu1WnPfSg0WoB7bevjx9vAA3qXVDdBV2SCRcSA4I4B2A34MiTu7TKXXh1TSBSzjlncLjoLzyRAZHu2fn5DYTdSCDgzKHx2AVlDTAwOMzO12FL7s5J8tImvY3o9xAF8iF6RVrb99Zp+eNkDjei19fvjX7x5hfeOgQGQQ3kAw4jiLTO26apyqZp65wBOWcdiA1qTwzk5PCALXjMy7Zp2qptGAQbUJ+pOZl7/n5SEgQgpXlJVVHxkktqD4AOO/rpocOad3xTIpcoi5byNTAYnbJOhR2INM7qrM1zBh6HUZMEEdxEe3YD3eSDHb4Nwan1FOa2fOb5FfVEMF/FKx9rHNYS485q+TagC8dADDorKdbKkLEgsiJbPJulcSBgNlNY/PME/IjdjNersJ3WcWeHBK/8/ImOKFFvkwXP0UZTF16hkZrcbZSN0jRi2IKA5J0n5xPES2XQb5PeJuOHPhmsTL4U/5vLNC7SmC84yfYIEPcW2KFeR79N5MOx5VWTFZksoyLLqqhosIrapkwjWRZYFGsqs3qz/G1JG91cOToj8MqLo1NMPiL0IUpFUVV11bRlmjaFuG2VeM4K7lerFVsm9gSi5F8lys+7l/bFfPzIdrc8z+dduFYjCLjGcd6MYxYDBae6O/ifKPHJbA9gJyLgnp2n7C5z+P1f922el01V12WbVWWeZjyvVyv2hWRQ638W4ewj/f8M8zT7rwL+/UafJL8flsfid7vvUWtyyTvzwdgr8+j3wyP513I59PekCc088iOaJ3A5+xqV345onisZi/JsOlnLfE3rqmvzNu2OYW7X6MFg8Jm2PCw/jwvmIxJ5MqnuMFBv3W4WHDLk1FyUcTGZ4HZvrDIfpexOpfHJHlTPEtr/xW0Z2n/njWOWuP0fAAAA//8BAAD//8swp8OVCgAA"]`)
-	payload = []byte(base64.StdEncoding.EncodeToString(payload))
-
-	traceId, err := ExtractTraceID(payload)
-
-	assert.Nil(t, err)
-	assert.Equal(t, "ae135e646050de9a70c0f5a0dad49e3b", traceId)
-}
-
 func TestExtractTraceIDSpanEvent(t *testing.T) {
 	payload := []byte("[1, \"NR_LAMBDA_MONITORING\", \"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\"]")
 	payload = []byte(base64.StdEncoding.EncodeToString(payload))
@@ -75,6 +65,60 @@ func TestExtractTraceIDSpanEvent(t *testing.T) {
 
 func TestExtractTraceIDInvalid(t *testing.T) {
 	payload := []byte("[1, \"NR_LAMBDA_MONITORING\", \"H4sIAK6pdWIC/0vLz09KLAIAlR/2ngYAAAA=\"]")
+	payload = []byte(base64.StdEncoding.EncodeToString(payload))
+
+	traceId, err := ExtractTraceID(payload)
+
+	assert.Error(t, err)
+	assert.Empty(t, traceId)
+
+	payload2 := []byte("[foobar]")
+	payload2 = []byte(base64.StdEncoding.EncodeToString(payload))
+
+	traceId, err = ExtractTraceID(payload2)
+
+	assert.Nil(t, err)
+	assert.Empty(t, traceId)
+
+	payload3 := []byte("[foobar]")
+
+	traceId, err = ExtractTraceID(payload3)
+
+	assert.Error(t, err)
+	assert.Empty(t, traceId)
+}
+
+func TestExtractTraceIDPayloadVersion2AnalyticEvent(t *testing.T) {
+	payload := []byte(`[2,"NR_LAMBDA_MONITORING",{"metadata_version":2,"arn":"arn:aws:lambda:us-east-1:466768951184:function:go-ext-test-HelloWorldFunction-OzWnlEPQ09ra","protocol_version":17,"agent_version":"3.36.0","agent_language":"go"},"H4sIAAAAAAAA/+xWS3PbNhD+L3sGSfBN4tRXmvTQSTpxmoNH41kRKwoTEGAB0K7s0X/vUKITO7UTu1WnPfSg0WoB7bevjx9vAA3qXVDdBV2SCRcSA4I4B2A34MiTu7TKXXh1TSBSzjlncLjoLzyRAZHu2fn5DYTdSCDgzKHx2AVlDTAwOMzO12FL7s5J8tImvY3o9xAF8iF6RVrb99Zp+eNkDjei19fvjX7x5hfeOgQGQQ3kAw4jiLTO26apyqZp65wBOWcdiA1qTwzk5PCALXjMy7Zp2qptGAQbUJ+pOZl7/n5SEgQgpXlJVVHxkktqD4AOO/rpocOad3xTIpcoi5byNTAYnbJOhR2INM7qrM1zBh6HUZMEEdxEe3YD3eSDHb4Nwan1FOa2fOb5FfVEMF/FKx9rHNYS485q+TagC8dADDorKdbKkLEgsiJbPJulcSBgNlNY/PME/IjdjNersJ3WcWeHBK/8/ImOKFFvkwXP0UZTF16hkZrcbZSN0jRi2IKA5J0n5xPES2XQb5PeJuOHPhmsTL4U/5vLNC7SmC84yfYIEPcW2KFeR79N5MOx5VWTFZksoyLLqqhosIrapkwjWRZYFGsqs3qz/G1JG91cOToj8MqLo1NMPiL0IUpFUVV11bRlmjaFuG2VeM4K7lerFVsm9gSi5F8lys+7l/bFfPzIdrc8z+dduFYjCLjGcd6MYxYDBae6O/ifKPHJbA9gJyLgnp2n7C5z+P1f922el01V12WbVWWeZjyvVyv2hWRQ638W4ewj/f8M8zT7rwL+/UafJL8flsfid7vvUWtyyTvzwdgr8+j3wyP513I59PekCc088iOaJ3A5+xqV345onisZi/JsOlnLfE3rqmvzNu2OYW7X6MFg8Jm2PCw/jwvmIxJ5MqnuMFBv3W4WHDLk1FyUcTGZ4HZvrDIfpexOpfHJHlTPEtr/xW0Z2n/njWOWuP0fAAAA//8BAAD//8swp8OVCgAA"]`)
+	payload = []byte(base64.StdEncoding.EncodeToString(payload))
+
+	traceId, err := ExtractTraceID(payload)
+
+	assert.Nil(t, err)
+	assert.Equal(t, "ae135e646050de9a70c0f5a0dad49e3b", traceId)
+}
+
+func TestExtractTraceIDPayloadVersion2SpanEvent(t *testing.T) {
+	payload := []byte("[2,\"NR_LAMBDA_MONITORING\",{\"metadata_version\":2,\"arn\":\"arn:aws:lambda:us-east-1:466768951184:function:go-ext-test-HelloWorldFunction-OzWnlEPQ09ra\",\"protocol_version\":17,\"agent_version\":\"3.36.0\",\"agent_language\":\"go\"},\"H4sIAG2gtWcC/+1X21LbMBB95ysYP8f3q/LUG4U+dKADlAeGyaytjePBllJZDk2Y/HtlJ6SkxCYtGWg7ZCaJIp3dlc5Zbda3e/vq1XxoSVVKXgxwgkwOKEjQ+vuXzVKzrPVW49vVqFkRWKKY8EwMymyGysq11Ku3DmrcloMSkSmEvVqc/8Rdrlms/3oYduVZTsd1UO3z9JAf1FG0XgswK7CUUIzrDYQuiaLAj4jlug/g8962wWdZ7U2bwVjbyst8bepqb310tbDQCpQiS7pFWJ0g2jBHnswqg6Jh9ViOUJwJYCUkMuPMPORmynX8LnWp2NSPMM/5BRc5/VixBqEfzy5YfnDyxSICtmLlcuMW7M0yWoblq0OSgEQtgD+12wJguX4UhKFPnMB3bcdywwfIq3WFezumH/L8ldPdcnrGJeRnqji8BLHPAvh7KP4Hysf/qciHSkBN77vpe1VCUJjn7JrxG9b6/UKF5pX9O/abO/QqwWO9UjkGtoum1XmJnvVUbb61XRWQ4CdawwBt18fACyzfokggtBJr6INFgXoE3bjNRVpljf0woSF1Y4yDhLjETjpC3lXszYHbDEvVVedYm0hRYQtoLDIuMjmtuTSc0CGu+zudekTCNjxdXi8FfzT3dtbZtrhPQGLKRX1KLUWGqpFvgzJhqAQT0xOeqaeWTu7uKWM8Z2vekr+LZ8W3Uj2mxJVsdvPL1FfIK3xSCE7RGGY5jkGO6gDmubqxpQkwyRiUI3VUc3ydmgWnZprJURUbCS9MuCnrt55DEVPQU/5mYhuebVjmYsYcAaOqAhspb5NFmRsCv1WKw+UtCCLHc6ive44T6F4EgU4i39ap74Hnxeg74bDL2SKyAYI13gTrq9n+YrZflTqCUsvue0EQBhHxbTvy+sOlZP0dpOS9PSQ8p6cSxCPp1pCfZwwZr0uj53Th7rbaVBo1trUudJ29qmYnTdJ0CbcUTEkxzDGRRwvdNqRU99/E3vwHxv8etOUQAAA=\"]")
+	payload = []byte(base64.StdEncoding.EncodeToString(payload))
+
+	traceId, err := ExtractTraceID(payload)
+
+	assert.Nil(t, err)
+	assert.Equal(t, "ae135e646050de9a70c0f5a0dad49e3b", traceId)
+}
+
+func TestParsePayloadVersion2InvalidData(t *testing.T) {
+	payload := []byte("[2, \"NR_LAMBDA_MONITORING\", \"H4sIAK6pdWIC/0vLz09KLAIAlR/2ngYAAAA=\"]")
+
+	data, err := parsePayload(payload)
+
+	assert.Nil(t, data)
+	assert.Error(t, err)
+}
+
+func TestExtractTraceIDPayloadVersion2Invalid(t *testing.T) {
+	payload := []byte("[2, \"NR_LAMBDA_MONITORING\", \"H4sIAK6pdWIC/0vLz09KLAIAlR/2ngYAAAA=\"]")
 	payload = []byte(base64.StdEncoding.EncodeToString(payload))
 
 	traceId, err := ExtractTraceID(payload)

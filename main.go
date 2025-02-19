@@ -231,7 +231,7 @@ func mainLoop(ctx context.Context, invocationClient *client.InvocationClient, ba
 				case telemetryBytes := <-telemetryChan:
 					// We received telemetry
 					util.Debugf("Agent telemetry bytes: %s", base64.URLEncoding.EncodeToString(telemetryBytes))
-					batch.AddTelemetry(lastRequestId, telemetryBytes)
+					batch.AddTelemetry(lastRequestId, telemetryBytes, true)
 					util.Logf("We suspected a timeout for request %s but got telemetry anyway", lastRequestId)
 				default:
 				}
@@ -248,11 +248,11 @@ func mainLoop(ctx context.Context, invocationClient *client.InvocationClient, ba
 						lastRequestId,
 						timeoutSecs,
 					)
-					batch.AddTelemetry(lastRequestId, []byte(timeoutMessage))
+					batch.AddTelemetry(lastRequestId, []byte(timeoutMessage), false)
 				} else if event.ShutdownReason == api.Failure && lastRequestId != "" {
 					// Synthesize a generic platform error. Probably an OOM, though it could be any runtime crash.
 					errorMessage := fmt.Sprintf("RequestId: %s AWS Lambda platform fault caused a shutdown", lastRequestId)
-					batch.AddTelemetry(lastRequestId, []byte(errorMessage))
+					batch.AddTelemetry(lastRequestId, []byte(errorMessage), false)
 				}
 
 				return eventCounter
@@ -295,7 +295,7 @@ func mainLoop(ctx context.Context, invocationClient *client.InvocationClient, ba
 
 				// We received telemetry
 				util.Debugf("Agent telemetry bytes: %s", base64.URLEncoding.EncodeToString(telemetryBytes))
-				inv := batch.AddTelemetry(lastRequestId, telemetryBytes)
+				inv := batch.AddTelemetry(lastRequestId, telemetryBytes, true)
 				if inv == nil {
 					util.Logf("Failed to add telemetry for request %v", lastRequestId)
 				}
@@ -314,7 +314,7 @@ func mainLoop(ctx context.Context, invocationClient *client.InvocationClient, ba
 // pollLogServer polls for platform logs, and annotates telemetry
 func pollLogServer(logServer *logserver.LogServer, batch *telemetry.Batch) {
 	for _, platformLog := range logServer.PollPlatformChannel() {
-		inv := batch.AddTelemetry(platformLog.RequestID, platformLog.Content)
+		inv := batch.AddTelemetry(platformLog.RequestID, platformLog.Content, false)
 		if inv == nil {
 			util.Debugf("Skipping platform log for request %v", platformLog.RequestID)
 		}

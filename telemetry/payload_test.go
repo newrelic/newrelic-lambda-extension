@@ -2,7 +2,6 @@ package telemetry
 
 import (
 	"encoding/base64"
-	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"

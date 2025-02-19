@@ -2,6 +2,7 @@ package telemetry
 
 import (
 	"encoding/base64"
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -118,7 +119,7 @@ func TestParsePayloadVersion2InvalidData(t *testing.T) {
 }
 
 func TestExtractTraceIDPayloadVersion2Invalid(t *testing.T) {
-	payload := []byte("[2, \"NR_LAMBDA_MONITORING\", \"H4sIAK6pdWIC/0vLz09KLAIAlR/2ngYAAAA=\"]")
+	payload := []byte("[2, \"NR_LAMBDA_MONITORING\",{\"metadata_version\":2,\"arn\":\"arn:aws:lambda:us-east-1:466768951184:function:go-ext-test-HelloWorldFunction-OzWnlEPQ09ra\",\"protocol_version\":17,\"agent_version\":\"3.36.0\",\"agent_language\":\"go\"}, \"H4sIAK6pdWIC/0vLz09KLAIAlR/2ngYAAAA=\"]")
 	payload = []byte(base64.StdEncoding.EncodeToString(payload))
 
 	traceId, err := ExtractTraceID(payload)

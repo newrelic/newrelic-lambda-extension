@@ -36,17 +36,11 @@ See below for details on supported New Relic agents.
 
 ## Supported Configurations
 
-AWS's [Extension API supports](https://docs.aws.amazon.com/lambda/latest/dg/runtimes-extensions-api.html) only a subset 
-of all their runtimes. Notably absent as of this writing are Node JS before 10, Python before 3.7, Go (all versions), 
-Dotnet before 3.1, and the older "java8" runtime, though "java8.al2" is supported.
+The New Relic Extension uses the AWS [Lambda Extensions API](https://docs.aws.amazon.com/lambda/latest/dg/runtimes-extensions-api.html), which supports all Lambda runtimes. For Go lambdas, we suggest using "provided.al2023" or "provided.al2". See the [Custom runtime](https://docs.aws.amazon.com/lambda/latest/dg/runtimes-custom.html) docs for further details.
 
-For Go lambdas, we suggest using "provided" or "provided.al2". The Go example's deploy script contains compiler flags
-that produce a suitable self-hosting Go executable. See the [Custom runtime](https://docs.aws.amazon.com/lambda/latest/dg/runtimes-custom.html)
-docs for more details on this feature. 
-
-All of our layers include the extension, and the latest Agent version for the Layer's runtime. The latest 
-layer version ARNs for your runtime and region are available [here](https://layers.newrelic-external.com/). The 
-`NewRelicLambdaExtension` layer is suitable for Go, Java and Dotnet.
+All of the New Relic Lambda Layers include the Extension and the latest Agent version for the Layer's runtime. The latest 
+New Relic Lambda Layer ARNs for your runtime and region are available [here](https://layers.newrelic-external.com/). The 
+`NewRelicLambdaExtension` layer is suitable for Go runtime Lambda.
 
 ## Building
 
@@ -107,6 +101,7 @@ The New Relic Lambda Extension offers various features, which can be utilised by
 |--------|-----------|-------------|-------------|
 |`NEW_RELIC_IGNORE_EXTENSION_CHECKS`| `false` | `all` , `agent`, `handler`, `sanity`, `vendor` | Ignore selected Extension Checks by using a comma-separated value, e.g., `agent,handler`, to ignore agent and handler checks. Use `all` to ignore all the Extension Checks as mentioned [here](#startup-checks). It is recommended to ignore all Extension checks after the lambda is successfully instrumented. |
 |`NEW_RELIC_DATA_COLLECTION_TIMEOUT`| `10s` | Time such as `5s`. Valid time units are "ms", "s"| Reduce time the Extension waits for sending telemetry.|
+|`NEW_RELIC_COLLECT_TRACE_ID`| `false` | `true` , `false` | Add attribute `trace.id` to Lambda Logs |
 |`NEW_RELIC_LAMBDA_EXTENSION_ENABLED`| `false` | `true` , `false` | Disable the Extension. It is enabled by default |
 
 

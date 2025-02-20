@@ -1,3 +1,5 @@
 bootstrap
 handler
 go-example.zip
+.aws-sam
+*.toml

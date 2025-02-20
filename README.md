@@ -36,9 +36,7 @@ See below for details on supported New Relic agents.
 
 ## Supported Configurations
 
-The AWS [Lambda Extensions API](https://docs.aws.amazon.com/lambda/latest/dg/runtimes-extensions-api.html) supports all Lambda runtimes.
-
-For Go lambdas, we suggest using "provided.al2023" or "provided.al2". See the [Custom runtime](https://docs.aws.amazon.com/lambda/latest/dg/runtimes-custom.html) docs for further details.
+The New Relic Extension uses the AWS [Lambda Extensions API](https://docs.aws.amazon.com/lambda/latest/dg/runtimes-extensions-api.html), which supports all Lambda runtimes. For Go lambdas, we suggest using "provided.al2023" or "provided.al2". See the [Custom runtime](https://docs.aws.amazon.com/lambda/latest/dg/runtimes-custom.html) docs for further details.
 
 All of the New Relic Lambda Layers include the Extension and the latest Agent version for the Layer's runtime. The latest 
 New Relic Lambda Layer ARNs for your runtime and region are available [here](https://layers.newrelic-external.com/). The 

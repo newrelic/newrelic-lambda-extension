@@ -12,7 +12,6 @@
         "integ-test": "jest --roots __tests__/integration"
     },
     "dependencies": {
-        "aws-sdk": "^2.1692.0",
-        "newrelic": "^12.14.0"
+        "aws-sdk": "^2.1692.0"
     }
 }

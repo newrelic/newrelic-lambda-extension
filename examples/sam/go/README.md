@@ -40,7 +40,6 @@ make
 
 ```bash
 .
-├── Makefile                    <-- Make to automate build
 ├── README.md                   <-- This instructions file
 ├── hello-world                 <-- Source code for a lambda function
 │   ├── main.go                 <-- Lambda function code

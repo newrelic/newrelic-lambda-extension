@@ -1,42 +1,48 @@
 AWSTemplateFormatVersion: '2010-09-09'
 Transform: AWS::Serverless-2016-10-31
-Description: And example of a simple instrumented Go Lambda
+Description: And example of a simple instrumented Go Lambda function
 
 Parameters:
   NRAccountId:
     Type: String
     Description: Your New Relic account ID; necessary for distributed tracing.
     AllowedPattern: '[0-9]+'
+Globals:
+  Function:
+    Timeout: 5
+    MemorySize: 128
 
 Resources:
-  NewRelicExample:
-    Type: AWS::Serverless::Function
+  HelloWorldFunction:
+    Type: AWS::Serverless::Function 
+    Metadata:
+      BuildMethod: go1.x
     Properties:
-      CodeUri:
-        Bucket: !Sub newrelic-example-${AWS::Region}-${NRAccountId}
-        Key: go-example.zip
-      Description: A simple Lambda, with New Relic telemetry
-      FunctionName: newrelic-example-go
-      # For go1.x, the handler is the name of your go executable. With the norpc option, it is ignored.
-      Handler: handler
-      Runtime: provided
-      Environment:
+      CodeUri: hello-world/
+      Handler: bootstrap
+      Runtime: provided.al2023
+      Environment: 
         Variables:
           NEW_RELIC_ACCOUNT_ID: !Sub ${NRAccountId}
           NEW_RELIC_TRUSTED_ACCOUNT_KEY: !Sub ${NRAccountId}
-          # NEW_RELIC_EXTENSION_SEND_FUNCTION_LOGS: true
-          # NEW_RELIC_EXTENSION_LOG_LEVEL: DEBUG
+          NEW_RELIC_LOG_ENABLED: "true"
+          NEW_RELIC_LOG: "stdout"
+          # NEW_RELIC_EXTENSION_SEND_EXTENSION_LOGS: "true"
+          # NEW_RELIC_EXTENSION_SEND_FUNCTION_LOGS: "true"
+          # NEW_RELIC_EXTENSION_LOG_LEVEL: "DEBUG"
+
       Layers:
         # This layer includes the New Relic Lambda Extension, a sidecar process that sends telemetry
-        - !Sub arn:${AWS::Partition}:lambda:${AWS::Region}:451483290750:layer:NewRelicLambdaExtension:23
+        - !Sub arn:${AWS::Partition}:lambda:${AWS::Region}:451483290750:layer:NewRelicLambdaExtension:46
       Policies:
         # This policy allows the lambda to know the value of the New Relic licence key. We need this so
         # that we can send telemetry back to New Relic
         - AWSSecretsManagerGetSecretValuePolicy:
             SecretArn: !ImportValue NewRelicLicenseKeySecret-NewRelic-LicenseKeySecretARN
-  Logs:
-    Type: AWS::Logs::LogGroup
-    Properties:
-      LogGroupName: {"Fn::Join": ["", ["/aws/lambda/", {"Ref": "NewRelicExample"}]]}
-      # Lambda functions will auto-create their log group on first execution, but it retains logs forever, which can get expensive.
-      RetentionInDays: 7
+Outputs:
+  HelloWorldFunction:
+    Description: "First Lambda Function ARN"
+    Value: !GetAtt HelloWorldFunction.Arn
+  HelloWorldFunctionIamRole:
+    Description: "Implicit IAM Role created for Hello World function"
+    Value: !GetAtt HelloWorldFunctionRole.Arn

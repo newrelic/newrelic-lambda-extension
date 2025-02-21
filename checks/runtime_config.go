@@ -9,10 +9,10 @@ var (
 		"/opt/python/lib/python3.8/site-packages/newrelic",
 		"/opt/python/lib/python3.9/site-packages/newrelic",
 	}
-	layerAgentPathsRuby    = []string{
-    "/opt/ruby/gems/3.2.0/gems/newrelic_rpm",
-    "/opt/ruby/gems/3.3.0/gems/newrelic_rpm",
-  }
+	layerAgentPathsRuby = []string{
+		"/opt/ruby/gems/3.2.0/gems/newrelic_rpm",
+		"/opt/ruby/gems/3.3.0/gems/newrelic_rpm",
+	}
 	vendorAgentPathNode   = "/var/task/node_modules/newrelic"
 	vendorAgentPathPython = "/var/task/newrelic"
 	vendorAgentPathRuby   = "/var/task/vendor/bundle/ruby/3.3.0/gems/newrelic_rpm"
@@ -28,7 +28,7 @@ type runtimeConfig struct {
 	language            Runtime
 	layerAgentPaths     []string
 	vendorAgentPath     string
-	wrapperName         string
+	wrapperName         []string
 }
 
 type Runtime string
@@ -43,7 +43,7 @@ const (
 var runtimeConfigs = map[Runtime]runtimeConfig{
 	Node: {
 		language:            Node,
-		wrapperName:         "newrelic-lambda-wrapper.handler",
+		wrapperName:         []string{"newrelic-lambda-wrapper.handler", "/opt/nodejs/node_modules/newrelic-esm-lambda-wrapper/index.handler"},
 		fileType:            "js",
 		layerAgentPaths:     layerAgentPathNode,
 		vendorAgentPath:     vendorAgentPathNode,
@@ -53,7 +53,7 @@ var runtimeConfigs = map[Runtime]runtimeConfig{
 	},
 	Python: {
 		language:            Python,
-		wrapperName:         "newrelic_lambda_wrapper.handler",
+		wrapperName:         []string{"newrelic_lambda_wrapper.handler"},
 		fileType:            "py",
 		layerAgentPaths:     layerAgentPathsPython,
 		vendorAgentPath:     vendorAgentPathPython,
@@ -63,7 +63,7 @@ var runtimeConfigs = map[Runtime]runtimeConfig{
 	},
 	Ruby: {
 		language:        Ruby,
-		wrapperName:     "newrelic_lambda_wrapper.handler",
+		wrapperName:     []string{"newrelic_lambda_wrapper.handler"},
 		fileType:        "rb",
 		layerAgentPaths: layerAgentPathsRuby,
 		vendorAgentPath: vendorAgentPathRuby,

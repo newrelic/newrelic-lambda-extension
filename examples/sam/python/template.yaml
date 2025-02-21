@@ -14,7 +14,7 @@ Globals:
     Timeout: 3
 
 Resources:
-  HelloWorldFunction:
+  NewRelicExample:
     Type: AWS::Serverless::Function # More info about Function Resource: https://github.com/awslabs/serverless-application-model/blob/master/versions/2016-10-31.md#awsserverlessfunction
     Properties:
       # In this example, we're using the SAM CLI to package and deploy our lambda. SAM will transform this value during the publish step.
@@ -44,9 +44,9 @@ Resources:
         - AWSSecretsManagerGetSecretValuePolicy:
             SecretArn: !ImportValue NewRelicLicenseKeySecret-NewRelic-LicenseKeySecretARN
 Outputs:
-  HelloWorldFunction:
+  NewRelicExample:
     Description: "Hello World Lambda Function ARN"
-    Value: !GetAtt HelloWorldFunction.Arn
-  HelloWorldFunctionIamRole:
-    Description: "Implicit IAM Role created for Hello World function"
-    Value: !GetAtt HelloWorldFunctionRole.Arn
+    Value: !GetAtt NewRelicExample.Arn
+  NewRelicExampleIamRole:
+    Description: "Implicit IAM Role created for Newrelic Example function"
+    Value: !GetAtt NewRelicExampleRole.Arn

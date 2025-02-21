@@ -30,11 +30,6 @@ function doesn't pay attention to its invocation event. If everything
 has gone well, each invocation gets reported to New Relic, and its
 telemetry appears in NR One.
 
-The `sam build` command is wrapped inside of the `Makefile`. To execute this simply run
- 
-```shell
-make
-```
 
 ## Code Structure
 

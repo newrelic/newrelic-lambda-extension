@@ -97,6 +97,27 @@ func Connect(cmd RpmCmd, cs *RpmControls) (string, string) {
 
 }
 
+
+func SendErrorEvent(cmd RpmCmd, cs *RpmControls, errorData []interface{}) {
+	tg := NewTraceIDGenerator(1453)
+	spanId := tg.GenerateSpanID()
+	traceId := tg.GenerateTraceID()
+	guid := tg.GenerateTraceID()
+	if len(errorData) > 0 {
+		startTimeMetric := time.Now()
+		updatedData, _ := MapToErrorEventData(errorData, cs.GetRunId(), spanId, traceId, guid)
+		finalData, _ := json.Marshal(updatedData)
+		cmd.Name = CmdErrorEvents
+		cmd.Data = finalData
+		cmd.RunID = cs.GetRunId()
+		rpmResponse := CollectorRequest(cmd, cs)
+		fmt.Printf("Status Code %v telemetry: %d\n", CmdErrorEvents, rpmResponse.GetStatusCode())
+		endTimeMetric := time.Now()
+		durationMetric := endTimeMetric.Sub(startTimeMetric)
+		fmt.Printf("Send %v duration: %s\n", CmdErrorEvents, durationMetric)
+	}
+}
+
 // Function to send data based on the type specified
 func sendAPMTelemetryInternal(data []interface{}, dataType string, wg *sync.WaitGroup, run_id string, cmd RpmCmd, cs *RpmControls) {
 	defer wg.Done()

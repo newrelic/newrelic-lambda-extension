@@ -208,15 +208,22 @@ func compress(b []byte, gzipWriterPool *sync.Pool) (*bytes.Buffer, error) {
 // collectorRequest makes a request to New Relic.
 func CollectorRequest(cmd RpmCmd, cs *RpmControls) *rpmResponse {
 	url := RpmURL(cmd, cs)
-	resp := collectorRequestInternal(url, cmd, cs)
-	return resp
+	return collectorRequestInternal(url, cmd, cs)
 }
-
 
 func collectorRequestInternal(url string, cmd RpmCmd, cs *RpmControls) *rpmResponse {
 	compressed, err := compress(cmd.Data, cs.GzipWriterPool)
+	if err != nil {
+		fmt.Printf("Error compressing data: %v", err)
+		return newRPMResponse(err)
+	}
 
 	req, err := http.NewRequest("POST", url, compressed)
+	if err != nil {
+		fmt.Printf("Error creating request: %v", err)
+		return newRPMResponse(err)
+	}
+
 	req.Header.Add("NR-Session", cmd.RunID)
 	req.Header.Add("Accept-Encoding", "identity, deflate")
 	req.Header.Add("Content-Type", "application/octet-stream")
@@ -229,8 +236,8 @@ func collectorRequestInternal(url string, cmd RpmCmd, cs *RpmControls) *rpmRespo
 
 	resp, err := cs.Client.Do(req)
 	if err != nil {
-		fmt.Println("error connecting")
-		return nil
+		fmt.Println("Error connecting:", err)
+		return newRPMResponse(err)
 	}
 
 	defer resp.Body.Close()
@@ -245,11 +252,13 @@ func collectorRequestInternal(url string, cmd RpmCmd, cs *RpmControls) *rpmRespo
 }
 
 func ProcessData(data []interface{}, runId string) []interface{} {
-	data[0] = runId
+	if len(data) > 0 {
+		data[0] = runId
+	}
 	return data
 }
 
-func NewAPMClient(conf *config.Configuration, FunctionName string ) (RpmCmd, *RpmControls) {
+func NewAPMClient(conf *config.Configuration, FunctionName string) (RpmCmd, *RpmControls, error) {
 	cmd := RpmCmd{
 		Collector: conf.NewRelicHost,
 	}
@@ -257,45 +266,59 @@ func NewAPMClient(conf *config.Configuration, FunctionName string ) (RpmCmd, *Rp
 	cs := RpmControls{
 		License: conf.LicenseKey,
 		Client: &http.Client{
-			Timeout: 1000 * time.Second, 
+			Timeout: 1000 * time.Second,
 		},
 		GzipWriterPool: &sync.Pool{
 			New: func() interface{} {
-				return gzip.NewWriter(io.Discard)
+				w, _ := gzip.NewWriterLevel(io.Discard, gzip.BestSpeed)
+				return w
 			},
 		},
 		FunctionName: FunctionName,
 	}
 	if conf.PreconnectEnabled {
 		// Perform Preconnect before sending cmd
-		redirectHost := apmPreConnect(cmd, &cs)
+		redirectHost, err := apmPreConnect(cmd, &cs)
+		if err != nil {
+			return RpmCmd{}, nil, fmt.Errorf("preconnect failed: %w", err)
+		}
 		cmd.Collector = redirectHost
 	}
-	apmConnect(cmd, &cs)
+	_, _, err := apmConnect(cmd, &cs)
+	if err != nil {
+		return RpmCmd{}, nil, fmt.Errorf("connect failed: %w", err)
+	}
+	// Close the channel to signal that the connect process is done
 	close(ConnectDone)
-	return cmd, &cs
+
+	return cmd, &cs, nil
 }
 
-func apmPreConnect(apmCmd RpmCmd, apmControls *RpmControls) string {
+func apmPreConnect(apmCmd RpmCmd, apmControls *RpmControls) (string, error) {
 	// PRE-CONNECT
 	apmCmd.Name = cmdPreconnect
 	startTime := time.Now()
-	redirect_host := PreConnect(apmCmd, apmControls)
-	fmt.Printf("Redirect Host: %s\n", redirect_host)
-	endTime := time.Now()
-	duration := endTime.Sub(startTime)
+	redirectHost, err := PreConnect(apmCmd, apmControls)
+	if err != nil {
+		return "", fmt.Errorf("pre-connect failed: %w", err)
+	}
+	duration := time.Since(startTime)
+	fmt.Printf("Redirect Host: %s\n", redirectHost)
 	fmt.Printf("Pre-Connect Cycle duration: %s\n", duration)
-	return redirect_host
+	return redirectHost, nil
 }
 
-func apmConnect(apmCmd RpmCmd, apmControls *RpmControls) {
+func apmConnect(apmCmd RpmCmd, apmControls *RpmControls) (string, string, error) {
 	// CONNECT
 	apmCmd.Name = cmdConnect
 	startTime := time.Now()
-	run_id, entity_guid := Connect(apmCmd, apmControls)
-	fmt.Printf("Run ID: %s\n", run_id)
-	fmt.Printf("Entity GUID: %s\n", entity_guid)
-	endTime := time.Now()
-	duration := endTime.Sub(startTime)
+	runID, entityGUID, err := Connect(apmCmd, apmControls)
+	if err != nil {
+		return "", "", fmt.Errorf("connect failed: %w", err)
+	}
+	duration := time.Since(startTime)
+	fmt.Printf("Run ID: %s\n", runID)
+	fmt.Printf("Entity GUID: %s\n", entityGUID)
 	fmt.Printf("Connect Cycle duration: %s\n", duration)
+	return runID, entityGUID, nil
 }

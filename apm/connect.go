@@ -1,6 +1,7 @@
 package apm
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -15,36 +16,37 @@ import (
 	"github.com/newrelic/newrelic-lambda-extension/util"
 )
 
+type telemetryType struct {
+	Data     []interface{}
+	DataType string
+}
 type PreconnectReply struct {
-	Collector        string           `json:"redirect_host"`
+	Collector string `json:"redirect_host"`
 }
 
 func UnmarshalPreConnectReply(body []byte) (*PreconnectReply, error) {
 	var preconnect struct {
-		Preconnect PreconnectReply `json:"return_value"`
+		ReturnValue PreconnectReply `json:"return_value"`
 	}
-	err := json.Unmarshal(body, &preconnect)
-	if nil != err {
-		return nil, fmt.Errorf("unable to parse pre-connect reply: %v", err)
+	if err := json.Unmarshal(body, &preconnect); err != nil {
+		return nil, fmt.Errorf("unable to parse pre-connect reply: %w", err)
 	}
-	return &preconnect.Preconnect, nil
+	return &preconnect.ReturnValue, nil
 }
 
 type ConnectReply struct {
-	RunID                 string        `json:"agent_run_id"`
-	EntityGUID            string            `json:"entity_guid"`
+	RunID      string `json:"agent_run_id"`
+	EntityGUID string `json:"entity_guid"`
 }
-
 
 func UnmarshalConnectReply(body []byte) (*ConnectReply, error) {
 	var reply struct {
-		Reply *ConnectReply `json:"return_value"`
+		ReturnValue *ConnectReply `json:"return_value"`
 	}
-	err := json.Unmarshal(body, &reply)
-	if nil != err {
-		return nil, fmt.Errorf("unable to parse connect reply: %v", err)
+	if err := json.Unmarshal(body, &reply); err != nil {
+		return nil, fmt.Errorf("unable to parse connect reply: %w", err)
 	}
-	return reply.Reply, nil
+	return reply.ReturnValue, nil
 }
 
 type preconnectRequest struct {
@@ -52,89 +54,277 @@ type preconnectRequest struct {
 	HighSecurity          bool   `json:"high_security"`
 }
 
-func PreConnect(cmd RpmCmd, cs *RpmControls) string{
-	preconnectData, _ := json.Marshal([]preconnectRequest{{
+func PreConnect(cmd RpmCmd, cs *RpmControls) (string, error) {
+	//Prepare preconnect data
+	preconnectData := []preconnectRequest{{
 		SecurityPoliciesToken: "",
 		HighSecurity:          false,
-	}})
-	cmd.Data = preconnectData
+	}}
+	marshaledData, err := json.Marshal(preconnectData)
+
+	if err != nil {
+		return "", fmt.Errorf("failed to marshal preconnect data: %w", err)
+	}
+	// Set the command's data and name
+	cmd.Data = marshaledData
 	cmd.Name = cmdPreconnect
+
 	resp := CollectorRequest(cmd, cs)
-	body, _ := io.ReadAll(resp.GetBody())
-	preConnectReponse, _:= UnmarshalPreConnectReply(body)
-	return preConnectReponse.Collector
+	if resp == nil {
+		return "", fmt.Errorf("no response received from CollectorRequest")
+	}
+
+	// Read the response body
+	body, err := io.ReadAll(resp.GetBody())
+	if err != nil {
+		return "", fmt.Errorf("failed to read response body: %w", err)
+	}
+	preConnectResponse, err := UnmarshalPreConnectReply(body)
+	if err != nil {
+		return "", fmt.Errorf("failed to unmarshal preconnect response: %w", err)
+	}
+	// Return the collector name from the response
+	return preConnectResponse.Collector, nil
 }
 
-func Connect(cmd RpmCmd, cs *RpmControls) (string, string) {
+func Connect(cmd RpmCmd, cs *RpmControls) (string, string, error) {
 
 	pid := os.Getpid()
-	AppName := os.Getenv("AWS_LAMBDA_FUNCTION_NAME")
+	appName := os.Getenv("AWS_LAMBDA_FUNCTION_NAME")
+	if appName == "" {
+		return "", "", fmt.Errorf("AWS_LAMBDA_FUNCTION_NAME environment variable not set")
+	}
 	data := []map[string]interface{}{
 		{
 			"pid":           pid,
 			"language":      "go",
 			"agent_version": "3.35.1",
 			"host":          "AWS Lambda",
-			"app_name":      []string{AppName},
-			"identifier":     AppName,
+			"app_name":      []string{appName},
+			"identifier":    appName,
 		},
 	}
-	cmd.Data, _ = json.Marshal(data)
-	cmd.Name = cmdConnect
-	resp := CollectorRequest(cmd, cs)
-
-	body, _ := io.ReadAll(resp.GetBody())
-	connectReponse, _:= UnmarshalConnectReply(body)
-	if connectReponse != nil  {
-		if connectReponse.EntityGUID == "" && connectReponse.RunID == "" {
-			fmt.Println("Connect Response Unsuccessful")
-			
-		}
+	marshaledData, err := json.Marshal(data)
+	if err != nil {
+		return "", "", fmt.Errorf("failed to marshal connect data: %w", err)
 	}
-	cs.SetRunId(connectReponse.RunID)
-	SetEntityGuid(connectReponse.EntityGUID)
-	return connectReponse.RunID, connectReponse.EntityGUID
+	cmd.Data = marshaledData
+	cmd.Name = cmdConnect
+
+	resp := CollectorRequest(cmd, cs)
+	if resp == nil {
+		return "", "", fmt.Errorf("no response received from CollectorRequest")
+	}
+
+	body, err := io.ReadAll(resp.GetBody())
+	if err != nil {
+		return "", "", fmt.Errorf("failed to read response body: %w", err)
+	}
+	connectResponse, err := UnmarshalConnectReply(body)
+	if err != nil {
+		return "", "", fmt.Errorf("failed to unmarshal connect response: %w", err)
+	}
+
+	if connectResponse == nil || (connectResponse.EntityGUID == "" && connectResponse.RunID == "") {
+		return "", "", fmt.Errorf("connect response unsuccessful: missing required fields")
+	}
+
+	cs.SetRunId(connectResponse.RunID)
+	SetEntityGuid(connectResponse.EntityGUID)
+
+	return connectResponse.RunID, connectResponse.EntityGUID, nil
 
 }
 
 // Function to send data based on the type specified
-func sendAPMTelemetryInternal(data []interface{}, dataType string, wg *sync.WaitGroup, run_id string, cmd RpmCmd, cs *RpmControls) {
-	defer wg.Done()
-	if len(data) > 0 {
-		startTimeMetric := time.Now()
-		updatedData := ProcessData(data, run_id)
-		finalData, _ := json.Marshal(updatedData)
-		cmd.Name = dataType
-		cmd.Data = finalData
-		cmd.RunID = run_id
-		rpmResponse := CollectorRequest(cmd, cs)
-
-		fmt.Printf("Status Code %v telemetry: %d\n", dataType, rpmResponse.GetStatusCode())
-		endTimeMetric := time.Now()
-		durationMetric := endTimeMetric.Sub(startTimeMetric)
-		fmt.Printf("Send %v duration: %s\n", dataType, durationMetric)
+func sendAPMTelemetryInternal(data []interface{}, dataType string, wg *sync.WaitGroup, runID string, cmd RpmCmd, cs *RpmControls) error {
+	if len(data) == 0 {
+		return nil
 	}
+	wg.Add(1)
+	defer func() {
+		if r := recover(); r != nil {
+			log.Printf("Recovered from panic in sendAPMTelemetryInternal: %v", r)
+		}
+		wg.Done()
+	}()
+
+	startTimeMetric := time.Now()
+	updatedData := ProcessData(data, runID)
+
+	var buf bytes.Buffer
+	enc := json.NewEncoder(&buf)
+	if err := enc.Encode(updatedData); err != nil {
+		util.Logf("Error encoding data for %s: %v", dataType, err)
+		return err
+	}
+
+	cmd.Name = dataType
+	cmd.Data = buf.Bytes()
+	cmd.RunID = runID
+
+	rpmResponse := CollectorRequest(cmd, cs)
+
+	if rpmResponse == nil {
+		log.Printf("No response received for %s telemetry", dataType)
+		return fmt.Errorf("no response received for telemetry")
+	}
+
+	statusCode := rpmResponse.GetStatusCode()
+	util.Debugf("Status Code for %s telemetry: %d", dataType, statusCode)
+	if err := rpmResponse.GetError(); err != nil {
+		util.Logf("Error in telemetry response for %s: %v", dataType, err)
+		return err
+	}
+
+	durationMetric := time.Since(startTimeMetric)
+	fmt.Printf("Send %v duration: %s\n", dataType, durationMetric)
+
+	return nil
 }
 
 func SendAPMTelemetry(ctx context.Context, invokedFunctionARN string, payload []byte, conf *config.Configuration, cmd RpmCmd, cs *RpmControls) (error, int) {
 	util.Debugf("Send APM Telemetry: sending telemetry to New Relic...")
-	
-	run_id := cs.GetRunId()
-	
-	data, err := GetServerlessData(payload)
+
+	runID := cs.GetRunId()
+
+	// Decode and decompress payload
+	datav1, datav2, pv, err := GetServerlessData(payload)
 	if err != nil {
-		log.Fatalf("failed to decode and decompress: %v", err)
+		return fmt.Errorf("failed to decode and decompress: %w", err), 0
 	}
-	if reflect.DeepEqual(data, LambdaRawData{}) {
-		util.Debugf("SendTelemetry: no telemetry data found in payload")
-		return nil, 1
+
+	// Extract telemetry data based on protocol version
+	telemetryData, err := extractTelemetryData(datav1, datav2, pv)
+	if err != nil {
+		return err, 0
 	}
+
+	return sendTelemetryData(ctx, telemetryData, runID, cmd, cs)
+}
+func extractTelemetryData(datav1 LambdaRawData, datav2 LambdaData, pv int) (struct {
+	MetricData     []interface{}
+	SpanEventData  []interface{}
+	ErrorData      []interface{}
+	ErrorEventData []interface{}
+}, error) {
+	var telemetryData struct {
+		MetricData     []interface{}
+		SpanEventData  []interface{}
+		ErrorData      []interface{}
+		ErrorEventData []interface{}
+	}
+
+	switch pv {
+	case 2:
+		if reflect.DeepEqual(datav2, LambdaData{}) {
+			util.Debugf("SendTelemetry: no telemetry data found in payload")
+			return telemetryData, nil
+		}
+		telemetryData = struct {
+			MetricData     []interface{}
+			SpanEventData  []interface{}
+			ErrorData      []interface{}
+			ErrorEventData []interface{}
+		}{
+			MetricData:     datav2.MetricData,
+			SpanEventData:  datav2.SpanEventData,
+			ErrorData:      datav2.ErrorData,
+			ErrorEventData: datav2.ErrorEventData,
+		}
+	default: // Assuming default case is for v1 data
+		if reflect.DeepEqual(datav1, LambdaRawData{}) {
+			util.Debugf("SendTelemetry: no telemetry data found in payload")
+			return telemetryData, nil
+		}
+		telemetryData = struct {
+			MetricData     []interface{}
+			SpanEventData  []interface{}
+			ErrorData      []interface{}
+			ErrorEventData []interface{}
+		}{
+			MetricData:     datav1.LambdaData.MetricData,
+			SpanEventData:  datav1.LambdaData.SpanEventData,
+			ErrorData:      datav1.LambdaData.ErrorData,
+			ErrorEventData: datav1.LambdaData.ErrorEventData,
+		}
+	}
+
+	return telemetryData, nil
+}
+func sendTelemetryData(ctx context.Context, data struct {
+	MetricData     []interface{}
+	SpanEventData  []interface{}
+	ErrorData      []interface{}
+	ErrorEventData []interface{}
+}, runID string, cmd RpmCmd, cs *RpmControls) (error, int) {
+	// Define telemetry tasks
+	telemetryTasks := []telemetryType{
+		{data.MetricData, CmdMetrics},
+		{data.SpanEventData, CmdSpanEvents},
+		{data.ErrorData, CmdErrorData},
+		{data.ErrorEventData, CmdErrorEvents},
+	}
+
 	var wg sync.WaitGroup
-	wg.Add(4)
-	go sendAPMTelemetryInternal(data.LambdaData.MetricData, CmdMetrics, &wg, run_id, cmd, cs)
-	go sendAPMTelemetryInternal(data.LambdaData.SpanEventData, CmdSpanEvents, &wg, run_id, cmd, cs)
-	go sendAPMTelemetryInternal(data.LambdaData.ErrorData, CmdErrorData, &wg, run_id, cmd, cs)
-	go sendAPMTelemetryInternal(data.LambdaData.ErrorEventData, CmdErrorEvents, &wg, run_id, cmd, cs)
-	wg.Wait()
+	errChan := make(chan error, len(telemetryTasks))
+
+	for _, task := range telemetryTasks {
+		sendSingleTelemetry(task, &wg, errChan, runID, cmd, cs)
+	}
+
+	// Wait for goroutines or context cancellation
+	done := make(chan struct{})
+	go func() {
+		wg.Wait()
+		close(done)
+	}()
+
+	select {
+	case <-ctx.Done():
+		return fmt.Errorf("operation canceled: %w", ctx.Err()), 0
+	case <-done:
+	}
+
+	close(errChan)
+
+	// Aggregate errors
+	return aggregateErrors(errChan)
+}
+func sendSingleTelemetry(task telemetryType, wg *sync.WaitGroup, errChan chan<- error, runID string, cmd RpmCmd, cs *RpmControls) {
+	if len(task.Data) == 0 {
+		util.Debugf("No %s telemetry to send", task.DataType)
+		return
+	}
+	wg.Add(1)
+	go func() {
+		defer func() {
+			if r := recover(); r != nil {
+				log.Printf("Recovered from panic in sendAPMTelemetryInternal for %s: %v", task.DataType, r)
+			}
+			wg.Done()
+		}()
+
+		if err := sendAPMTelemetryInternal(task.Data, task.DataType, wg, runID, cmd, cs); err != nil {
+			errChan <- fmt.Errorf("error sending %s telemetry: %w", task.DataType, err)
+		}
+	}()
+}
+
+func aggregateErrors(errChan <-chan error) (error, int) {
+	var combinedErr error
+	for err := range errChan {
+		if combinedErr == nil {
+			combinedErr = err
+		} else {
+			combinedErr = fmt.Errorf("%v; %w", combinedErr, err)
+		}
+	}
+
+	if combinedErr != nil {
+		return combinedErr, 0
+	}
+
+	log.Print("SendAPMTelemetry: completed sending telemetry to New Relic")
 	return nil, 1
 }

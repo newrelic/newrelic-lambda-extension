@@ -18,40 +18,47 @@ const (
 	MetricEndpointUS string = "https://metric-api.newrelic.com/metric/v1"
 )
 
+// Precompile regex patterns at package level for reusability
+var (
+	basicRe    = regexp.MustCompile(`RequestId: (\S+)\s+Duration: ([\d.]+) ms\s+Billed Duration: (\d+) ms\s+Memory Size: (\d+) MB\s+Max Memory Used: (\d+) MB`)
+	initRe     = regexp.MustCompile(`Init Duration: ([\d.]+) ms`)
+	faultLogRe = regexp.MustCompile(`RequestId: (\S+)\s+Status: (\S+)(?:\s+ErrorType: (\S+))?`)
+)
+
 type Metric struct {
 	Name       string            `json:"name"`
 	Type       string            `json:"type"`
-	Value      float64          `json:"value"`
-	Timestamp  int64            `json:"timestamp"`
+	Value      float64           `json:"value"`
+	Timestamp  int64             `json:"timestamp"`
 	Attributes map[string]string `json:"attributes"`
-	Interval   int64            `json:"interval.ms,omitempty"`
+	Interval   int64             `json:"interval.ms,omitempty"`
 }
 type MetricPayload struct {
 	Metrics []Metric `json:"metrics"`
 }
 type LambdaMetrics struct {
 	RequestID      string
-	Duration      float64
+	Duration       float64
 	BilledDuration float64
 	MemorySize     int64
 	MaxMemoryUsed  int64
-	InitDuration   *float64 
-	Error 		string
-	ErrorType	string
+	InitDuration   *float64
+	Error          string
+	ErrorType      string
 }
 
 func ParseLambdaFaultLog(logLine string) (*LambdaMetrics, error) {
-	logPattern := `RequestId: (\S+)\s+Status: (\S+)(?:\s+ErrorType: (\S+))?`
-	logRe := regexp.MustCompile(logPattern)
-
-	matches := logRe.FindStringSubmatch(logLine)
+	matches := faultLogRe.FindStringSubmatch(logLine)
 	if matches == nil {
 		return nil, fmt.Errorf("error parsing log line: %s", logLine)
 	}
+
 	metrics := &LambdaMetrics{
 		RequestID: matches[1],
-		Error: matches[2],
+		Error:     matches[2], // Status field repurposed as Error
 	}
+
+	// Check for optional ErrorType (index 3)
 	if len(matches) > 3 && matches[3] != "" {
 		metrics.ErrorType = matches[3]
 	}
@@ -60,13 +67,12 @@ func ParseLambdaFaultLog(logLine string) (*LambdaMetrics, error) {
 }
 
 func ParseLambdaReportLog(logLine string) (*LambdaMetrics, error) {
-	basicPattern := `RequestId: (\S+)\s+Duration: ([\d.]+) ms\s+Billed Duration: (\d+) ms\s+Memory Size: (\d+) MB\s+Max Memory Used: (\d+) MB`
-	initPattern := `Init Duration: ([\d.]+) ms`
-	basicRe := regexp.MustCompile(basicPattern)
 	basicMatches := basicRe.FindStringSubmatch(logLine)
 	if basicMatches == nil {
-		return ParseLambdaFaultLog(logLine)
+		return ParseLambdaFaultLog(logLine) // Delegate to fault handler
 	}
+
+	// Parse fields directly from matches
 	duration, err := strconv.ParseFloat(basicMatches[2], 64)
 	if err != nil {
 		return nil, fmt.Errorf("error parsing duration: %v", err)
@@ -83,37 +89,35 @@ func ParseLambdaReportLog(logLine string) (*LambdaMetrics, error) {
 	if err != nil {
 		return nil, fmt.Errorf("error parsing max memory used: %v", err)
 	}
+
 	metrics := &LambdaMetrics{
 		RequestID:      basicMatches[1],
-		Duration:      duration,
+		Duration:       duration,
 		BilledDuration: float64(billedDuration),
 		MemorySize:     memorySize,
 		MaxMemoryUsed:  maxMemoryUsed,
-		InitDuration:   nil, 
+		InitDuration:   nil,
 	}
-	// Check for init duration if present
-	initRe := regexp.MustCompile(initPattern)
-	initMatches := initRe.FindStringSubmatch(logLine)
-	if initMatches != nil {
-		initDuration, err := strconv.ParseFloat(initMatches[1], 64)
-		if err == nil { 
+	// Parse optional init duration
+	if initMatches := initRe.FindStringSubmatch(logLine); initMatches != nil {
+		if initDuration, err := strconv.ParseFloat(initMatches[1], 64); err == nil {
 			metrics.InitDuration = &initDuration
 		}
 	}
+
 	return metrics, nil
 }
-
 
 func (lm *LambdaMetrics) ConvertToMetrics(prefix string, entityGuid string, functionName string) []Metric {
 	timestamp := util.Timestamp()
 	attributes := map[string]string{
 		"aws.requestId": lm.RequestID,
-		"entity.guid": entityGuid,
-		"entity.name": functionName,
-		"entity.type": "APM",
-		
+		"entity.guid":   entityGuid,
+		"entity.name":   functionName,
+		"entity.type":   "APM",
 	}
-	metrics := []Metric{}
+	// Preallocate slice with estimated capacity to reduce reallocations
+	metrics := make([]Metric, 0, 6) // Max possible metrics: 6 (duration, billed, memory, max memory, init, error)
 	if lm.Duration != 0 {
 		metrics = append(metrics, Metric{
 			Name:       prefix + ".duration",
@@ -171,7 +175,7 @@ func (lm *LambdaMetrics) ConvertToMetrics(prefix string, entityGuid string, func
 			Name:       prefix + ".error",
 			Type:       "count",
 			Value:      1,
-			Interval:  10000,
+			Interval:   10000,
 			Timestamp:  timestamp,
 			Attributes: attributes,
 		})

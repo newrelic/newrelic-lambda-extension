@@ -28,7 +28,7 @@ var (
 	lastEventStart     time.Time
 	lastRequestId      string
 	rootCtx            context.Context
-	LambadFunctionName string
+	LambdaFunctionName string
 	LambdaAccountId    string
 	LambdaFunctionVersion string
 )
@@ -78,7 +78,7 @@ func main() {
 	}
 
 	invocationClient, registrationResponse, err := registrationClient.Register(ctx, regReq)
-	LambadFunctionName = registrationResponse.FunctionName
+	LambdaFunctionName = registrationResponse.FunctionName
 	LambdaAccountId = registrationResponse.AccountId
 	LambdaFunctionVersion = registrationResponse.FunctionVersion
 	if err != nil {
@@ -301,7 +301,6 @@ func mainLoop(ctx context.Context, invocationClient *client.InvocationClient, ba
 						batch.AddTelemetry(lastRequestId, []byte(timeoutMessage))
 
 					} else if event.ShutdownReason == api.Failure && lastRequestId != "" {
-						// TODO: For APM this needs to be converted to error_event_data
 						// Synthesize a generic platform error. Probably an OOM, though it could be any runtime crash.
 						errorMessage := fmt.Sprintf("RequestId: %s AWS Lambda platform fault caused a shutdown", lastRequestId)
 						batch.AddTelemetry(lastRequestId, []byte(errorMessage))

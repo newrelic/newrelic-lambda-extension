@@ -221,7 +221,10 @@ func mainLoop(ctx context.Context, invocationClient *client.InvocationClient, ba
 			event, err := invocationClient.NextEvent(ctx)
 			if conf.APMLambdaMode {
 				apm.Once.Do(func() {
-					apmCmd, apmControls = apm.NewAPMClient(conf, LambadFunctionName)
+					apmCmd, apmControls, err = apm.NewAPMClient(conf, LambdaFunctionName)
+					if err != nil {
+						util.Logln("mainLoop: failed to initialize APM client:", err)
+					}
 				})
 			}
 			// We've thawed.
@@ -375,7 +378,7 @@ func pollLogAPMServer(logServer *logserver.LogServer, conf *config.Configuration
 	entityGuid := apm.GetEntityGuid()
 	for _, platformLog := range logServer.PollPlatformChannel() {
 		lambdaMetrics, _ := apm.ParseLambdaReportLog(string(platformLog.Content))
-		metrics := lambdaMetrics.ConvertToMetrics("apm.lambda.transaction", entityGuid, LambadFunctionName)
+		metrics := lambdaMetrics.ConvertToMetrics("apm.lambda.transaction", entityGuid, LambdaFunctionName)
 		statusCode, responseBody, err := apm.SendMetrics(conf.LicenseKey, metrics, true)
 		if err != nil {
 			util.Logf("Error sending metric: %v", err)

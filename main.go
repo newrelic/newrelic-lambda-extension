@@ -272,7 +272,7 @@ func mainLoop(ctx context.Context, invocationClient *client.InvocationClient, ba
 																			fmt.Sprintf("%f", timeoutSecs), 
 																			lastRequestId, 
 																			errorMessage,
-																			LambadFunctionName, 
+																			LambdaFunctionName, 
 																			LambdaAccountId, 
 																			LambdaFunctionVersion})
 					} else if event.ShutdownReason == api.Failure {
@@ -282,7 +282,7 @@ func mainLoop(ctx context.Context, invocationClient *client.InvocationClient, ba
 																			fmt.Sprintf("%f", timeoutSecs), 
 																			lastRequestId, 
 																			errorMessage,
-																			LambadFunctionName, 
+																			LambdaFunctionName, 
 																			LambdaAccountId, 
 																			LambdaFunctionVersion})
 					}

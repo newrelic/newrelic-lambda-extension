@@ -29,6 +29,8 @@ var (
 	lastRequestId      string
 	rootCtx            context.Context
 	LambdaFunctionName string
+	LambdaAccountId    string
+	LambdaFunctionVersion string
 )
 
 func init() {
@@ -77,6 +79,8 @@ func main() {
 
 	invocationClient, registrationResponse, err := registrationClient.Register(ctx, regReq)
 	LambdaFunctionName = registrationResponse.FunctionName
+	LambdaAccountId = registrationResponse.AccountId
+	LambdaFunctionVersion = registrationResponse.FunctionVersion
 	if err != nil {
 		util.Panic(err)
 	}
@@ -257,22 +261,46 @@ func mainLoop(ctx context.Context, invocationClient *client.InvocationClient, ba
 			}
 
 			if event.EventType == api.Shutdown {
-				if event.ShutdownReason == api.Timeout && lastRequestId != "" {
-					// Synthesize the timeout error message that the platform produces, and LLC parses
-					timestamp := eventStart.UTC()
-					timeoutSecs := eventStart.Sub(lastEventStart).Seconds()
-					timeoutMessage := fmt.Sprintf(
-						"%s %s Task timed out after %.2f seconds",
-						timestamp.Format(time.RFC3339),
-						lastRequestId,
-						timeoutSecs,
-					)
-					if !conf.APMLambdaMode {
-						batch.AddTelemetry(lastRequestId, []byte(timeoutMessage))
+				if conf.APMLambdaMode {
+					if event.ShutdownReason == api.Timeout {
+						timeoutSecs := eventStart.Sub(lastEventStart).Seconds()
+						errorMessage := fmt.Sprintf(
+							"Task timed out after %.2f seconds",
+							timeoutSecs,
+						)
+						apm.SendErrorEvent(apmCmd, apmControls, []interface{}{"Lambda.Timedout", 
+																			fmt.Sprintf("%f", timeoutSecs), 
+																			lastRequestId, 
+																			errorMessage,
+																			LambdaFunctionName, 
+																			LambdaAccountId, 
+																			LambdaFunctionVersion})
+					} else if event.ShutdownReason == api.Failure {
+						errorMessage := fmt.Sprintf("RequestId: %s AWS Lambda platform fault caused a shutdown", lastRequestId)
+						timeoutSecs := eventStart.Sub(lastEventStart).Seconds()
+						apm.SendErrorEvent(apmCmd, apmControls, []interface{}{"Lambda.PlatformFault", 
+																			fmt.Sprintf("%f", timeoutSecs), 
+																			lastRequestId, 
+																			errorMessage,
+																			LambdaFunctionName, 
+																			LambdaAccountId, 
+																			LambdaFunctionVersion})
 					}
-				} else if event.ShutdownReason == api.Failure && lastRequestId != "" {
-					// TODO: For APM this needs to be converted to error_event_data
-					if !conf.APMLambdaMode {
+				} else {
+					if event.ShutdownReason == api.Timeout && lastRequestId != "" {
+						// Synthesize the timeout error message that the platform produces, and LLC parses
+						timestamp := eventStart.UTC()
+						timeoutSecs := eventStart.Sub(lastEventStart).Seconds()
+						timeoutMessage := fmt.Sprintf(
+							"%s %s Task timed out after %.2f seconds",
+							timestamp.Format(time.RFC3339),
+							lastRequestId,
+							timeoutSecs,
+						)
+
+						batch.AddTelemetry(lastRequestId, []byte(timeoutMessage))
+
+					} else if event.ShutdownReason == api.Failure && lastRequestId != "" {
 						// Synthesize a generic platform error. Probably an OOM, though it could be any runtime crash.
 						errorMessage := fmt.Sprintf("RequestId: %s AWS Lambda platform fault caused a shutdown", lastRequestId)
 						batch.AddTelemetry(lastRequestId, []byte(errorMessage))

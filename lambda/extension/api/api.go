@@ -60,6 +60,7 @@ type RegistrationResponse struct {
 	FunctionName    string `json:"functionName"`
 	FunctionVersion string `json:"functionVersion"`
 	Handler         string `json:"handler"`
+	AccountId 		string `json:"accountId"`
 }
 
 type LogSubscription struct {

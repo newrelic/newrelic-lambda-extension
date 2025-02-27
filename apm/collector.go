@@ -31,7 +31,7 @@ const (
 	cmdPreconnect   = "preconnect"
 	cmdConnect      = "connect"
 	CmdMetrics      = "metric_data"
-	cmdCustomEvents = "custom_event_data"
+	CmdCustomEvents = "custom_event_data"
 	cmdLogEvents    = "log_event_data"
 	cmdTxnEvents    = "analytic_event_data"
 	CmdErrorEvents  = "error_event_data"

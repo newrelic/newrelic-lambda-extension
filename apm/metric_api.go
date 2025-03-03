@@ -184,7 +184,7 @@ func (lm *LambdaMetrics) ConvertToMetrics(prefix string, entityGuid string, func
 	return metrics
 }
 
-func getInfraEndpointURL(licenseKey string, metricEndpointOverride string) string {
+func getMetricEndpointURL(licenseKey string, metricEndpointOverride string) string {
 	if metricEndpointOverride != "" {
 		return metricEndpointOverride
 	}
@@ -206,7 +206,7 @@ func SendMetrics(apiKey string, metricEndpointOverride string, metrics []Metric,
 	if err != nil {
 		return 0, "", fmt.Errorf("error marshaling JSON: %v", err)
 	}
-	metricEndpoint := getInfraEndpointURL(apiKey, metricEndpointOverride)
+	metricEndpoint := getMetricEndpointURL(apiKey, metricEndpointOverride)
 	req, err := http.NewRequest("POST", metricEndpoint, bytes.NewBuffer(jsonData))
 	if err != nil {
 		return 0, "", fmt.Errorf("error creating request: %v", err)

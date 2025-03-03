@@ -33,6 +33,7 @@ type Configuration struct {
 	LicenseKeySSMParameterName string
 	NRHandler                  string
 	TelemetryEndpoint          string
+	MetricEndpoint 		       string
 	LogEndpoint                string
 	LogLevel                   string
 	LogServerHost              string
@@ -96,6 +97,8 @@ func ConfigurationFromEnvironment() *Configuration {
 	collectTraceIDStr, collectTraceIDOverride := os.LookupEnv("NEW_RELIC_COLLECT_TRACE_ID")
 	nrHostStr, nrHostOverride := os.LookupEnv("NEW_RELIC_HOST")
 	nrAPMModeStr, nrAPMModeOverride := os.LookupEnv("NEW_RELIC_APM_LAMBDA_MODE")
+	metricEndpoint, meOverride := os.LookupEnv("NEW_RELIC_METRIC_ENDPOINT")
+
 
 	extensionEnabled := true
 	if nrEnabledOverride {
@@ -151,6 +154,10 @@ func ConfigurationFromEnvironment() *Configuration {
 
 	if teOverride {
 		ret.TelemetryEndpoint = telemetryEndpoint
+	}
+
+	if meOverride {
+		ret.MetricEndpoint = metricEndpoint
 	}
 
 	if leOverride {

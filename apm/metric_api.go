@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"regexp"
 	"strconv"
+	"strings"
 
 	"github.com/newrelic/newrelic-lambda-extension/util"
 )
@@ -182,7 +183,20 @@ func (lm *LambdaMetrics) ConvertToMetrics(prefix string, entityGuid string, func
 	}
 	return metrics
 }
-func SendMetrics(apiKey string, metrics []Metric, skipTLSVerify bool) (int, string, error) {
+
+func getMetricEndpointURL(licenseKey string, metricEndpointOverride string) string {
+	if metricEndpointOverride != "" {
+		return metricEndpointOverride
+	}
+
+	if strings.HasPrefix(licenseKey, "eu") {
+		return MetricEndpointEU
+	}
+
+	return MetricEndpointUS
+}
+
+func SendMetrics(apiKey string, metricEndpointOverride string, metrics []Metric, skipTLSVerify bool) (int, string, error) {
 	payload := []MetricPayload{
 		{
 			Metrics: metrics,
@@ -192,7 +206,8 @@ func SendMetrics(apiKey string, metrics []Metric, skipTLSVerify bool) (int, stri
 	if err != nil {
 		return 0, "", fmt.Errorf("error marshaling JSON: %v", err)
 	}
-	req, err := http.NewRequest("POST", MetricEndpointUS, bytes.NewBuffer(jsonData))
+	metricEndpoint := getMetricEndpointURL(apiKey, metricEndpointOverride)
+	req, err := http.NewRequest("POST", metricEndpoint, bytes.NewBuffer(jsonData))
 	if err != nil {
 		return 0, "", fmt.Errorf("error creating request: %v", err)
 	}

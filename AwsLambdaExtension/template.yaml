@@ -1,0 +1,26 @@
+AWSTemplateFormatVersion: 2010-09-09
+Transform: AWS::Serverless-2016-10-31
+Description: AwsLambdaExtension
+
+Parameters:
+  NEW_RELIC_LICENSE_KEY:
+    Type: String
+    Description: Your New Relic ingest key.
+
+Resources:
+  GoTelemetryApiExtensionLayer:
+    Type: AWS::Serverless::LayerVersion
+    Metadata:
+      BuildMethod: makefile
+    Properties:
+      LayerName: AwsLambdaExtension
+      ContentUri: .
+      LicenseInfo: MIT-0
+      RetentionPolicy: Delete
+
+      Environment:
+        Variables:
+          DISPATCH_MIN_BATCH_SIZE: 10
+          DEBUG_LOGGING_ENABLED: True
+          LOGGING_ENABLED: True
+          NEW_RELIC_LICENSE_KEY: !Sub ${NEW_RELIC_LICENSE_KEY}

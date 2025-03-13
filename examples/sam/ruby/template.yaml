@@ -24,14 +24,26 @@ Resources:
       Environment:
         Variables:
           # For the instrumentation handler to invoke your real handler, we need this value
-          NEW_RELIC_LAMBDA_HANDLER: app.lambda_handler
+
           NEW_RELIC_ACCOUNT_ID: !Sub ${NRAccountId}
-          # NEW_RELIC_EXTENSION_SEND_FUNCTION_LOGS: true
-          # NEW_RELIC_EXTENSION_LOG_LEVEL: DEBUG
+
+          NEW_RELIC_EXTENSION_LOG_LEVEL: DEBUG
+          
+          NEW_RELIC_EXTENSION_SEND_EXTENSION_LOGS: true
+
+          NEW_RELIC_EXTENSION_SEND_FUNCTION_LOGS: true
+
+          NEW_RELIC_LAMBDA_HANDLER: app.App.lambda_handler
+
+          NEW_RELIC_LICENSE_KEY: <YOUR-LICENSE-KEY>
+
+          NEW_RELIC_LOG_ENDPOINT: <YOUR-LOG-ENDPOINT>
+
+          NEW_RELIC_TELEMETRY_ENDPOINT: <YOUR-TELEMETRY-ENDPOINT>
       Layers:
         # This layer includes the New Relic Lambda Extension, a sidecar process that sends telemetry,
         # as well as the New Relic Agent for Ruby, and a handler wrapper that makes integration easy.
-        - !Sub arn:${AWS::Partition}:lambda:${AWS::Region}:451483290750:layer:NewRelicRuby32:1
+        - !Sub arn:${AWS::Partition}:lambda:${AWS::Region}:451483290750:layer:NewRelicRuby33:11
       Policies:
         # This policy allows the lambda to know the value of the New Relic licence key. We need this so
         # that we can send telemetry back to New Relic

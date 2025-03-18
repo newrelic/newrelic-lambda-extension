@@ -97,7 +97,7 @@ func GetServerlessData(data []byte) (LambdaRawData, LambdaData, int, error) {
 	}
 
 	// Remove the square brackets
-	jsonData := strings.Trim(string(data), `[]`)
+	jsonData := strings.Trim(strings.TrimSpace(string(data)), `[]`)
 
 	// Get the encoded and compressed part; use TrimSuffix to remove any trailing characters
 	components := strings.Split(jsonData, ",")

@@ -22,18 +22,23 @@ Resources:
         - x86_64
       Environment:
         Variables:
-          # For the instrumentation handler to invoke your real handler, we need this value
+          NEW_RELIC_ACCOUNT_ID: <Your-New-Relic-Account-ID>
+
+          NEW_RELIC_EXTENSION_LOG_LEVEL: DEBUG
+
+          NEW_RELIC_EXTENSION_SEND_EXTENSION_LOGS: true
+
+          NEW_RELIC_EXTENSION_SEND_FUNCTION_LOGS: true
+
           NEW_RELIC_LAMBDA_HANDLER: app.lambdaHandler
-          NEW_RELIC_ACCOUNT_ID: !Sub ${NRAccountId}
-          # NEW_RELIC_EXTENSION_LOG_LEVEL: "DEBUG"
-          # NEW_RELIC_EXTENSION_SEND_EXTENSION_LOGS: "true"
-          # NEW_RELIC_EXTENSION_SEND_FUNCTION_LOGS: "true"
-          # NEW_RELIC_LAMBDA_EXTENSION_ENABLED: "true"
-      
+         
+          NEW_RELIC_USE_ESM: true
+          NEW_RELIC_LICENSE_KEY: <Your-New-Relic-License-Key>
+
       Layers:
         # This layer includes the New Relic Lambda Extension, a sidecar process that sends telemetry,
         # as well as the New Relic Agent for Node.js, and a handler wrapper that makes integration easy.
-        - !Sub arn:${AWS::Partition}:lambda:${AWS::Region}:451483290750:layer:NewRelicNodeJS22X:12
+        - !Sub arn:${AWS::Partition}:lambda:${AWS::Region}:451483290750:layer:NewRelicNodeJS22X:15
       Policies:
         # This policy allows the lambda to know the value of the New Relic licence key. We need this so
         # that we can send telemetry back to New Relic

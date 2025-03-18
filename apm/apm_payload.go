@@ -37,6 +37,7 @@ type LambdaRawData struct {
 
 func decodeUncompress(input string) ([]byte, error) {
 	// Decode base64 first since it's less CPU intensive
+
 	decoded, err := base64.StdEncoding.DecodeString(input)
 	if err != nil {
 		return nil, err
@@ -57,7 +58,7 @@ func decodeUncompress(input string) ([]byte, error) {
 	if err != nil {
 		return nil, fmt.Errorf("error decompressing data: %w", err)
 	}
-	
+
 	// Append to buf to avoid creating a new slice
 	buf = append(buf, uncompressed...)
 
@@ -94,8 +95,9 @@ func GetServerlessData(data []byte) (LambdaRawData, LambdaData, int, error) {
 	if len(data) == 0 || data[0] != '[' {
 		return LambdaRawData{}, LambdaData{}, 0, nil
 	}
+
 	// Remove the square brackets
-	jsonData := strings.Trim(string(data), "[]")
+	jsonData := strings.Trim(string(data), `[]`)
 
 	// Get the encoded and compressed part; use TrimSuffix to remove any trailing characters
 	components := strings.Split(jsonData, ",")
@@ -103,9 +105,9 @@ func GetServerlessData(data []byte) (LambdaRawData, LambdaData, int, error) {
 		return LambdaRawData{}, LambdaData{}, 0, fmt.Errorf("insufficient data components")
 	}
 
-	protocolVersion := strings.TrimSpace(string(components[0]))
+	protocolVersion := string(components[0])
 
-	encodedPart := strings.Trim(components[len(components)-1], "\"")
+	encodedPart := strings.Trim(components[len(components)-1], `"`)
 
 	// Decode and decompress the data encoded data
 	uncompressedJSON, err := decodeUncompress(encodedPart)

@@ -456,6 +456,15 @@ func TestGetTrueHandler(t *testing.T) {
 			nrHandler:       "src/index.handler",
 			expected:        "src/index.handler",
 		},
+		{
+			name:            "Docker environment file exists",
+			testingOverride: false,
+			envVars: map[string]string{
+				"AWS_EXECUTION_ENV": "Docker",
+			},
+			handlerName: "index.handler",
+			expected:    "index.handler",
+		},
 	}
 
 	for _, tt := range tests {
@@ -484,10 +493,4 @@ func TestGetTrueHandler(t *testing.T) {
 			assert.Equal(t, tt.expected, result)
 		})
 	}
-}
-func determineBaseDir() string {
-
-	tempDir := os.TempDir()
-
-	return tempDir
 }

@@ -221,7 +221,7 @@ func mainLoop(ctx context.Context, invocationClient *client.InvocationClient, ba
 			event, err := invocationClient.NextEvent(ctx)
 			if conf.APMLambdaMode {
 				apm.Once.Do(func() {
-					apmCmd, apmControls, err = apm.NewAPMClient(conf, LambdaFunctionName)
+					apmCmd, apmControls, err = apm.NewAPMClient(conf, LambdaFunctionName, LambdaAccountId, LambdaFunctionVersion)
 					if err != nil {
 						util.Logln("mainLoop: failed to initialize APM client:", err)
 					}

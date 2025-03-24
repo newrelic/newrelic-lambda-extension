@@ -48,6 +48,7 @@ type RpmCmd struct {
 	Data              []byte
 	RequestHeadersMap map[string]string
 	MaxPayloadSize    int
+	metaData          map[string]interface{}
 }
 
 type RpmControls struct {
@@ -258,9 +259,14 @@ func ProcessData(data []interface{}, runId string) []interface{} {
 	return data
 }
 
-func NewAPMClient(conf *config.Configuration, FunctionName string) (RpmCmd, *RpmControls, error) {
+func NewAPMClient(conf *config.Configuration, awsFunctionName string, awsAccountId string, awsFunctionVersion string) (RpmCmd, *RpmControls, error) {
 	cmd := RpmCmd{
 		Collector: conf.NewRelicHost,
+		metaData: map[string]interface{}{
+			"AWSFunctionName": awsFunctionName,
+			"AWSAccountId": awsAccountId,
+			"AWSFunctionVersion": awsFunctionVersion,
+		},
 	}
 
 	cs := RpmControls{
@@ -274,7 +280,7 @@ func NewAPMClient(conf *config.Configuration, FunctionName string) (RpmCmd, *Rpm
 				return w
 			},
 		},
-		FunctionName: FunctionName,
+		FunctionName: awsFunctionName,
 	}
 	if conf.PreconnectEnabled {
 		// Perform Preconnect before sending cmd

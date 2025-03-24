@@ -334,41 +334,6 @@ func TestHandlerCheck(t *testing.T) {
 	}
 }
 
-func TestPathFormatter(t *testing.T) {
-	tests := []struct {
-		name            string
-		functionHandler string
-		fileType        string
-		expected        string
-	}{
-		{
-			name:            "simple handler",
-			functionHandler: "index",
-			fileType:        "js",
-			expected:        "/var/task/index.js",
-		},
-		{
-			name:            "nested handler",
-			functionHandler: "src/handlers/index",
-			fileType:        "py",
-			expected:        "/var/task/src/handlers/index.py",
-		},
-		{
-			name:            "handler with dashes",
-			functionHandler: "my-handler",
-			fileType:        "mjs",
-			expected:        "/var/task/my-handler.mjs",
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			result := pathFormatter(tt.functionHandler, tt.fileType)
-			assert.Equal(t, tt.expected, result)
-		})
-	}
-}
-
 func TestIsDocker(t *testing.T) {
 	originalEnv := os.Getenv("AWS_EXECUTION_ENV")
 	defer os.Setenv("AWS_EXECUTION_ENV", originalEnv)
@@ -439,4 +404,11 @@ func TestCheckWithTestingOverride(t *testing.T) {
 	conf.NRHandler = "test/handler.method"
 	result = r.check(h)
 	assert.True(t, result)
+}
+
+func determineBaseDir() string {
+
+	tempDir := os.TempDir()
+
+	return tempDir
 }

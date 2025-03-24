@@ -405,7 +405,86 @@ func TestCheckWithTestingOverride(t *testing.T) {
 	result = r.check(h)
 	assert.True(t, result)
 }
+func TestGetTrueHandler(t *testing.T) {
+	tests := []struct {
+		name            string
+		testingOverride bool
+		envVars         map[string]string
+		handlerName     string
+		wrapperName     string
+		nrHandler       string
+		expected        string
+	}{
+		{
+			name:            "Testing override true",
+			testingOverride: true,
+			handlerName:     "index.handler",
+			wrapperName:     "newrelic-lambda-wrapper",
+			nrHandler:       "index.handler",
+			expected:        "index.handler",
+		},
+		{
+			name:            "ESM enabled",
+			testingOverride: false,
+			envVars: map[string]string{
+				"NEW_RELIC_USE_ESM": "true",
+			},
+			handlerName: "index.handler",
+			expected:    "index.handler",
+		},
+		{
+			name:            "Docker environment",
+			testingOverride: false,
+			envVars: map[string]string{
+				"AWS_EXECUTION_ENV": "Docker",
+			},
+			handlerName: "index.handler",
+			expected:    "index.handler",
+		},
+		{
+			name:            "Handler not set to wrapper",
+			testingOverride: false,
+			handlerName:     "index.handler",
+			wrapperName:     "newrelic-lambda-wrapper",
+			expected:        "index.handler",
+		},
+		{
+			name:            "Handler set to wrapper",
+			testingOverride: false,
+			handlerName:     "newrelic-lambda-wrapper",
+			wrapperName:     "newrelic-lambda-wrapper",
+			nrHandler:       "src/index.handler",
+			expected:        "src/index.handler",
+		},
+	}
 
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Setup environment
+			for k, v := range tt.envVars {
+				os.Setenv(k, v)
+				defer os.Unsetenv(k)
+			}
+
+			conf := &config.Configuration{
+				TestingOverride: tt.testingOverride,
+				NRHandler:       tt.nrHandler,
+			}
+
+			h := handlerConfigs{
+				handlerName: tt.handlerName,
+				conf:        conf,
+			}
+
+			r := runtimeConfig{
+				wrapperName: tt.wrapperName,
+			}
+
+			result := r.getTrueHandler(h)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
 func determineBaseDir() string {
 
 	tempDir := os.TempDir()

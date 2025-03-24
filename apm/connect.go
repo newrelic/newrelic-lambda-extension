@@ -87,6 +87,27 @@ func PreConnect(cmd RpmCmd, cs *RpmControls) (string, error) {
 	return preConnectResponse.Collector, nil
 }
 
+func getUtilizationData(cmd RpmCmd) map[string]interface{} {
+	awsLambdaName := cmd.metaData["AWSFunctionName"].(string)
+	awsAccountId := cmd.metaData["AWSAccountId"].(string)
+	awsRegion := os.Getenv("AWS_REGION")
+	if awsRegion == "" {
+		awsRegion = os.Getenv("AWS_DEFAULT_REGION")
+	}
+	awsUnqualifiedLambdaARN := fmt.Sprintf("arn:aws:lambda:%s:%s:function:%s", awsRegion, awsAccountId, awsLambdaName)
+	utilizationData := map[string]interface{}{
+		"vendors": map[string]interface{}{
+			"awslambdafunction": map[string]interface{}{
+				"aws.arn": awsUnqualifiedLambdaARN,
+				"aws.region":awsRegion,
+				"aws.accountId": awsAccountId,
+				"aws.functionName": awsLambdaName,
+			},
+		},
+	}
+	return utilizationData
+}
+
 func Connect(cmd RpmCmd, cs *RpmControls) (string, string, error) {
 
 	pid := os.Getpid()
@@ -102,9 +123,11 @@ func Connect(cmd RpmCmd, cs *RpmControls) (string, string, error) {
 			"host":          "AWS Lambda",
 			"app_name":      []string{appName},
 			"identifier":    appName,
+			"utilization":   getUtilizationData(cmd),
 		},
 	}
 	marshaledData, err := json.Marshal(data)
+	fmt.Println("Marshalled Data for Connect Call: ", string(marshaledData))
 	if err != nil {
 		return "", "", fmt.Errorf("failed to marshal connect data: %w", err)
 	}

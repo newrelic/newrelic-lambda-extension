@@ -29,6 +29,7 @@ const (
 	LambdaHostPortEnvVar = "AWS_LAMBDA_RUNTIME_API"
 
 	ExtensionNameHeader      = "Lambda-Extension-Name"
+	ExtensionFeatureHeader   = "Lambda-Extension-Accept-Feature"
 	ExtensionIdHeader        = "Lambda-Extension-Identifier"
 	ExtensionErrorTypeHeader = "Lambda-Extension-Function-Error-Type"
 

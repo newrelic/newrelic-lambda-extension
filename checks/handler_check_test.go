@@ -457,11 +457,24 @@ func TestGetTrueHandler(t *testing.T) {
 			expected:        "src/index.handler",
 		},
 		{
+			name:            "Nested Handler set",
+			testingOverride: false,
+			handlerName:     "src/index.default.handler",
+			wrapperName:     "newrelic-lambda-wrapper",
+			nrHandler:       "src/index.default.handler",
+			expected:        "src/index.default.handler",
+		},
+		{
 			name:            "Docker environment file exists",
 			testingOverride: false,
 			envVars: map[string]string{
 				"AWS_EXECUTION_ENV": "Docker",
 			},
+			handlerName: "index.handler",
+			expected:    "index.handler",
+		},
+		{
+			name:        "Handler with Docker Env file exists",
 			handlerName: "index.handler",
 			expected:    "index.handler",
 		},

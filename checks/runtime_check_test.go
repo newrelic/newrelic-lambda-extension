@@ -3,6 +3,7 @@
 
 package checks
 
+//Test
 import (
 	"os"
 	"path/filepath"

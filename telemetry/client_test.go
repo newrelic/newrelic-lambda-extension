@@ -166,7 +166,7 @@ func TestClientSendRetry(t *testing.T) {
 	var count int32 = 0
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		atomic.AddInt32(&count, 1)
+		//atomic.AddInt32(&count, 1)
 
 		if atomic.LoadInt32(&count) == 0 {
 			time.Sleep(50 * time.Millisecond)

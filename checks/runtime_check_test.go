@@ -3,7 +3,7 @@
 
 package checks
 
-//Testingg
+//Testinggg
 import (
 	"os"
 	"path/filepath"

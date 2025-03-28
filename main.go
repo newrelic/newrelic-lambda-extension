@@ -157,7 +157,7 @@ func main() {
 	}()
 
 	// Call next, and process telemetry, until we're shut down
-	eventCounter := mainLoop(ctx, invocationClient, batch, telemetryChan, logServer, telemetryClient)
+	eventCounter := mainLoop(ctx, invocationClient, batch, telemetryChan, logServer, telemetryClient, extensionStartup)
 
 	util.Logf("New Relic Extension shutting down after %v events\n", eventCounter)
 
@@ -194,7 +194,7 @@ func logShipLoop(ctx context.Context, logServer *logserver.LogServer, telemetryC
 }
 
 // mainLoop repeatedly calls the /next api, and processes telemetry and platform logs. The timing is rather complicated.
-func mainLoop(ctx context.Context, invocationClient *client.InvocationClient, batch *telemetry.Batch, telemetryChan chan []byte, logServer *logserver.LogServer, telemetryClient *telemetry.Client) int {
+func mainLoop(ctx context.Context, invocationClient *client.InvocationClient, batch *telemetry.Batch, telemetryChan chan []byte, logServer *logserver.LogServer, telemetryClient *telemetry.Client, extensionStartup time.Time) int {
 	eventCounter := 0
 	probablyTimeout := false
 
@@ -240,6 +240,9 @@ func mainLoop(ctx context.Context, invocationClient *client.InvocationClient, ba
 			if event.EventType == api.Shutdown {
 				if event.ShutdownReason == api.Timeout && lastRequestId != "" {
 					// Synthesize the timeout error message that the platform produces, and LLC parses
+					if lastEventStart.IsZero() {
+						lastEventStart = extensionStartup.UTC()
+					}
 					timestamp := eventStart.UTC()
 					timeoutSecs := eventStart.Sub(lastEventStart).Seconds()
 					timeoutMessage := fmt.Sprintf(

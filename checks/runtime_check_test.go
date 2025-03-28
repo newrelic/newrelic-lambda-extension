@@ -3,7 +3,6 @@
 
 package checks
 
-
 import (
 	"os"
 	"path/filepath"

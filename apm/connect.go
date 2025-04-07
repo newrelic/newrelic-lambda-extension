@@ -8,6 +8,7 @@ import (
 	"io"
 	"log"
 	"os"
+	"path/filepath"
 	"reflect"
 	"sync"
 	"time"
@@ -108,8 +109,66 @@ func getUtilizationData(cmd RpmCmd) map[string]interface{} {
 	return utilizationData
 }
 
-func Connect(cmd RpmCmd, cs *RpmControls) (string, string, error) {
+type AgentRuntime string
 
+var (
+	Node 	AgentRuntime = "node"
+	Python 	AgentRuntime = "python"
+	Go 		AgentRuntime = "go"
+	Dotnet 	AgentRuntime = "dotnet"
+	Ruby   	AgentRuntime = "ruby"
+	Java 	AgentRuntime = "java"
+	runtimeLookupPath     = "/var/lang/bin"
+)
+
+var LambdaRuntimes = []AgentRuntime{Node, Python, Go, Dotnet, Ruby, Java}
+
+func checkRuntime() (AgentRuntime) {
+	for _, runtime := range LambdaRuntimes {
+		p := filepath.Join(runtimeLookupPath, string(runtime))
+		if util.PathExists(p) {
+			return runtime
+		}
+	}
+	return Go
+}
+
+type agentConfig struct {
+	language            AgentRuntime
+	agentVersion        string
+}
+
+var agentRuntimeConfig = map[AgentRuntime]agentConfig{
+	Node: {
+		language:     Node,
+		agentVersion: "12.17.0",
+	},
+	Python: {
+		language:     Python,
+		agentVersion: "10.8.1",
+	},
+	Ruby: {
+		language:     Ruby,
+		agentVersion: "9.18.0",
+	},
+	Go: {
+		language:     Go,
+		agentVersion: "3.38.0",
+	},
+	Dotnet: {
+		language:    Dotnet,
+		agentVersion: "10.40.0",
+	},
+	Java: {
+		language:   Java,
+		agentVersion: "2.2.0",
+	},
+}
+
+
+func Connect(cmd RpmCmd, cs *RpmControls) (string, string, error) {
+	runtime := checkRuntime()
+	runtimeConfig := agentRuntimeConfig[runtime]
 	pid := os.Getpid()
 	appName := os.Getenv("AWS_LAMBDA_FUNCTION_NAME")
 	if appName == "" {
@@ -118,8 +177,8 @@ func Connect(cmd RpmCmd, cs *RpmControls) (string, string, error) {
 	data := []map[string]interface{}{
 		{
 			"pid":           pid,
-			"language":      "go",
-			"agent_version": "3.35.1",
+			"language":      runtimeConfig.language,
+			"agent_version": runtimeConfig.agentVersion,
 			"host":          "AWS Lambda",
 			"app_name":      []string{appName},
 			"identifier":    appName,
@@ -127,7 +186,7 @@ func Connect(cmd RpmCmd, cs *RpmControls) (string, string, error) {
 		},
 	}
 	marshaledData, err := json.Marshal(data)
-	fmt.Println("Marshalled Data for Connect Call: ", string(marshaledData))
+	util.Debugf("Marshalled Data for Connect Call for runtime %s: %s\n", string(runtime), string(marshaledData))
 	if err != nil {
 		return "", "", fmt.Errorf("failed to marshal connect data: %w", err)
 	}

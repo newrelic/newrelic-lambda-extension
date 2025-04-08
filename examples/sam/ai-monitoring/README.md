@@ -1,6 +1,6 @@
-# Lambda Response streaming: NR AI MONITORING
+# Lambda response streaming: New Relic AI Monitoring
 
-This example was generated using sam init and modified to add newrelic instrumentation with NR AI Monitoring capabilities. We've used modelId: 'anthropic.claude-v2', but any AI models can be utilized similarly. For more information on AI monitoring with New Relic, refer to the documentation[https://docs.newrelic.com/install/ai-monitoring/?agent-lang=nodejs]. 
+This example was generated using sam init and modified to add newrelic instrumentation with New Relic AI Monitoring capabilities. We've used modelId: 'anthropic.claude-v2', but any AI models can be utilized similarly. For more information on AI monitoring with New Relic, refer to the documentation[https://docs.newrelic.com/install/ai-monitoring/?agent-lang=nodejs].
 
 Important: this application uses various AWS services and there are costs associated with these services after the Free Tier usage - please see the [AWS Pricing page](https://aws.amazon.com/pricing/) for details. You are responsible for any AWS costs incurred. No warranty is implied in this example.
 
@@ -34,8 +34,7 @@ sam build
 
 This command compiles your application into the `.aws-sam/build` directory, preparing it for deployment by resolving dependencies and building necessary resources.
 
-### 4. Deploy the AWS Resources
-
+### 3. Deploy the AWS Resources
 Deploy the AWS resources using AWS SAM:
 
 ```bash
@@ -50,8 +49,7 @@ During this phase, you'll answer several prompts:
 
 After completing the guided deployment once, a `samconfig.toml` file will be generated with saved configurations.
 
-### 5. Subsequent Deployments
-
+### 4. Subsequent Deployments
 For future deployments, you can simply use:
 
 ```bash

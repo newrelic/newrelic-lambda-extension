@@ -1,6 +1,6 @@
 # Lambda Response streaming: NR AI MONITORING
 
-This example showcases the utility of response streaming and introduces AI monitoring through New Relic (NR). We've used modelId: 'anthropic.claude-v2', but any AI models can be utilized similarly. For more information on AI monitoring with New Relic, refer to the documentation[https://docs.newrelic.com/install/ai-monitoring/?agent-lang=nodejs]. 
+This example was generated using sam init and modified to add newrelic instrumentation with NR AI Monitoring capabilities. We've used modelId: 'anthropic.claude-v2', but any AI models can be utilized similarly. For more information on AI monitoring with New Relic, refer to the documentation[https://docs.newrelic.com/install/ai-monitoring/?agent-lang=nodejs]. 
 
 Important: this application uses various AWS services and there are costs associated with these services after the Free Tier usage - please see the [AWS Pricing page](https://aws.amazon.com/pricing/) for details. You are responsible for any AWS costs incurred. No warranty is implied in this example.
 
@@ -11,46 +11,75 @@ Important: this application uses various AWS services and there are costs associ
 * [Git Installed](https://git-scm.com/book/en/v2/Getting-Started-Installing-Git)
 * [AWS Serverless Application Model](https://docs.aws.amazon.com/serverless-application-model/latest/developerguide/serverless-sam-cli-install.html) (AWS SAM) installed
 
-## Deployment Instructions
+##  Initial Setup and Deployment Instructions Using AWS SAM
+### 1. Clone the repository
 
-1. Create a new directory, navigate to that directory in a terminal and clone the GitHub repository:
-
-```
+```bash
 git clone https://github.com/newrelic/newrelic-lambda-extension.git
 ```
 
-2. Change directory to the pattern directory:
+Navigate to the example pattern directory:
 
-    ```
-    cd examples/sam/ai-monitoring/
-    ```
+```bash
+cd examples/sam/ai-monitoring/
+```
 
-3. From the command line, use AWS SAM to deploy the AWS resources for the pattern as specified in the template.yml file:
+### 2. Build the AWS SAM Application
 
-    ```
-    sam deploy --guided
-    ```
+Before deploying, you need to build the application using:
 
-4. During the prompts:
-    * Enter a stack name
-    * Enter the desired AWS Region - AWS CLI default region is recommended
-    * Allow SAM CLI to create IAM roles with the required permissions.
+```bash
+sam build
+```
 
-5. Once you have run `sam deploy --guided` mode once and saved arguments to a configuration file `samconfig.toml`, you can use `sam deploy` in future to use these defaults.
+This command compiles your application into the `.aws-sam/build` directory, preparing it for deployment by resolving dependencies and building necessary resources.
 
-## Testing
+### 4. Deploy the AWS Resources
 
-1.	Use curl with your AWS credentials to view the streaming response as the url uses AWS Identity and Access Management (IAM) for authorization. Replace the URL and Region parameters for your deployment.
+Deploy the AWS resources using AWS SAM:
 
-    ```
-    curl --request GET https://<url>.lambda-url.<Region>.on.aws/ --user AKIAIOSFODNN7EXAMPLE:wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY --aws-sigv4 'aws:amz:<Region>:lambda' -d '{"prompt": "hello! how are you?"}'
-    ```
+```bash
+sam deploy --guided
+```
+
+During this phase, you'll answer several prompts:
+
+- **Stack name**: Choose a name for your stack.
+- **AWS Region**: Select the AWS region (default region recommended).
+- **IAM roles**: Permit SAM CLI to create IAM roles for your application resources.
+
+After completing the guided deployment once, a `samconfig.toml` file will be generated with saved configurations.
+
+### 5. Subsequent Deployments
+
+For future deployments, you can simply use:
+
+```bash
+sam deploy
+```
+
+This will utilize saved defaults from your `samconfig.toml` file.
+
+## Testing the Deployment
+
+To test the streaming feature, the `curl` command includes `--user` and `--aws-sigv4` because our Lambda function is secured with the `AWS_IAM` authentication type. This requires signing the request with AWS credentials to ensure proper authentication and authorization.
+
+```bash
+curl --request GET https://<url>.lambda-url.<Region>.on.aws/ \
+--user AKIAIOSFODNN7EXAMPLE:wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY \
+--aws-sigv4 'aws:amz:<Region>:lambda' \
+-d '{"prompt": "hello! how are you?"}'
+```
+Ensure you replace `<url>` and `<Region>` with your specific deployment details. For more details, refer to [AWS IAM Documentation](https://docs.aws.amazon.com/lambda/latest/dg/urls-auth.html#urls-auth-iam).
 
 
 
-## Cleanup
- 
-1. Delete the stack, Enter `Y` to confirm deleting the stack and folder.
-    ```
-    sam delete
-    ```
+## Cleanup Resources
+
+To delete the stack and associated resources, execute:
+
+```bash
+sam delete
+```
+
+Confirm the deletion by entering `Y` when prompted to ensure clean removal of your deployed stack and resources.

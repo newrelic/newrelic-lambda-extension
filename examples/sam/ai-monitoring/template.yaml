@@ -18,7 +18,6 @@ Resources:
         Variables:
           
           NEW_RELIC_LAMBDA_HANDLER: index.handler
-          # Distributed tracing needs your account ID, and your trusted account ID
           NEW_RELIC_ACCOUNT_ID: 'your-nr-account-id'
           NEW_RELIC_LICENSE_KEY: "your-license-key"
           NEW_RELIC_EXTENSION_LOG_LEVEL: "INFO"
@@ -28,7 +27,7 @@ Resources:
       Layers:
         # This layer includes the New Relic Lambda extension, a sidecar process that sends telemetry,
         # as well as the New Relic agent for Node.js, and a handler wrapper that makes integration easy.
-        - !Sub arn:aws:lambda:us-east-1:451483290750:layer:NewRelicNodeJS20X:59
+        - !Sub arn:${AWS::Partition}:lambda:${AWS::Region}:451483290750:layer:NewRelicNodeJS20X:59
     
      
   MyFunctionUrl:
@@ -44,4 +43,3 @@ Outputs:
   StreamingFunctionURL:
     Description: "Streaming Lambda Function URL"
     Value: !GetAtt MyFunctionUrl.FunctionUrl
-

@@ -7,7 +7,7 @@ const pipeline = util.promisify(stream.pipeline);
 const {
 	BedrockRuntimeClient,
 	InvokeModelWithResponseStreamCommand,
-} = require('@aws-sdk/client-bedrock-runtime'); // ES Modules import
+} = require('@aws-sdk/client-bedrock-runtime');
 
 const bedrock = new BedrockRuntimeClient({ region: 'us-east-1' });
 

@@ -8,11 +8,13 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"regexp"
 	"strconv"
 	"sync"
 	"time"
 
 	"github.com/newrelic/newrelic-lambda-extension/config"
+	"github.com/newrelic/newrelic-lambda-extension/util"
 )
 
 var (
@@ -259,9 +261,27 @@ func ProcessData(data []interface{}, runId string) []interface{} {
 	return data
 }
 
+var (
+	preconnectHostDefault        = "collector.newrelic.com"
+	preconnectRegionLicenseRegex = regexp.MustCompile(`(^.+?)x`)
+)
+
+func preconnectHost(conf *config.Configuration) string {
+	if conf.NewRelicHost != "" {
+		return conf.NewRelicHost
+	}
+	m := preconnectRegionLicenseRegex.FindStringSubmatch(conf.LicenseKey)
+	if len(m) > 1 {
+		return "collector." + m[1] + ".nr-data.net"
+	}
+	return preconnectHostDefault
+}
+
 func NewAPMClient(conf *config.Configuration, awsFunctionName string, awsAccountId string, awsFunctionVersion string) (RpmCmd, *RpmControls, error) {
+	preconnectCollectorHost := preconnectHost(conf)
+	util.Debugf("Preconnect collector host: %s", preconnectCollectorHost)
 	cmd := RpmCmd{
-		Collector: conf.NewRelicHost,
+		Collector: preconnectCollectorHost,
 		metaData: map[string]interface{}{
 			"AWSFunctionName": awsFunctionName,
 			"AWSAccountId": awsAccountId,
@@ -309,8 +329,8 @@ func apmPreConnect(apmCmd RpmCmd, apmControls *RpmControls) (string, error) {
 		return "", fmt.Errorf("pre-connect failed: %w", err)
 	}
 	duration := time.Since(startTime)
-	fmt.Printf("Redirect Host: %s\n", redirectHost)
-	fmt.Printf("Pre-Connect Cycle duration: %s\n", duration)
+	util.Debugf("Redirect Host: %s\n", redirectHost)
+	util.Debugf("Pre-Connect Cycle duration: %s\n", duration)
 	return redirectHost, nil
 }
 
@@ -323,8 +343,8 @@ func apmConnect(apmCmd RpmCmd, apmControls *RpmControls) (string, string, error)
 		return "", "", fmt.Errorf("connect failed: %w", err)
 	}
 	duration := time.Since(startTime)
-	fmt.Printf("Run ID: %s\n", runID)
-	fmt.Printf("Entity GUID: %s\n", entityGUID)
-	fmt.Printf("Connect Cycle duration: %s\n", duration)
+	util.Debugf("Run ID: %s\n", runID)
+	util.Debugf("Entity GUID: %s\n", entityGUID)
+	util.Debugf("Connect Cycle duration: %s\n", duration)
 	return runID, entityGUID, nil
 }

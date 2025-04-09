@@ -88,6 +88,16 @@ func PreConnect(cmd RpmCmd, cs *RpmControls) (string, error) {
 	return preConnectResponse.Collector, nil
 }
 
+func getLambdaARN(cmd RpmCmd) string {
+	awsLambdaName := cmd.metaData["AWSFunctionName"].(string)
+	awsAccountId := cmd.metaData["AWSAccountId"].(string)
+	awsRegion := os.Getenv("AWS_REGION")
+	if awsRegion == "" {
+		awsRegion = os.Getenv("AWS_DEFAULT_REGION")
+	}
+	return fmt.Sprintf("arn:aws:lambda:%s:%s:function:%s", awsRegion, awsAccountId, awsLambdaName)
+}
+
 func getUtilizationData(cmd RpmCmd) map[string]interface{} {
 	awsLambdaName := cmd.metaData["AWSFunctionName"].(string)
 	awsAccountId := cmd.metaData["AWSAccountId"].(string)
@@ -95,7 +105,7 @@ func getUtilizationData(cmd RpmCmd) map[string]interface{} {
 	if awsRegion == "" {
 		awsRegion = os.Getenv("AWS_DEFAULT_REGION")
 	}
-	awsUnqualifiedLambdaARN := fmt.Sprintf("arn:aws:lambda:%s:%s:function:%s", awsRegion, awsAccountId, awsLambdaName)
+	awsUnqualifiedLambdaARN := getLambdaARN(cmd)
 	utilizationData := map[string]interface{}{
 		"vendors": map[string]interface{}{
 			"awslambdafunction": map[string]interface{}{
@@ -165,6 +175,20 @@ var agentRuntimeConfig = map[AgentRuntime]agentConfig{
 	},
 }
 
+type Label struct {
+	LabelType  string `json:"label_type"`
+	LabelValue string `json:"label_value"`
+}
+
+func getLabels(cmd RpmCmd) []Label {
+	lambdaARN := getLambdaARN(cmd)
+	labels := []Label{
+		{LabelType: "aws.arn", LabelValue: lambdaARN},
+		{LabelType: "isLambdaFunction", LabelValue: "true"},
+	}
+	return labels
+}
+
 
 func Connect(cmd RpmCmd, cs *RpmControls) (string, string, error) {
 	runtime := checkRuntime()
@@ -183,6 +207,7 @@ func Connect(cmd RpmCmd, cs *RpmControls) (string, string, error) {
 			"app_name":      []string{appName},
 			"identifier":    appName,
 			"utilization":   getUtilizationData(cmd),
+			"labels": 		 getLabels(cmd),
 		},
 	}
 	marshaledData, err := json.Marshal(data)
@@ -203,6 +228,7 @@ func Connect(cmd RpmCmd, cs *RpmControls) (string, string, error) {
 		return "", "", fmt.Errorf("failed to read response body: %w", err)
 	}
 	connectResponse, err := UnmarshalConnectReply(body)
+	fmt.Printf("Connect Response: %s\n", string(body))
 	if err != nil {
 		return "", "", fmt.Errorf("failed to unmarshal connect response: %w", err)
 	}

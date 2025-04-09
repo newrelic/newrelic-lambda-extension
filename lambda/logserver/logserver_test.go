@@ -74,7 +74,7 @@ func TestFunctionLogs(t *testing.T) {
 		{
 			Time:   time.Now().Add(-50 * time.Millisecond),
 			Type:   "function",
-			Record: "log line 1",
+			Record: `{"timestamp":"2025-04-09T03:59:43.467Z","level":"INFO","requestId":"testRequestId","message":"Starting Lambda Function..."}`,
 		},
 	}
 
@@ -97,14 +97,14 @@ func TestFunctionLogs(t *testing.T) {
 	logLines, _ := logs.AwaitFunctionLogs()
 
 	assert.Equal(t, 1, len(logLines))
-	assert.Equal(t, "log line 1", string(logLines[0].Content))
+	assert.Equal(t, `{"timestamp":"2025-04-09T03:59:43.467Z","level":"INFO","requestId":"testRequestId","message":"Starting Lambda Function..."}`, string(logLines[0].Content))
 	assert.Equal(t, "testRequestId", logLines[0].RequestID)
 
 	testEvents2 := []api.LogEvent{
 		{
 			Time:   time.Now().Add(500 * time.Millisecond),
 			Type:   "function",
-			Record: "log line 2",
+			Record: `{"timestamp":"2025-04-09T03:59:43.467Z","level":"INFO","requestId":"testRequestId","message":"Starting Lambda Function..."}`,
 		},
 	}
 
@@ -124,10 +124,10 @@ func TestFunctionLogs(t *testing.T) {
 	logLines2, _ := logs.AwaitFunctionLogs()
 
 	assert.Equal(t, 1, len(logLines2))
-	assert.Equal(t, "log line 2", string(logLines2[0].Content))
+	assert.Equal(t, `{"timestamp":"2025-04-09T03:59:43.467Z","level":"INFO","requestId":"testRequestId","message":"Starting Lambda Function..."}`, string(logLines2[0].Content))
 	assert.Equal(t, "testRequestId", logLines2[0].RequestID)
 
-	testRequestId := "abcdef01-a2b3-4321-cd89-0123456789ab"
+	testRequestId := "7b317588-2cdc-4bef-ac04-92e83cc8f418"
 
 	testEvents3 := []api.LogEvent{
 		{
@@ -138,7 +138,7 @@ func TestFunctionLogs(t *testing.T) {
 		{
 			Time:   time.Now().Add(700 * time.Millisecond),
 			Type:   "function",
-			Record: "log line 3, for testing start line record as string",
+			Record: "2025-04-09T06:07:39.603Z	7b317588-2cdc-4bef-ac04-92e83cc8f418	INFO	1744178859603: executing handler",
 		},
 	}
 
@@ -158,7 +158,7 @@ func TestFunctionLogs(t *testing.T) {
 	logLines3, _ := logs.AwaitFunctionLogs()
 
 	assert.Equal(t, 1, len(logLines3))
-	assert.Equal(t, "log line 3, for testing start line record as string", string(logLines3[0].Content))
+	assert.Equal(t, "2025-04-09T06:07:39.603Z	7b317588-2cdc-4bef-ac04-92e83cc8f418	INFO	1744178859603: executing handler", string(logLines3[0].Content))
 	assert.Equal(t, testRequestId, logLines3[0].RequestID)
 
 	platformMetricString := "REPORT RequestId: " + testRequestId + "\tDuration: 25.30 ms\tBilled Duration: 100 ms\tMemory Size: 128 MB\tMax Memory Used: 74 MB\tInit Duration: 202.00 ms"
@@ -172,7 +172,7 @@ func TestFunctionLogs(t *testing.T) {
 		{
 			Time:   time.Now().Add(900 * time.Millisecond),
 			Type:   "function",
-			Record: "log line 4, testing platform metrics as string",
+			Record: "2025-04-09T06:07:39.603Z	7b317588-2cdc-4bef-ac04-92e83cc8f418	INFO	1744178859603: executing handler",
 		},
 	}
 
@@ -192,10 +192,59 @@ func TestFunctionLogs(t *testing.T) {
 	logLines4, _ := logs.AwaitFunctionLogs()
 
 	assert.Equal(t, 1, len(logLines4))
-	assert.Equal(t, "log line 4, testing platform metrics as string", string(logLines4[0].Content))
+	assert.Equal(t, "2025-04-09T06:07:39.603Z	7b317588-2cdc-4bef-ac04-92e83cc8f418	INFO	1744178859603: executing handler", string(logLines4[0].Content))
 	assert.Equal(t, testRequestId, logLines4[0].RequestID)
 
+	testEvents5 := []api.LogEvent{
+		{
+			Time:   time.Now().Add(800 * time.Millisecond),
+			Type:   "platform.report",
+			Record: platformMetricString,
+		},
+		{
+			Time:   time.Now().Add(900 * time.Millisecond),
+			Type:   "function",
+			Record: "log line 5",
+		},
+	}
+	testEventBytes, err = json.Marshal(testEvents5)
+	assert.NoError(t, err)
+
+	req, err = http.NewRequest("POST", realEndpoint, bytes.NewBuffer(testEventBytes))
+	assert.NoError(t, err)
+
+	go func() {
+		res, err := client.Do(req)
+		assert.NoError(t, err)
+		assert.Equal(t, 200, res.StatusCode)
+		assert.Equal(t, http.NoBody, res.Body)
+	}()
+	logLines5, _ := logs.AwaitFunctionLogs()
+	assert.Equal(t, 1, len(logLines5))
+	assert.Equal(t, "log line 5", string(logLines5[0].Content))
+	assert.Equal(t, "", logLines5[0].RequestID)
+
+	testEvents = []api.LogEvent{
+		{
+			Time:   time.Now(),
+			Type:   "platform.logsDropped",
+			Record: "Dropped 5 logs due to buffer overflow",
+		},
+	}
+
+	testEventBytes, err = json.Marshal(testEvents)
+	assert.NoError(t, err)
+
+	req, err = http.NewRequest("POST", realEndpoint, bytes.NewBuffer(testEventBytes))
+	assert.NoError(t, err)
+
+	res, err := client.Do(req)
+
+	assert.NoError(t, err)
+	assert.Equal(t, 200, res.StatusCode)
+	assert.Equal(t, http.NoBody, res.Body)
 	assert.Nil(t, logs.Close())
+
 }
 
 func TestLogServerStart(t *testing.T) {

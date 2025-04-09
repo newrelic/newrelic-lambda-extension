@@ -228,7 +228,6 @@ func Connect(cmd RpmCmd, cs *RpmControls) (string, string, error) {
 		return "", "", fmt.Errorf("failed to read response body: %w", err)
 	}
 	connectResponse, err := UnmarshalConnectReply(body)
-	fmt.Printf("Connect Response: %s\n", string(body))
 	if err != nil {
 		return "", "", fmt.Errorf("failed to unmarshal connect response: %w", err)
 	}

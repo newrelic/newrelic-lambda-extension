@@ -12,6 +12,7 @@ os.environ.setdefault("NEW_RELIC_SERVERLESS_MODE_ENABLED", "true")
 os.environ.setdefault(
     "NEW_RELIC_TRUSTED_ACCOUNT_KEY", os.getenv("NEW_RELIC_ACCOUNT_ID", "")
 )
+os.environ.setdefault("NEW_RELIC_PACKAGE_REPORTING_ENABLED", "false")
 
 # The agent will load some environment variables on module import so we need
 # to perform the import after setting the necessary environment variables.
@@ -61,8 +62,11 @@ def get_handler():
             )
 
         module = importlib.import_module(module_path.replace("/", "."))
+    except ImportError as e:
+            raise ImportError("Failed to import module '%s': %s" % (module_path, e))
     except Exception as e:
-        raise ImportError("Failed to import module '%s': %s" % (module_path, e))
+        raise type(e)(f"Error while importing '{module_path}': {type(e).__name__} {str(e)}").with_traceback(e.__traceback__)
+    
 
     try:
         handler = getattr(module, handler_name)

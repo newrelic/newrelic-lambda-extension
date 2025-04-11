@@ -9,7 +9,6 @@
   "license": "ISC",
   "description": "",
   "dependencies": {
-    "@aws-sdk/client-bedrock-runtime": "^3.758.0",
-    "newrelic": "^12.16.0"
+    "@aws-sdk/client-bedrock-runtime": "^3.758.0"
   }
 }

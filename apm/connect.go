@@ -108,7 +108,7 @@ func getUtilizationData(cmd RpmCmd) map[string]interface{} {
 	awsUnqualifiedLambdaARN := getLambdaARN(cmd)
 	utilizationData := map[string]interface{}{
 		"vendors": map[string]interface{}{
-			"awslambdafunction": map[string]interface{}{
+			"awslambda": map[string]interface{}{
 				"aws.arn": awsUnqualifiedLambdaARN,
 				"aws.region":awsRegion,
 				"aws.accountId": awsAccountId,
@@ -175,20 +175,6 @@ var agentRuntimeConfig = map[AgentRuntime]agentConfig{
 	},
 }
 
-type Label struct {
-	LabelType  string `json:"label_type"`
-	LabelValue string `json:"label_value"`
-}
-
-func getLabels(cmd RpmCmd) []Label {
-	lambdaARN := getLambdaARN(cmd)
-	labels := []Label{
-		{LabelType: "aws.arn", LabelValue: lambdaARN},
-		{LabelType: "isLambdaFunction", LabelValue: "true"},
-	}
-	return labels
-}
-
 
 func Connect(cmd RpmCmd, cs *RpmControls) (string, string, error) {
 	runtime := checkRuntime()
@@ -207,7 +193,6 @@ func Connect(cmd RpmCmd, cs *RpmControls) (string, string, error) {
 			"app_name":      []string{appName},
 			"identifier":    appName,
 			"utilization":   getUtilizationData(cmd),
-			"labels": 		 getLabels(cmd),
 		},
 	}
 	marshaledData, err := json.Marshal(data)

@@ -20,14 +20,15 @@ type LambdaMetadata struct {
 }
 
 type LambdaData struct {
-	MetricData          []interface{} `json:"metric_data"`
-	CustomEventData     []interface{} `json:"custom_event_data"`
-	LogEventData        []interface{} `json:"log_event_data"`
-	AnalyticEventData   []interface{} `json:"analytic_event_data"`
-	ErrorEventData      []interface{} `json:"error_event_data"`
-	ErrorData           []interface{} `json:"error_data"`
-	SpanEventData       []interface{} `json:"span_event_data"`
-	UpdateLoadedModules []interface{} `json:"update_loaded_modules"`
+	MetricData             []interface{} `json:"metric_data"`
+	CustomEventData        []interface{} `json:"custom_event_data"`
+	LogEventData           []interface{} `json:"log_event_data"`
+	AnalyticEventData      []interface{} `json:"analytic_event_data"`
+	ErrorEventData         []interface{} `json:"error_event_data"`
+	ErrorData              []interface{} `json:"error_data"`
+	SpanEventData          []interface{} `json:"span_event_data"`
+	UpdateLoadedModules    []interface{} `json:"update_loaded_modules"`
+	TransactionSampleData  []interface{} `json:"transaction_sample_data"`
 }
 
 type LambdaRawData struct {

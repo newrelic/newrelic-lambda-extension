@@ -108,7 +108,7 @@ func getUtilizationData(cmd RpmCmd) map[string]interface{} {
 	awsUnqualifiedLambdaARN := getLambdaARN(cmd)
 	utilizationData := map[string]interface{}{
 		"vendors": map[string]interface{}{
-			"awslambdafunction": map[string]interface{}{
+			"awslambda": map[string]interface{}{
 				"aws.arn": awsUnqualifiedLambdaARN,
 				"aws.region":awsRegion,
 				"aws.accountId": awsAccountId,
@@ -175,20 +175,6 @@ var agentRuntimeConfig = map[AgentRuntime]agentConfig{
 	},
 }
 
-type Label struct {
-	LabelType  string `json:"label_type"`
-	LabelValue string `json:"label_value"`
-}
-
-func getLabels(cmd RpmCmd) []Label {
-	lambdaARN := getLambdaARN(cmd)
-	labels := []Label{
-		{LabelType: "aws.arn", LabelValue: lambdaARN},
-		{LabelType: "isLambdaFunction", LabelValue: "true"},
-	}
-	return labels
-}
-
 
 func Connect(cmd RpmCmd, cs *RpmControls) (string, string, error) {
 	runtime := checkRuntime()
@@ -207,7 +193,6 @@ func Connect(cmd RpmCmd, cs *RpmControls) (string, string, error) {
 			"app_name":      []string{appName},
 			"identifier":    appName,
 			"utilization":   getUtilizationData(cmd),
-			"labels": 		 getLabels(cmd),
 		},
 	}
 	marshaledData, err := json.Marshal(data)
@@ -330,12 +315,15 @@ func SendAPMTelemetry(ctx context.Context, invokedFunctionARN string, payload []
 
 	return sendTelemetryData(ctx, telemetryData, runID, cmd, cs)
 }
+
 func extractTelemetryData(datav1 LambdaRawData, datav2 LambdaData, pv int) (struct {
 	MetricData     	[]interface{}
 	SpanEventData  	[]interface{}
 	ErrorData      	[]interface{}
 	ErrorEventData 	[]interface{}
 	CustomEventData []interface{}
+	AnalyticEventData []interface{}
+	TransactionSampleData []interface{}
 }, error) {
 	var telemetryData struct {
 		MetricData     	[]interface{}
@@ -343,6 +331,8 @@ func extractTelemetryData(datav1 LambdaRawData, datav2 LambdaData, pv int) (stru
 		ErrorData      	[]interface{}
 		ErrorEventData 	[]interface{}
 		CustomEventData []interface{}
+		AnalyticEventData []interface{}
+		TransactionSampleData []interface{}
 	}
 
 	switch pv {
@@ -357,12 +347,16 @@ func extractTelemetryData(datav1 LambdaRawData, datav2 LambdaData, pv int) (stru
 			ErrorData      []interface{}
 			ErrorEventData []interface{}
 			CustomEventData []interface{}
+			AnalyticEventData []interface{}
+			TransactionSampleData []interface{}
 		}{
 			MetricData:     datav2.MetricData,
 			SpanEventData:  datav2.SpanEventData,
 			ErrorData:      datav2.ErrorData,
 			ErrorEventData: datav2.ErrorEventData,
 			CustomEventData: datav2.CustomEventData,
+			AnalyticEventData: datav2.AnalyticEventData,
+			TransactionSampleData: datav2.TransactionSampleData,
 		}
 	default: // Assuming default case is for v1 data
 		if reflect.DeepEqual(datav1, LambdaRawData{}) {
@@ -375,23 +369,30 @@ func extractTelemetryData(datav1 LambdaRawData, datav2 LambdaData, pv int) (stru
 			ErrorData      	[]interface{}
 			ErrorEventData 	[]interface{}
 			CustomEventData []interface{}
+			AnalyticEventData []interface{}
+			TransactionSampleData []interface{}
 		}{
 			MetricData:     datav1.LambdaData.MetricData,
 			SpanEventData:  datav1.LambdaData.SpanEventData,
 			ErrorData:      datav1.LambdaData.ErrorData,
 			ErrorEventData: datav1.LambdaData.ErrorEventData,
 			CustomEventData: datav1.LambdaData.CustomEventData,
+			AnalyticEventData: datav1.LambdaData.AnalyticEventData,
+			TransactionSampleData: datav1.LambdaData.TransactionSampleData,
 		}
 	}
 
 	return telemetryData, nil
 }
+
 func sendTelemetryData(ctx context.Context, data struct {
-	MetricData     []interface{}
-	SpanEventData  []interface{}
-	ErrorData      []interface{}
-	ErrorEventData []interface{}
-	CustomEventData	[]interface{}
+	MetricData            []interface{}
+	SpanEventData         []interface{}
+	ErrorData             []interface{}
+	ErrorEventData        []interface{}
+	CustomEventData	      []interface{}
+	AnalyticEventData     []interface{}
+	TransactionSampleData []interface{}
 }, runID string, cmd RpmCmd, cs *RpmControls) (error, int) {
 	// Define telemetry tasks
 	telemetryTasks := []telemetryType{
@@ -400,6 +401,8 @@ func sendTelemetryData(ctx context.Context, data struct {
 		{data.ErrorData, CmdErrorData},
 		{data.ErrorEventData, CmdErrorEvents},
 		{data.CustomEventData, CmdCustomEvents},
+		{data.AnalyticEventData, cmdAnalyticEvents},
+		{data.TransactionSampleData, cmdTxnTraces},
 	}
 
 	var wg sync.WaitGroup
@@ -427,6 +430,7 @@ func sendTelemetryData(ctx context.Context, data struct {
 	// Aggregate errors
 	return aggregateErrors(errChan)
 }
+
 func sendSingleTelemetry(task telemetryType, wg *sync.WaitGroup, errChan chan<- error, runID string, cmd RpmCmd, cs *RpmControls) {
 	if len(task.Data) == 0 {
 		util.Debugf("No %s telemetry to send", task.DataType)

@@ -30,17 +30,17 @@ const (
 	userAgentPrefix = "NewRelic-Go-Agent/"
 
 	// Methods used in collector communication.
-	cmdPreconnect   = "preconnect"
-	cmdConnect      = "connect"
-	CmdMetrics      = "metric_data"
-	CmdCustomEvents = "custom_event_data"
-	cmdLogEvents    = "log_event_data"
-	cmdTxnEvents    = "analytic_event_data"
-	CmdErrorEvents  = "error_event_data"
-	CmdErrorData    = "error_data"
-	cmdTxnTraces    = "transaction_sample_data"
-	cmdSlowSQLs     = "sql_trace_data"
-	CmdSpanEvents   = "span_event_data"
+	cmdPreconnect        = "preconnect"
+	cmdConnect           = "connect"
+	CmdMetrics           = "metric_data"
+	CmdCustomEvents      = "custom_event_data"
+	cmdLogEvents         = "log_event_data"
+	cmdAnalyticEvents    = "analytic_event_data"
+	CmdErrorEvents       = "error_event_data"
+	CmdErrorData         = "error_data"
+	cmdTxnTraces         = "transaction_sample_data"
+	cmdSlowSQLs          = "sql_trace_data"
+	CmdSpanEvents        = "span_event_data"
 )
 
 type RpmCmd struct {

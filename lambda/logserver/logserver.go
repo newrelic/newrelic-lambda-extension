@@ -193,8 +193,6 @@ func (ls *LogServer) handler(res http.ResponseWriter, req *http.Request) {
 		case "platform.logsDropped":
 			util.Logf("Platform dropped logs: %v", event.Record)
 		case "function":
-
-			util.Logf("Function log event: %v", event.Record)
 			recordString := event.Record.(string)
 
 			requestId, err := ExtractRequestId(recordString)

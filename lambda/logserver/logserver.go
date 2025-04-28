@@ -37,7 +37,7 @@ type LogServer struct {
 	lastRequestIdLock *sync.Mutex
 }
 
-type FunctionLogJSON struct {
+type functionLogJSON struct {
 	RequestId string `json:"requestId"`
 	Message   string `json:"message"`
 }
@@ -115,7 +115,7 @@ func ExtractRequestId(recordString string) (string, error) {
 		return fields[1], nil
 	}
 
-	var functionLogJSON FunctionLogJSON
+	var functionLogJSON functionLogJSON
 	err := json.Unmarshal([]byte(recordString), &functionLogJSON)
 	if err == nil {
 		return functionLogJSON.RequestId, nil
@@ -197,8 +197,9 @@ func (ls *LogServer) handler(res http.ResponseWriter, req *http.Request) {
 
 			requestId, err := ExtractRequestId(recordString)
 			if err != nil {
-				util.Debugf("Unrecognized log format: %s", recordString)
-				requestId = ""
+				ls.lastRequestIdLock.Lock()
+				requestId = ls.lastRequestId
+				ls.lastRequestIdLock.Unlock()
 			}
 
 			functionLogs = append(functionLogs, LogLine{

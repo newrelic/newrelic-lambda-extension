@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"regexp"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -34,6 +35,11 @@ type LogServer struct {
 	functionLogChan   chan []LogLine
 	lastRequestId     string
 	lastRequestIdLock *sync.Mutex
+}
+
+type functionLogJSON struct {
+	RequestId string `json:"requestId"`
+	Message   string `json:"message"`
 }
 
 func (ls *LogServer) Port() uint16 {
@@ -102,6 +108,20 @@ func formatReport(metrics map[string]interface{}) string {
 	}
 	util.Debugf("Formatted Return Report: %s", ret)
 	return ret
+}
+func ExtractRequestId(recordString string) (string, error) {
+	fields := strings.Split(recordString, "\t")
+	if len(fields) >= 2 {
+		return fields[1], nil
+	}
+
+	var functionLogJSON functionLogJSON
+	err := json.Unmarshal([]byte(recordString), &functionLogJSON)
+	if err == nil {
+		return functionLogJSON.RequestId, nil
+	}
+
+	return "", err
 }
 
 var reportStringRegExp, _ = regexp.Compile("RequestId: ([a-fA-F0-9-]+)(.*)")
@@ -172,7 +192,23 @@ func (ls *LogServer) handler(res http.ResponseWriter, req *http.Request) {
 			ls.platformLogChan <- reportLine
 		case "platform.logsDropped":
 			util.Logf("Platform dropped logs: %v", event.Record)
-		case "function", "extension", "platform.fault":
+		case "function":
+			recordString := event.Record.(string)
+
+			requestId, err := ExtractRequestId(recordString)
+			if err != nil {
+				ls.lastRequestIdLock.Lock()
+				requestId = ls.lastRequestId
+				ls.lastRequestIdLock.Unlock()
+			}
+
+			functionLogs = append(functionLogs, LogLine{
+				Time:      event.Time,
+				RequestID: requestId,
+				Content:   []byte(recordString),
+			})
+
+		case "extension", "platform.fault":
 			record := event.Record.(string)
 			ls.lastRequestIdLock.Lock()
 			functionLogs = append(functionLogs, LogLine{

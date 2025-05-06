@@ -17,12 +17,13 @@ type LogSender interface {
 	SendFunctionLogs(ctx context.Context, invokedFunctionARN string, lines []logserver.LogLine) error
 }
 
-/// Register checks here
+// / Register checks here
 var checks = map[string]checkFn{
-    "agent":         agentVersionCheck, 
-    "handler":       handlerCheck,
-    "sanity":        sanityCheck, 
-    "vendor":        vendorCheck, 
+	"bootstrap": bootstrapCheck,
+	"agent":     agentVersionCheck,
+	"handler":   handlerCheck,
+	"sanity":    sanityCheck,
+	"vendor":    vendorCheck,
 }
 
 func RunChecks(ctx context.Context, conf *config.Configuration, reg *api.RegistrationResponse, logSender LogSender) {

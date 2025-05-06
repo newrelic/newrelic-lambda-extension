@@ -34,10 +34,7 @@ func bootstrapCheck(ctx context.Context, _ *config.Configuration, _ *api.Registr
 
 	contentBytes, _ := os.ReadFile(bootstrapPath)
 	content := string(contentBytes)
-	// Check for the presence of the New Relic nrlambda import
 	nrlambdaMatch := strings.Contains(content, nrlambdaImport)
-
-	// Check for the presence of the New Relic agent import
 	newrelicMatch := strings.Contains(content, newrelicImport)
 
 	if !nrlambdaMatch || !newrelicMatch {

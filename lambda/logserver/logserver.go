@@ -109,7 +109,6 @@ func formatReport(metrics map[string]interface{}) string {
 	util.Debugf("Formatted Return Report: %s", ret)
 	return ret
 }
-
 func ExtractRequestId(recordString string) (string, error) {
 	fields := strings.Split(recordString, "\t")
 	if len(fields) >= 2 {

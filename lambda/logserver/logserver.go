@@ -191,7 +191,11 @@ func (ls *LogServer) handler(res http.ResponseWriter, req *http.Request) {
 	}
 
 	if len(functionLogs) > 0 {
-		ls.functionLogChan <- functionLogs
+		select {
+		case ls.functionLogChan <- functionLogs:
+		case <-req.Context().Done():
+			util.Logf("Handler: Request cancelled by logserver shutdown during send to functionLogChan")
+		}
 	}
 
 	_, _ = res.Write(nil)

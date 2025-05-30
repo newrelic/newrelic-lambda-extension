@@ -75,7 +75,7 @@ func main() {
 
 	invocationClient, registrationResponse, err := registrationClient.Register(ctx, regReq)
 	if err != nil {
-		util.Panic(err)
+		util.Fatal(err)
 	}
 
 	// If extension disabled, go into no op mode
@@ -107,7 +107,7 @@ func main() {
 		if err2 != nil {
 			util.Logln(err2)
 		}
-		util.Panic("Failed to start logs HTTP server", err)
+		util.Fatal("Failed to start logs HTTP server", err)
 	}
 
 	eventTypes := []api.LogEventType{api.Platform}
@@ -124,7 +124,7 @@ func main() {
 		if err2 != nil {
 			util.Logln(err2)
 		}
-		util.Panic("Failed to register with Logs API", err)
+		util.Fatal("Failed to register with Logs API", err)
 	}
 
 	// Init the telemetry sending client
@@ -135,7 +135,7 @@ func main() {
 		if err2 != nil {
 			util.Logln(err2)
 		}
-		util.Panic("telemetry pipe init failed: ", err)
+		util.Fatal("telemetry pipe init failed: ", err)
 	}
 
 	// Run startup checks

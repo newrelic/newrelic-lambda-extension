@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/newrelic/newrelic-lambda-extension/config"
@@ -35,11 +36,11 @@ func handlerCheck(ctx context.Context, conf *config.Configuration, reg *api.Regi
 
 func isDocker() bool {
 	aws_runtime := strings.ToLower(os.Getenv("AWS_EXECUTION_ENV"))
-	return !strings.HasPrefix(aws_runtime, "AWS_Lambda")
+	return !strings.HasPrefix(aws_runtime, "aws_lambda")
 }
 
 func (r runtimeConfig) check(h handlerConfigs) bool {
-	if !h.conf.TestingOverride {
+	if h.conf.TestingOverride {
 		esm := strings.ToLower(os.Getenv("NEW_RELIC_USE_ESM"))
 		if esm == "true" {
 			return true
@@ -49,8 +50,9 @@ func (r runtimeConfig) check(h handlerConfigs) bool {
 		}
 	}
 	functionHandler := r.getTrueHandler(h)
-	p := removePathMethodName(functionHandler)
+	var p string
 	if r.language == Node {
+		p = removePathMethodNameNode(functionHandler)
 		pJS := pathFormatter(p, "js")
 		cJS := pathFormatter(p, "cjs")
 		pMJS := pathFormatter(p, "mjs")
@@ -59,13 +61,30 @@ func (r runtimeConfig) check(h handlerConfigs) bool {
 			return true
 		}
 	} else {
+		p = removePathMethodName(functionHandler)
 		p = pathFormatter(p, r.fileType)
 	}
 	return util.PathExists(p)
 }
 
 func (r runtimeConfig) getTrueHandler(h handlerConfigs) string {
-	if h.handlerName != r.wrapperName {
+	if h.conf.TestingOverride {
+		esm := strings.ToLower(os.Getenv("NEW_RELIC_USE_ESM"))
+		if esm == "true" {
+			return h.handlerName
+		}
+		if util.PathExists("/.dockerenv") {
+			return h.handlerName
+		}
+	}
+	found := false
+	for _, wrapper := range r.wrapperName {
+		if strings.Contains(wrapper, h.handlerName) {
+			found = true
+			break
+		}
+	}
+	if !found {
 		util.Logln("Warning: handler not set to New Relic layer wrapper", r.wrapperName)
 		return h.handlerName
 	}
@@ -76,6 +95,16 @@ func (r runtimeConfig) getTrueHandler(h handlerConfigs) string {
 func removePathMethodName(p string) string {
 	s := strings.Split(p, ".")
 	return strings.Join(s[:len(s)-1], "/")
+}
+
+func removePathMethodNameNode(p string) string {
+	mh := filepath.Base(p)
+	mr := p[0:strings.Index(p, mh)]
+
+	s := strings.Split(mh, ".")
+	m := s[0]
+
+	return filepath.Join(mr, m)
 }
 
 func pathFormatter(functionHandler string, fileType string) string {

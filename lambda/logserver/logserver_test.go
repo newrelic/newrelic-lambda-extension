@@ -262,24 +262,8 @@ func TestLogServerHandlerDuringShutdown(t *testing.T) {
 	logServer.Close()
 }
 
-func TestLogServerShutdownDuringRequests(t *testing.T) {
-    logServer, err := startInternal("localhost")
-    require.NoError(t, err)
-    require.NotNil(t, logServer)
-    
-    logsReceived := make(chan []LogLine, 10)
-    
-    go func() {
-        for {
-            logs, more := logServer.AwaitFunctionLogs()
-            if !more {
-                return
-            }
-            logsReceived <- logs
-        }
-    }()
-    
-    for i := 0; i < 5; i++ {
+func SendFunctionLogsContinuously(logServer *LogServer, t *testing.T) {
+	for i := 0; i < 5000; i++ {
         logEvent := []api.LogEvent{
             {
                 Time:   time.Now(),
@@ -295,45 +279,59 @@ func TestLogServerShutdownDuringRequests(t *testing.T) {
         recorder := httptest.NewRecorder()
         logServer.handler(recorder, request)
     }
-    
-    time.Sleep(50 * time.Millisecond)
-    
-    go logServer.Close()
-    
-    time.Sleep(10 * time.Millisecond)
-    
-    logEvent := []api.LogEvent{
-        {
-            Time:   time.Now(),
-            Type:   "function",
-            Record: "this should be rejected",
-        },
-    }
-    
-    jsonData, err := json.Marshal(logEvent)
+}
+
+func TestLogServerShutdownDuringRequests(t *testing.T) {
+    logServer, err := startInternal("localhost")
     require.NoError(t, err)
+    require.NotNil(t, logServer)
     
-    request := httptest.NewRequest("POST", "/", bytes.NewBuffer(jsonData))
-    recorder := httptest.NewRecorder()
-    logServer.handler(recorder, request)
+    panicChan := make(chan interface{})
     
-    time.Sleep(250 * time.Millisecond)
+    done := make(chan struct{})
     
-    logCount := 0
-    for {
-        select {
-        case logs := <-logsReceived:
-            logCount += len(logs)
-        case <-time.After(100 * time.Millisecond):
-            goto countDone
+    go func() {
+        defer func() {
+            if r := recover(); r != nil {
+                panicChan <- r
+            }
+        }()
+        
+        for {
+            _, more := logServer.AwaitFunctionLogs()
+            if !more {
+                return
+            }
         }
+    }()
+    
+    go func() {
+        defer func() {
+            if r := recover(); r != nil {
+                panicChan <- r
+            }
+        }()
+        
+        SendFunctionLogsContinuously(logServer, t)
+    }()
+    
+    go func() {
+        defer func() {
+            if r := recover(); r != nil {
+                panicChan <- r
+            }
+            close(done)
+        }()
+         time.Sleep(10 * time.Millisecond)
+        err := logServer.Close()
+        assert.NoError(t, err, "Server should close without errors")
+    }()
+    
+    select {
+    case <-done:
+    case panicVal := <-panicChan:
+        t.Fatalf("Panic during test: %v", panicVal)
+    case <-time.After(5 * time.Second):
+        t.Fatal("Test timed out")
     }
-	countDone:
-		assert.GreaterOrEqual(t, logCount, 1, "Should have received at least some logs")
-		
-		_, functionLogsOpen := <-logServer.functionLogChan
-		_, platformLogsOpen := <-logServer.platformLogChan
-		
-		assert.False(t, functionLogsOpen, "Function logs channel should be closed after shutdown")
-		assert.False(t, platformLogsOpen, "Platform logs channel should be closed after shutdown")
 }

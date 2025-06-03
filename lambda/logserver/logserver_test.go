@@ -4,16 +4,18 @@
 package logserver
 
 import (
-	"bytes"
-	"encoding/json"
-	"fmt"
-	"net/http"
-	"testing"
-	"time"
-
-	"github.com/newrelic/newrelic-lambda-extension/config"
-	"github.com/newrelic/newrelic-lambda-extension/lambda/extension/api"
-	"github.com/stretchr/testify/assert"
+    "bytes"
+    "encoding/json"
+    "fmt"
+    "net/http"
+    "net/http/httptest"
+    "testing"
+    "time"
+    
+    "github.com/newrelic/newrelic-lambda-extension/config"
+    "github.com/newrelic/newrelic-lambda-extension/lambda/extension/api"
+    "github.com/stretchr/testify/assert"
+    "github.com/stretchr/testify/require"
 )
 
 func TestLogServer(t *testing.T) {
@@ -202,4 +204,136 @@ func TestLogServerStart(t *testing.T) {
 	logs, err := Start(&config.Configuration{LogServerHost: "localhost"})
 	assert.NoError(t, err)
 	assert.Nil(t, logs.Close())
+}
+
+func TestLogServerCloseShutdownFlag(t *testing.T) {
+	logServer, err := startInternal("localhost")
+	require.NoError(t, err)
+	require.NotNil(t, logServer)
+
+	logServer.shutdownLock.RLock()
+	initialShutdownState := logServer.isShuttingDown
+	logServer.shutdownLock.RUnlock()
+	assert.False(t, initialShutdownState, "LogServer should not be in shutdown state initially")
+
+	err = logServer.Close()
+	assert.NoError(t, err)
+
+	logServer.shutdownLock.RLock()
+	finalShutdownState := logServer.isShuttingDown
+	logServer.shutdownLock.RUnlock()
+	assert.True(t, finalShutdownState, "LogServer should be in shutdown state after Close()")
+}
+
+func TestLogServerHandlerDuringShutdown(t *testing.T) {
+	logServer, err := startInternal("localhost")
+	require.NoError(t, err)
+	require.NotNil(t, logServer)
+
+	recorder := httptest.NewRecorder()
+
+	logEvent := []api.LogEvent{
+		{
+			Time:   time.Now(),
+			Type:   "function",
+			Record: "test log event",
+		},
+	}
+
+	jsonData, err := json.Marshal(logEvent)
+	require.NoError(t, err)
+
+	request := httptest.NewRequest("POST", "/", bytes.NewBuffer(jsonData))
+
+	logServer.shutdownLock.Lock()
+	logServer.isShuttingDown = true
+	logServer.shutdownLock.Unlock()
+
+	logServer.handler(recorder, request)
+
+	assert.Equal(t, http.StatusOK, recorder.Code)
+
+	select {
+	case logs := <-logServer.functionLogChan:
+		t.Fatalf("Expected no logs to be processed, but got: %v", logs)
+	default:
+	}
+
+	logServer.Close()
+}
+
+func TestLogServerShutdownDuringRequests(t *testing.T) {
+    logServer, err := startInternal("localhost")
+    require.NoError(t, err)
+    require.NotNil(t, logServer)
+    
+    logsReceived := make(chan []LogLine, 10)
+    
+    go func() {
+        for {
+            logs, more := logServer.AwaitFunctionLogs()
+            if !more {
+                return
+            }
+            logsReceived <- logs
+        }
+    }()
+    
+    for i := 0; i < 5; i++ {
+        logEvent := []api.LogEvent{
+            {
+                Time:   time.Now(),
+                Type:   "function",
+                Record: fmt.Sprintf("test log event %d", i),
+            },
+        }
+        
+        jsonData, err := json.Marshal(logEvent)
+        require.NoError(t, err)
+        
+        request := httptest.NewRequest("POST", "/", bytes.NewBuffer(jsonData))
+        recorder := httptest.NewRecorder()
+        logServer.handler(recorder, request)
+    }
+    
+    time.Sleep(50 * time.Millisecond)
+    
+    go logServer.Close()
+    
+    time.Sleep(10 * time.Millisecond)
+    
+    logEvent := []api.LogEvent{
+        {
+            Time:   time.Now(),
+            Type:   "function",
+            Record: "this should be rejected",
+        },
+    }
+    
+    jsonData, err := json.Marshal(logEvent)
+    require.NoError(t, err)
+    
+    request := httptest.NewRequest("POST", "/", bytes.NewBuffer(jsonData))
+    recorder := httptest.NewRecorder()
+    logServer.handler(recorder, request)
+    
+    time.Sleep(250 * time.Millisecond)
+    
+    logCount := 0
+    for {
+        select {
+        case logs := <-logsReceived:
+            logCount += len(logs)
+        case <-time.After(100 * time.Millisecond):
+            goto countDone
+        }
+    }
+	countDone:
+		assert.GreaterOrEqual(t, logCount, 1, "Should have received at least some logs")
+		
+		_, functionLogsOpen := <-logServer.functionLogChan
+		_, platformLogsOpen := <-logServer.platformLogChan
+		
+		assert.False(t, functionLogsOpen, "Function logs channel should be closed after shutdown")
+		assert.False(t, platformLogsOpen, "Platform logs channel should be closed after shutdown")
 }

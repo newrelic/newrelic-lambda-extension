@@ -121,9 +121,9 @@ func (ls *LogServer) handler(res http.ResponseWriter, req *http.Request) {
 	defer ls.wg.Done()
 
 	ls.shutdownLock.RLock()
-	isClosing := ls.isShuttingDown
+	logServerShuttingDown := ls.isShuttingDown
 	ls.shutdownLock.RUnlock()
-	if isClosing {
+	if logServerShuttingDown {
 		_, _ = res.Write(nil)
 		return
 	}
@@ -190,14 +190,7 @@ func (ls *LogServer) handler(res http.ResponseWriter, req *http.Request) {
 			}
 			ls.platformLogChan <- reportLine
 		case "platform.logsDropped":
-			ls.shutdownLock.RLock()
-			isClosing := ls.isShuttingDown
-			ls.shutdownLock.RUnlock()
-			if !isClosing {
-				util.Logf("Platform dropped logs: %v", event.Record)
-			} else {
-				fmt.Printf("Platform dropped logs during shutdown: %v\n", event.Record)
-			}
+			util.Logf("Platform dropped logs: %v", event.Record)
 		case "function", "extension", "platform.fault":
 			record := event.Record.(string)
 			ls.lastRequestIdLock.Lock()

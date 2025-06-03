@@ -34,6 +34,8 @@ type LogServer struct {
 	functionLogChan   chan []LogLine
 	lastRequestId     string
 	lastRequestIdLock *sync.Mutex
+	isShuttingDown    bool
+	shutdownLock      sync.RWMutex
 
 	wg                sync.WaitGroup
 }
@@ -45,6 +47,11 @@ func (ls *LogServer) Port() uint16 {
 }
 
 func (ls *LogServer) Close() error {
+
+	ls.shutdownLock.Lock()
+	ls.isShuttingDown = true
+	ls.shutdownLock.Unlock()
+
 	ctx, cancel := context.WithTimeout(context.Background(), 200*time.Millisecond)
 	defer cancel()
 
@@ -113,6 +120,14 @@ func (ls *LogServer) handler(res http.ResponseWriter, req *http.Request) {
 	ls.wg.Add(1)
 	defer ls.wg.Done()
 
+	ls.shutdownLock.RLock()
+	isClosing := ls.isShuttingDown
+	ls.shutdownLock.RUnlock()
+	if isClosing {
+		_, _ = res.Write(nil)
+		return
+	}
+
 	bodyBytes, err := io.ReadAll(req.Body)
 	if err != nil {
 		util.Logf("Error processing log request: %v", err)
@@ -175,7 +190,14 @@ func (ls *LogServer) handler(res http.ResponseWriter, req *http.Request) {
 			}
 			ls.platformLogChan <- reportLine
 		case "platform.logsDropped":
-			util.Logf("Platform dropped logs: %v", event.Record)
+			ls.shutdownLock.RLock()
+			isClosing := ls.isShuttingDown
+			ls.shutdownLock.RUnlock()
+			if !isClosing {
+				util.Logf("Platform dropped logs: %v", event.Record)
+			} else {
+				fmt.Printf("Platform dropped logs during shutdown: %v\n", event.Record)
+			}
 		case "function", "extension", "platform.fault":
 			record := event.Record.(string)
 			ls.lastRequestIdLock.Lock()

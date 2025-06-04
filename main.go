@@ -165,8 +165,14 @@ func main() {
 		logShipLoop(ctx, logServer, telemetryClient, conf.APMLambdaMode)
 	}()
 
+	var eventCounter int
 	// Call next, and process telemetry, until we're shut down
-	eventCounter := mainLoop(ctx, invocationClient, batch, telemetryChan, logServer, conf, telemetryClient)
+	if conf.APMLambdaMode {
+		eventCounter = mainAPMLoop(ctx, invocationClient, batch, telemetryChan, logServer, conf, telemetryClient)
+	} else {
+		// In non-APM mode, we process telemetry and platform logs
+		eventCounter = mainLoop(ctx, invocationClient, batch, telemetryChan, logServer, telemetryClient, extensionStartup)
+	}
 
 	util.Logf("New Relic Extension shutting down after %v events\n", eventCounter)
 	if conf.APMLambdaMode {
@@ -205,11 +211,10 @@ func logShipLoop(ctx context.Context, logServer *logserver.LogServer, telemetryC
 }
 
 // mainLoop repeatedly calls the /next api, and processes telemetry and platform logs. The timing is rather complicated.
-func mainLoop(ctx context.Context, invocationClient *client.InvocationClient, batch *telemetry.Batch, telemetryChan chan []byte, logServer *logserver.LogServer, conf *config.Configuration, telemetryClient *telemetry.Client) int {
+func mainLoop(ctx context.Context, invocationClient *client.InvocationClient, batch *telemetry.Batch, telemetryChan chan []byte, logServer *logserver.LogServer, telemetryClient *telemetry.Client, extensionStartup time.Time) int {
 	eventCounter := 0
 	probablyTimeout := false
-	apmCmd := apm.RpmCmd{}
-	apmControls := &apm.RpmControls{}
+
 	for {
 		select {
 		case <-ctx.Done():
@@ -219,14 +224,7 @@ func mainLoop(ctx context.Context, invocationClient *client.InvocationClient, ba
 			// Our call to next blocks. It is likely that the container is frozen immediately after we call NextEvent.
 			util.Debugln("mainLoop: waiting for next lambda invocation event...")
 			event, err := invocationClient.NextEvent(ctx)
-			if conf.APMLambdaMode {
-				apm.Once.Do(func() {
-					apmCmd, apmControls, err = apm.NewAPMClient(conf, LambdaFunctionName, LambdaAccountId, LambdaFunctionVersion)
-					if err != nil {
-						util.Logln("mainLoop: failed to initialize APM client:", err)
-					}
-				})
-			}
+
 			// We've thawed.
 			eventStart := time.Now()
 
@@ -248,63 +246,33 @@ func mainLoop(ctx context.Context, invocationClient *client.InvocationClient, ba
 				// timed out, this will catch us up to the current state of telemetry, allowing us to resume.
 				select {
 				case telemetryBytes := <-telemetryChan:
-					if conf.APMLambdaMode {
-						shipAPMHarvest(ctx, telemetryBytes, conf, apmCmd, apmControls)
-					} else {
-						// We received telemetry
-						util.Debugf("Agent telemetry bytes: %s", base64.URLEncoding.EncodeToString(telemetryBytes))
-						batch.AddTelemetry(lastRequestId, telemetryBytes)
-						util.Logf("We suspected a timeout for request %s but got telemetry anyway", lastRequestId)
-					}
+					// We received telemetry
+					util.Debugf("Agent telemetry bytes: %s", base64.URLEncoding.EncodeToString(telemetryBytes))
+					batch.AddTelemetry(lastRequestId, telemetryBytes, true)
+					util.Logf("We suspected a timeout for request %s but got telemetry anyway", lastRequestId)
 				default:
 				}
 			}
 
 			if event.EventType == api.Shutdown {
-				if conf.APMLambdaMode {
-					if event.ShutdownReason == api.Timeout {
-						timeoutSecs := eventStart.Sub(lastEventStart).Seconds()
-						errorMessage := fmt.Sprintf(
-							"Task timed out after %.2f seconds",
-							timeoutSecs,
-						)
-						apm.SendErrorEvent(apmCmd, apmControls, []interface{}{"Lambda.Timedout", 
-																			fmt.Sprintf("%f", timeoutSecs), 
-																			lastRequestId, 
-																			errorMessage,
-																			LambdaFunctionName, 
-																			LambdaAccountId, 
-																			LambdaFunctionVersion})
-					} else if event.ShutdownReason == api.Failure {
-						errorMessage := fmt.Sprintf("RequestId: %s AWS Lambda platform fault caused a shutdown", lastRequestId)
-						timeoutSecs := eventStart.Sub(lastEventStart).Seconds()
-						apm.SendErrorEvent(apmCmd, apmControls, []interface{}{"Lambda.PlatformFault", 
-																			fmt.Sprintf("%f", timeoutSecs), 
-																			lastRequestId, 
-																			errorMessage,
-																			LambdaFunctionName, 
-																			LambdaAccountId, 
-																			LambdaFunctionVersion})
+				if event.ShutdownReason == api.Timeout && lastRequestId != "" {
+					// Synthesize the timeout error message that the platform produces, and LLC parses
+					if lastEventStart.IsZero() {
+						lastEventStart = extensionStartup.UTC()
 					}
-				} else {
-					if event.ShutdownReason == api.Timeout && lastRequestId != "" {
-						// Synthesize the timeout error message that the platform produces, and LLC parses
-						timestamp := eventStart.UTC()
-						timeoutSecs := eventStart.Sub(lastEventStart).Seconds()
-						timeoutMessage := fmt.Sprintf(
-							"%s %s Task timed out after %.2f seconds",
-							timestamp.Format(time.RFC3339),
-							lastRequestId,
-							timeoutSecs,
-						)
-
-						batch.AddTelemetry(lastRequestId, []byte(timeoutMessage))
-
-					} else if event.ShutdownReason == api.Failure && lastRequestId != "" {
-						// Synthesize a generic platform error. Probably an OOM, though it could be any runtime crash.
-						errorMessage := fmt.Sprintf("RequestId: %s AWS Lambda platform fault caused a shutdown", lastRequestId)
-						batch.AddTelemetry(lastRequestId, []byte(errorMessage))
-					}
+					timestamp := eventStart.UTC()
+					timeoutSecs := eventStart.Sub(lastEventStart).Seconds()
+					timeoutMessage := fmt.Sprintf(
+						"%s %s Task timed out after %.2f seconds",
+						timestamp.Format(time.RFC3339),
+						lastRequestId,
+						timeoutSecs,
+					)
+					batch.AddTelemetry(lastRequestId, []byte(timeoutMessage), false)
+				} else if event.ShutdownReason == api.Failure && lastRequestId != "" {
+					// Synthesize a generic platform error. Probably an OOM, though it could be any runtime crash.
+					errorMessage := fmt.Sprintf("RequestId: %s AWS Lambda platform fault caused a shutdown", lastRequestId)
+					batch.AddTelemetry(lastRequestId, []byte(errorMessage), false)
 				}
 
 				return eventCounter
@@ -312,16 +280,15 @@ func mainLoop(ctx context.Context, invocationClient *client.InvocationClient, ba
 				// Reset probablyTimeout if the event after the suspected timeout wasn't a timeout shutdown.
 				probablyTimeout = false
 			}
-			if !conf.APMLambdaMode {
-				// Note: shutdown events do not have these properties; we now know this is an invocation event.
-				invokedFunctionARN = event.InvokedFunctionARN
-				lastRequestId = event.RequestID
 
-				// Create an invocation record to hold telemetry
-				batch.AddInvocation(lastRequestId, eventStart)
+			// Note: shutdown events do not have these properties; we now know this is an invocation event.
+			invokedFunctionARN = event.InvokedFunctionARN
+			lastRequestId = event.RequestID
 
-				// Await agent telemetry, which may time out.
-			}
+			// Create an invocation record to hold telemetry
+			batch.AddInvocation(lastRequestId, eventStart)
+
+			// Await agent telemetry, which may time out.
 
 			// timeoutInstant is when the invocation will time out
 			timeoutInstant := time.Unix(0, event.DeadlineMs*int64(time.Millisecond))
@@ -329,15 +296,12 @@ func mainLoop(ctx context.Context, invocationClient *client.InvocationClient, ba
 			// Set the timeout timer for a smidge before the actual timeout; we can recover from false timeouts.
 			timeoutWatchBegins := 200 * time.Millisecond
 			timeLimitContext, timeLimitCancel := context.WithDeadline(ctx, timeoutInstant.Add(-timeoutWatchBegins))
-			if conf.APMLambdaMode {
-				pollLogAPMServer(logServer, conf)
-			} else {
-				// Before we begin to await telemetry, harvest and ship. Ripe telemetry will mostly be handled here. Even that is a
-				// minority of invocations. Putting this here lets us run the HTTP request to send to NR in parallel with the Lambda
-				// handler, reducing or eliminating our latency impact.
-				pollLogServer(logServer, batch)
-				shipHarvest(ctx, batch.Harvest(time.Now()), telemetryClient)
-			}
+
+			// Before we begin to await telemetry, harvest and ship. Ripe telemetry will mostly be handled here. Even that is a
+			// minority of invocations. Putting this here lets us run the HTTP request to send to NR in parallel with the Lambda
+			// handler, reducing or eliminating our latency impact.
+			pollLogServer(logServer, batch)
+			shipHarvest(ctx, batch.Harvest(time.Now()), telemetryClient)
 
 			select {
 			case <-timeLimitContext.Done():
@@ -348,22 +312,124 @@ func mainLoop(ctx context.Context, invocationClient *client.InvocationClient, ba
 				continue
 			case telemetryBytes := <-telemetryChan:
 				timeLimitCancel()
-				if conf.APMLambdaMode {
-					pollLogAPMServer(logServer, conf)
-					shipAPMHarvest(ctx, telemetryBytes, conf, apmCmd, apmControls)
-				} else {
-					// We received telemetry
-					util.Debugf("Agent telemetry bytes: %s", base64.URLEncoding.EncodeToString(telemetryBytes))
-					inv := batch.AddTelemetry(lastRequestId, telemetryBytes)
-					if inv == nil {
-						util.Logf("Failed to add telemetry for request %v", lastRequestId)
-					}
-					// Opportunity for an aggressive harvest, in which case, we definitely want to wait for the HTTP POST
-					// to complete. Mostly, nothing really happens here.
-					pollLogServer(logServer, batch)
-					shipHarvest(ctx, batch.Harvest(time.Now()), telemetryClient)
+
+				// We received telemetry
+				util.Debugf("Agent telemetry bytes: %s", base64.URLEncoding.EncodeToString(telemetryBytes))
+				inv := batch.AddTelemetry(lastRequestId, telemetryBytes, true)
+				if inv == nil {
+					util.Logf("Failed to add telemetry for request %v", lastRequestId)
 				}
-				
+
+				// Opportunity for an aggressive harvest, in which case, we definitely want to wait for the HTTP POST
+				// to complete. Mostly, nothing really happens here.
+				pollLogServer(logServer, batch)
+				shipHarvest(ctx, batch.Harvest(time.Now()), telemetryClient)
+			}
+
+			lastEventStart = eventStart
+		}
+	}
+}
+
+
+// mainAPMLoop repeatedly calls the /next api, and processes telemetry and platform logs. The timing is rather complicated.
+func mainAPMLoop(ctx context.Context, invocationClient *client.InvocationClient, batch *telemetry.Batch, telemetryChan chan []byte, logServer *logserver.LogServer, conf *config.Configuration, telemetryClient *telemetry.Client) int {
+	eventCounter := 0
+	probablyTimeout := false
+	apmCmd := apm.RpmCmd{}
+	apmControls := &apm.RpmControls{}
+	for {
+		select {
+		case <-ctx.Done():
+			// We're already done
+			return eventCounter
+		default:
+			// Our call to next blocks. It is likely that the container is frozen immediately after we call NextEvent.
+			util.Debugln("mainLoop: waiting for next lambda invocation event...")
+			event, err := invocationClient.NextEvent(ctx)
+			apm.Once.Do(func() {
+				apmCmd, apmControls, err = apm.NewAPMClient(conf, LambdaFunctionName, LambdaAccountId, LambdaFunctionVersion)
+				if err != nil {
+					util.Logln("mainAPMLoop: failed to initialize APM client:", err)
+				}
+			})
+			// We've thawed.
+			eventStart := time.Now()
+
+			if err != nil {
+				util.Logln(err)
+				err = invocationClient.ExitError(ctx, "NextEventError.Main", err)
+				if err != nil {
+					util.Logln(err)
+				}
+				continue
+			}
+
+			eventCounter++
+
+			if probablyTimeout {
+				// We suspect a timeout. Either way, we've gotten to the next event, so telemetry will
+				// have arrived for the last request if it's going to. Non-blocking poll for telemetry.
+				// If we have indeed timed out, there's a chance we got telemetry out anyway. If we haven't
+				// timed out, this will catch us up to the current state of telemetry, allowing us to resume.
+				select {
+				case telemetryBytes := <-telemetryChan:
+					shipAPMHarvest(ctx, telemetryBytes, conf, apmCmd, apmControls)
+				default:
+				}
+			}
+
+			if event.EventType == api.Shutdown {
+				if event.ShutdownReason == api.Timeout {
+					timeoutSecs := eventStart.Sub(lastEventStart).Seconds()
+					errorMessage := fmt.Sprintf(
+						"Task timed out after %.2f seconds",
+						timeoutSecs,
+					)
+					apm.SendErrorEvent(apmCmd, apmControls, []interface{}{"Lambda.Timedout", 
+																		fmt.Sprintf("%f", timeoutSecs), 
+																		lastRequestId, 
+																		errorMessage,
+																		LambdaFunctionName, 
+																		LambdaAccountId, 
+																		LambdaFunctionVersion})
+				} else if event.ShutdownReason == api.Failure {
+					errorMessage := fmt.Sprintf("RequestId: %s AWS Lambda platform fault caused a shutdown", lastRequestId)
+					timeoutSecs := eventStart.Sub(lastEventStart).Seconds()
+					apm.SendErrorEvent(apmCmd, apmControls, []interface{}{"Lambda.PlatformFault", 
+																		fmt.Sprintf("%f", timeoutSecs), 
+																		lastRequestId, 
+																		errorMessage,
+																		LambdaFunctionName, 
+																		LambdaAccountId, 
+																		LambdaFunctionVersion})
+				}
+
+				return eventCounter
+			} else {
+				// Reset probablyTimeout if the event after the suspected timeout wasn't a timeout shutdown.
+				probablyTimeout = false
+			}
+
+			// timeoutInstant is when the invocation will time out
+			timeoutInstant := time.Unix(0, event.DeadlineMs*int64(time.Millisecond))
+
+			// Set the timeout timer for a smidge before the actual timeout; we can recover from false timeouts.
+			timeoutWatchBegins := 200 * time.Millisecond
+			timeLimitContext, timeLimitCancel := context.WithDeadline(ctx, timeoutInstant.Add(-timeoutWatchBegins))
+			pollLogAPMServer(logServer, conf)
+
+			select {
+			case <-timeLimitContext.Done():
+				timeLimitCancel()
+
+				// We are about to timeout
+				probablyTimeout = true
+				continue
+			case telemetryBytes := <-telemetryChan:
+				timeLimitCancel()
+				pollLogAPMServer(logServer, conf)
+				shipAPMHarvest(ctx, telemetryBytes, conf, apmCmd, apmControls)
 			}
 
 			lastEventStart = eventStart

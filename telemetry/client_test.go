@@ -168,7 +168,7 @@ func TestClientSendRetry(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 
 		if atomic.LoadInt32(&count) == 0 {
-			time.Sleep(50 * time.Millisecond)
+			time.Sleep(100 * time.Millisecond)
 		} else {
 			assert.Equal(t, r.Method, http.MethodPost)
 

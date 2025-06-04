@@ -87,3 +87,168 @@ func TestExtractTraceIDInvalid(t *testing.T) {
 	assert.Error(t, err)
 	assert.Empty(t, traceId)
 }
+
+func TestExtractTraceIDPayloadVersion2AnalyticEvent(t *testing.T) {
+	payload := []byte(`[2,"NR_LAMBDA_MONITORING",{"metadata_version":2,"arn":"arn:aws:lambda:us-east-1:466768951184:function:go-ext-test-HelloWorldFunction-OzWnlEPQ09ra","protocol_version":17,"agent_version":"3.36.0","agent_language":"go"},"H4sIAAAAAAAA/+xWS3PbNhD+L3sGSfBN4tRXmvTQSTpxmoNH41kRKwoTEGAB0K7s0X/vUKITO7UTu1WnPfSg0WoB7bevjx9vAA3qXVDdBV2SCRcSA4I4B2A34MiTu7TKXXh1TSBSzjlncLjoLzyRAZHu2fn5DYTdSCDgzKHx2AVlDTAwOMzO12FL7s5J8tImvY3o9xAF8iF6RVrb99Zp+eNkDjei19fvjX7x5hfeOgQGQQ3kAw4jiLTO26apyqZp65wBOWcdiA1qTwzk5PCALXjMy7Zp2qptGAQbUJ+pOZl7/n5SEgQgpXlJVVHxkktqD4AOO/rpocOad3xTIpcoi5byNTAYnbJOhR2INM7qrM1zBh6HUZMEEdxEe3YD3eSDHb4Nwan1FOa2fOb5FfVEMF/FKx9rHNYS485q+TagC8dADDorKdbKkLEgsiJbPJulcSBgNlNY/PME/IjdjNersJ3WcWeHBK/8/ImOKFFvkwXP0UZTF16hkZrcbZSN0jRi2IKA5J0n5xPES2XQb5PeJuOHPhmsTL4U/5vLNC7SmC84yfYIEPcW2KFeR79N5MOx5VWTFZksoyLLqqhosIrapkwjWRZYFGsqs3qz/G1JG91cOToj8MqLo1NMPiL0IUpFUVV11bRlmjaFuG2VeM4K7lerFVsm9gSi5F8lys+7l/bFfPzIdrc8z+dduFYjCLjGcd6MYxYDBae6O/ifKPHJbA9gJyLgnp2n7C5z+P1f922el01V12WbVWWeZjyvVyv2hWRQ638W4ewj/f8M8zT7rwL+/UafJL8flsfid7vvUWtyyTvzwdgr8+j3wyP513I59PekCc088iOaJ3A5+xqV345onisZi/JsOlnLfE3rqmvzNu2OYW7X6MFg8Jm2PCw/jwvmIxJ5MqnuMFBv3W4WHDLk1FyUcTGZ4HZvrDIfpexOpfHJHlTPEtr/xW0Z2n/njWOWuP0fAAAA//8BAAD//8swp8OVCgAA"]`)
+	payload = []byte(base64.StdEncoding.EncodeToString(payload))
+
+	traceId, err := ExtractTraceID(payload)
+
+	assert.Nil(t, err)
+	assert.Equal(t, "ae135e646050de9a70c0f5a0dad49e3b", traceId)
+}
+
+func TestExtractTraceIDPayloadVersion2SpanEvent(t *testing.T) {
+	payload := []byte("[2,\"NR_LAMBDA_MONITORING\",{\"metadata_version\":2,\"arn\":\"arn:aws:lambda:us-east-1:466768951184:function:go-ext-test-HelloWorldFunction-OzWnlEPQ09ra\",\"protocol_version\":17,\"agent_version\":\"3.36.0\",\"agent_language\":\"go\"},\"H4sIAG2gtWcC/+1X21LbMBB95ysYP8f3q/LUG4U+dKADlAeGyaytjePBllJZDk2Y/HtlJ6SkxCYtGWg7ZCaJIp3dlc5Zbda3e/vq1XxoSVVKXgxwgkwOKEjQ+vuXzVKzrPVW49vVqFkRWKKY8EwMymyGysq11Ku3DmrcloMSkSmEvVqc/8Rdrlms/3oYduVZTsd1UO3z9JAf1FG0XgswK7CUUIzrDYQuiaLAj4jlug/g8962wWdZ7U2bwVjbyst8bepqb310tbDQCpQiS7pFWJ0g2jBHnswqg6Jh9ViOUJwJYCUkMuPMPORmynX8LnWp2NSPMM/5BRc5/VixBqEfzy5YfnDyxSICtmLlcuMW7M0yWoblq0OSgEQtgD+12wJguX4UhKFPnMB3bcdywwfIq3WFezumH/L8ldPdcnrGJeRnqji8BLHPAvh7KP4Hysf/qciHSkBN77vpe1VCUJjn7JrxG9b6/UKF5pX9O/abO/QqwWO9UjkGtoum1XmJnvVUbb61XRWQ4CdawwBt18fACyzfokggtBJr6INFgXoE3bjNRVpljf0woSF1Y4yDhLjETjpC3lXszYHbDEvVVedYm0hRYQtoLDIuMjmtuTSc0CGu+zudekTCNjxdXi8FfzT3dtbZtrhPQGLKRX1KLUWGqpFvgzJhqAQT0xOeqaeWTu7uKWM8Z2vekr+LZ8W3Uj2mxJVsdvPL1FfIK3xSCE7RGGY5jkGO6gDmubqxpQkwyRiUI3VUc3ydmgWnZprJURUbCS9MuCnrt55DEVPQU/5mYhuebVjmYsYcAaOqAhspb5NFmRsCv1WKw+UtCCLHc6ive44T6F4EgU4i39ap74Hnxeg74bDL2SKyAYI13gTrq9n+YrZflTqCUsvue0EQBhHxbTvy+sOlZP0dpOS9PSQ8p6cSxCPp1pCfZwwZr0uj53Th7rbaVBo1trUudJ29qmYnTdJ0CbcUTEkxzDGRRwvdNqRU99/E3vwHxv8etOUQAAA=\"]")
+	payload = []byte(base64.StdEncoding.EncodeToString(payload))
+
+	traceId, err := ExtractTraceID(payload)
+
+	assert.Nil(t, err)
+	assert.Equal(t, "ae135e646050de9a70c0f5a0dad49e3b", traceId)
+}
+
+func TestParsePayloadVersion2InvalidData(t *testing.T) {
+	payload := []byte("[2, \"NR_LAMBDA_MONITORING\", \"H4sIAK6pdWIC/0vLz09KLAIAlR/2ngYAAAA=\"]")
+
+	data, err := parsePayload(payload)
+
+	assert.Nil(t, data)
+	assert.Error(t, err)
+}
+
+func TestExtractTraceIDPayloadVersion2Invalid(t *testing.T) {
+	payload := []byte("[2, \"NR_LAMBDA_MONITORING\",{\"metadata_version\":2,\"arn\":\"arn:aws:lambda:us-east-1:466768951184:function:go-ext-test-HelloWorldFunction-OzWnlEPQ09ra\",\"protocol_version\":17,\"agent_version\":\"3.36.0\",\"agent_language\":\"go\"}, \"H4sIAK6pdWIC/0vLz09KLAIAlR/2ngYAAAA=\"]")
+	payload = []byte(base64.StdEncoding.EncodeToString(payload))
+
+	traceId, err := ExtractTraceID(payload)
+
+	assert.Error(t, err)
+	assert.Empty(t, traceId)
+
+	payload2 := []byte("[foobar]")
+	payload2 = []byte(base64.StdEncoding.EncodeToString(payload))
+
+	traceId, err = ExtractTraceID(payload2)
+
+	assert.Nil(t, err)
+	assert.Empty(t, traceId)
+
+	payload3 := []byte("[foobar]")
+
+	traceId, err = ExtractTraceID(payload3)
+
+	assert.Error(t, err)
+	assert.Empty(t, traceId)
+}
+
+func TestParsePayloadVersion2InvalidVersion(t *testing.T) {
+	payload := []byte("[\"invalid\", \"NR_LAMBDA_MONITORING\", \"foo\", \"H4sIAK6pdWIC/0vLz09KLAIAlR/2ngYAAAA=\"]")
+
+	data, err := parsePayload(payload)
+
+	assert.Nil(t, data)
+	assert.Error(t, err)
+}
+
+func TestParsePayloadVersion2InvalidJSON(t *testing.T) {
+	payload := []byte("[\"2\", \"NR_LAMBDA_MONITORING\", \"foo\", \"H4sIAK6pdWIC/0vLz09KLAIAlR/2ngYAAAA=")
+	data, err := parsePayload(payload)
+	assert.Nil(t, data)
+	assert.Error(t, err)
+}
+
+func TestParsePayloadVersion2InvalidCompressedData(t *testing.T) {
+	payload := []byte("[\"2\", \"NR_LAMBDA_MONITORING\", \"foo\", \"invalid_base64\"]")
+
+	data, err := parsePayload(payload)
+	assert.Nil(t, data)
+	assert.Error(t, err)
+}
+
+func TestParsePayloadVersion2EmptyCompressedData(t *testing.T) {
+	payload := []byte("[\"2\", \"NR_LAMBDA_MONITORING\", \"foo\", \"\"]")
+
+	data, err := parsePayload(payload)
+	assert.Nil(t, data)
+	assert.Error(t, err)
+}
+
+func TestParsePayloadVersion2MalformedUncompressedJSON(t *testing.T) {
+	payload := []byte("[\"2\", \"NR_LAMBDA_MONITORING\", \"foo\", \"H4sIAK6pdWIC/6tmqGZkYKhmBGIglgsZGRgYaxlqGVgYaxhqGBsaGpkam1qYGBibmhkZmlgYGhobG5iYmhgbW5oZGFsYmhgYGxuamRgbmVoZGpkZmxqYGBsZW5gaGRhaGpgYmpgaGBoaGhgaGpkaGxkbGRsaGhsYGllYGBpaWBoZGhuYGlpamBgYmBpamBsbGZkamFgYGFiamxoZGVkaGJmaWJgZGBoYGFha/K9lqGWoZQQA5H6Q4DUAAAA=\"]")
+
+	data, err := parsePayload(payload)
+	assert.Nil(t, data)
+	assert.Error(t, err)
+}
+func TestExtractTraceIDVersion1AnalyticEventEmpty(t *testing.T) {
+	payload := []byte(`[1, "NR_LAMBDA_MONITORING", "H4sIAAAAAAAA/6pWykxRslLKKlYqLs3NTSyqVLIqKSpN1VEqLU4t8kxRsjI0MTG3NDI3MjAwMDSt5aoFAAAA//8BAAD//3cqHKg0AAAA"]`)
+	payload = []byte(base64.StdEncoding.EncodeToString(payload))
+
+	traceId, err := ExtractTraceID(payload)
+	assert.Error(t, err)
+	assert.Empty(t, traceId)
+}
+
+func TestExtractTraceIDVersion1SpanEventEmpty(t *testing.T) {
+	payload := []byte(`[1, "NR_LAMBDA_MONITORING", "H4sIAAAAAAAA/6pWKi7NzU0sqlSyKikqTdVRKi1OLfJMUbIyNDExtzQyNzIwMDA0rQUEAAD//wEAAP//V7DEFEQAAAA="]`)
+	payload = []byte(base64.StdEncoding.EncodeToString(payload))
+
+	traceId, err := ExtractTraceID(payload)
+	assert.Error(t, err)
+	assert.Empty(t, traceId)
+}
+
+func TestExtractTraceIDVersion2AnalyticEventEmpty(t *testing.T) {
+	payload := []byte(`[2, "NR_LAMBDA_MONITORING", {"metadata_version":2}, "H4sIAAAAAAAA/6pWKi7NzU0sqlSyKikqTdVRKi1OLfJMUbIyNDExtzQyNzIwMDA0rQUEAAD//wEAAP//V7DEFEQAAAA="]`)
+	payload = []byte(base64.StdEncoding.EncodeToString(payload))
+
+	traceId, err := ExtractTraceID(payload)
+	assert.Error(t, err)
+	assert.Empty(t, traceId)
+}
+
+func TestExtractTraceIDVersion2SpanEventEmpty(t *testing.T) {
+	payload := []byte(`[2, "NR_LAMBDA_MONITORING", {"metadata_version":2}, "H4sIAAAAAAAA/6pWKi7NzU0sqlSyKikqTdVRKi1OLfJMUbIyNDExtzQyNzIwMDA0rQUEAAD//wEAAP//V7DEFEQAAAA="]`)
+	payload = []byte(base64.StdEncoding.EncodeToString(payload))
+
+	traceId, err := ExtractTraceID(payload)
+	assert.Error(t, err)
+	assert.Empty(t, traceId)
+}
+
+func TestExtractTraceIDVersion1MalformedAnalyticEvent(t *testing.T) {
+	payload := []byte(`[1, "NR_LAMBDA_MONITORING", "H4sIAAAAAAAA/6pWKi7NzU0sqlSyKikqTdVRKi1OLfJMUbIyNDExtzQyNzIwMDA0rQUA{invalid}"]`)
+	payload = []byte(base64.StdEncoding.EncodeToString(payload))
+
+	traceId, err := ExtractTraceID(payload)
+	assert.Error(t, err)
+	assert.Empty(t, traceId)
+}
+
+func TestExtractTraceIDVersion2MalformedSpanEvent(t *testing.T) {
+	payload := []byte(`[2, "NR_LAMBDA_MONITORING", {"metadata_version":2}, "H4sIAAAAAAAA/6pWKi7NzU0sqlSyKikqTdVRKi1OLfJMUbIyNDExtzQyNzIwMDA0rQUA{invalid}"]`)
+	payload = []byte(base64.StdEncoding.EncodeToString(payload))
+
+	traceId, err := ExtractTraceID(payload)
+	assert.Error(t, err)
+	assert.Empty(t, traceId)
+}
+
+func TestExtractTraceIDVersion1NonLambdaMonitoring(t *testing.T) {
+	payload := []byte(`[1, "SOME_OTHER_EVENT", "H4sIAAAAAAAA/6pWKi7NzU0sqlSyKikqTdVRKi1OLfJMUbIyNDExtzQyNzIwMDA0rQUEAAD//wEAAP//V7DEFEQAAAA="]`)
+	payload = []byte(base64.StdEncoding.EncodeToString(payload))
+
+	traceId, err := ExtractTraceID(payload)
+	assert.Nil(t, err)
+	assert.Empty(t, traceId)
+}
+
+func TestExtractTraceIDVersion2NonLambdaMonitoring(t *testing.T) {
+	payload := []byte(`[2, "SOME_OTHER_EVENT", {"metadata_version":2}, "H4sIAAAAAAAA/6pWKi7NzU0sqlSyKikqTdVRKi1OLfJMUbIyNDExtzQyNzIwMDA0rQUEAAD//wEAAP//V7DEFEQAAAA="]`)
+	payload = []byte(base64.StdEncoding.EncodeToString(payload))
+
+	traceId, err := ExtractTraceID(payload)
+	assert.Nil(t, err)
+	assert.Empty(t, traceId)
+}

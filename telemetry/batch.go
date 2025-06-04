@@ -12,28 +12,6 @@ import (
 // The Unix epoch instant; used as a nil time for eldest and lastHarvest
 var epochStart = time.Unix(0, 0)
 
-var storeTraceID = &TraceIDStore{
-	store: make(map[string]string),
-}
-
-type TraceIDStore struct {
-	store map[string]string
-	mutex sync.RWMutex
-}
-
-func (t *TraceIDStore) SetTraceIDValue(key string, value string) {
-	t.mutex.Lock()
-	defer t.mutex.Unlock()
-	t.store[key] = value
-}
-func (t *TraceIDStore) GetTraceIDValue(key string) (string, bool) {
-	t.mutex.RLock()
-	defer t.mutex.RUnlock()
-	value, exists := t.store[key]
-	return value, exists
-}
-
-// Batch represents the unsent invocations and their telemetry, along with timing data.
 type Batch struct {
 	extractTraceID  bool
 	lastHarvest     time.Time
@@ -42,6 +20,12 @@ type Batch struct {
 	veryOldDuration time.Duration
 	invocations     map[string]*Invocation
 	lock            sync.RWMutex
+	storeTraceID    map[string]string
+}
+
+func (b *Batch) SetTraceIDValue(key string, value string) {
+
+	b.storeTraceID[key] = value
 }
 
 // NewBatch constructs a new batch.
@@ -54,6 +38,7 @@ func NewBatch(ripeMillis, rotMillis int64, extractTraceID bool) *Batch {
 		ripeDuration:    time.Duration(ripeMillis) * time.Millisecond,
 		veryOldDuration: time.Duration(rotMillis) * time.Millisecond,
 		extractTraceID:  extractTraceID,
+		storeTraceID:    make(map[string]string, initialSize),
 	}
 }
 
@@ -67,7 +52,7 @@ func (b *Batch) AddInvocation(requestId string, start time.Time) {
 }
 
 // AddTelemetry attaches telemetry to an existing Invocation, identified by requestId
-func (b *Batch) AddTelemetry(requestId string, telemetry []byte) *Invocation {
+func (b *Batch) AddTelemetry(requestId string, telemetry []byte, isAPMTelemetry bool) *Invocation {
 	b.lock.Lock()
 	defer b.lock.Unlock()
 
@@ -77,7 +62,7 @@ func (b *Batch) AddTelemetry(requestId string, telemetry []byte) *Invocation {
 		if b.eldest.Equal(epochStart) {
 			b.eldest = inv.Start
 		}
-		if b.extractTraceID {
+		if b.extractTraceID && isAPMTelemetry {
 			telemetryBytesEncoded := []byte(base64.StdEncoding.EncodeToString(telemetry))
 			traceId, err := ExtractTraceID(telemetryBytesEncoded)
 			if err != nil {
@@ -87,7 +72,7 @@ func (b *Batch) AddTelemetry(requestId string, telemetry []byte) *Invocation {
 			// We don't want to unset a previously set trace ID
 			if traceId != "" {
 				inv.TraceId = traceId
-				storeTraceID.SetTraceIDValue(requestId, traceId)
+				b.SetTraceIDValue(requestId, traceId)
 			}
 		}
 		return inv
@@ -166,8 +151,8 @@ func (b *Batch) ripeHarvest(now time.Time) []*Invocation {
 func (b *Batch) RetrieveTraceID(requestId string) string {
 	b.lock.RLock()
 	defer b.lock.RUnlock()
-
-	if traceId, exists := storeTraceID.GetTraceIDValue(requestId); exists {
+	traceId, exists := b.storeTraceID[requestId]
+	if exists {
 		return traceId
 	}
 	return ""

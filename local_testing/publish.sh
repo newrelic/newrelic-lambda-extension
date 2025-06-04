@@ -11,6 +11,9 @@ DIST_DIR=dist
 
 BUCKET_PREFIX=nr-extension-test-layers
 
+EXTENSION_DIST_ZIP_ARM64=$DIST_DIR/extension.arm64.zip
+EXTENSION_DIST_ZIP_X86_64=$DIST_DIR/extension.x86_64.zip
+
 PY311_DIST_ARM64=$DIST_DIR/python311.arm64.zip
 PY311_DIST_X86_64=$DIST_DIR/python311.x86_64.zip
 
@@ -185,6 +188,35 @@ function publish_python_version {
     done
 }
 
+function build_extension_version {
+    arch=$1
+    dist_dir=$2
+
+    echo "Building New Relic Lambda Extension Layer (x86_64)"
+    rm -rf $DIST_DIR
+    mkdir -p $DIST_DIR
+    download_extension $arch
+    zip -rq $dist_dir $EXTENSION_DIST_DIR 
+    # rm -rf $EXTENSION_DIST_DIR
+    echo "Build complete: ${dist_dir}"
+}
+
+function publish_extension_version {
+    dist_dir=$1
+    arch=$2
+    regions=("${@:3}")
+
+    if [ ! -f $dist_dir ]; then
+        echo "Package not found: ${dist_dir}"
+        exit 1
+    fi
+
+    for region in "${regions[@]}"; do
+        publish_layer $dist_dir $region extension $arch
+    done
+}
+
+
 if [ -f "$TMP_ENV_FILE_NAME" ]; then
     echo "Deleting tmp env file"
     rm -r "$TMP_ENV_FILE_NAME"
@@ -209,6 +241,16 @@ build_python_version "3.12" "arm64" $PY312_DIST_ARM64
 publish_python_version $PY312_DIST_ARM64 "arm64" "3.12" "${REGIONS_ARM[@]}"
 
 # Build and publish for python3.12 x86_64
-echo "Building and publishing for Python 3.11 x86_64..."
+echo "Building and publishing for Python 3.12 x86_64..."
 build_python_version "3.12" "x86_64" $PY312_DIST_X86_64
 publish_python_version $PY312_DIST_X86_64 "x86_64" "3.12" "${REGIONS_X86[@]}"
+
+# Build and publish for Extension ARM64
+echo "Building and publishing for Extension ARM64..."
+build_extension_version "arm64" $EXTENSION_DIST_ZIP_ARM64
+publish_extension_version $EXTENSION_DIST_ZIP_ARM64 "arm64" "${REGIONS_ARM[@]}"
+
+# Build and publish for Extension x86_64
+echo "Building and publishing for Extension x86_64..."
+build_extension_version "x86_64" $EXTENSION_DIST_ZIP_X86_64
+publish_extension_version $EXTENSION_DIST_ZIP_X86_64 "x86_64" "${REGIONS_X86[@]}"

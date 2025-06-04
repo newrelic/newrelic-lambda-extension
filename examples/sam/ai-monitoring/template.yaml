@@ -1,0 +1,45 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: ai-monitoring
+Resources:
+  StreamingFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: src/
+      Handler: newrelic-lambda-wrapper.handler
+      Runtime: nodejs20.x
+      Timeout: 300
+      MemorySize: 512
+      AutoPublishAlias: live
+      FunctionUrlConfig:
+        AuthType: AWS_IAM
+        InvokeMode: RESPONSE_STREAM
+      Environment:
+        Variables:
+          
+          NEW_RELIC_LAMBDA_HANDLER: index.handler
+          NEW_RELIC_ACCOUNT_ID: 'your-nr-account-id'
+          NEW_RELIC_LICENSE_KEY: "your-license-key"
+          NEW_RELIC_EXTENSION_LOG_LEVEL: "INFO"
+          NEW_RELIC_EXTENSION_SEND_EXTENSION_LOGS: "true"
+          NEW_RELIC_EXTENSION_SEND_FUNCTION_LOGS: "true"
+          NEW_RELIC_AI_MONITORING_ENABLED: "true"
+      Layers:
+        # This layer includes the New Relic Lambda extension, a sidecar process that sends telemetry,
+        # as well as the New Relic agent for Node.js, and a handler wrapper that makes integration easy.
+        - !Sub arn:${AWS::Partition}:lambda:${AWS::Region}:451483290750:layer:NewRelicNodeJS20X:59
+    
+     
+  MyFunctionUrl:
+    Type: AWS::Lambda::Url
+    Properties:
+      TargetFunctionArn: !Ref StreamingFunction
+      AuthType: AWS_IAM
+      InvokeMode: RESPONSE_STREAM       
+Outputs:
+  StreamingFunction:
+    Description: "Streaming Lambda Function ARN"
+    Value: !GetAtt StreamingFunction.Arn
+  StreamingFunctionURL:
+    Description: "Streaming Lambda Function URL"
+    Value: !GetAtt MyFunctionUrl.FunctionUrl

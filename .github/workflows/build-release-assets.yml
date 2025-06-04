@@ -9,7 +9,7 @@ on:
 jobs:
 
   build-release-x86_64:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-24.04
     if: startsWith(github.ref, 'refs/tags/v')
     steps:
       - uses: actions/checkout@v4
@@ -32,7 +32,7 @@ jobs:
           gh release upload "$TAG" "$file"
   
   build-release-arm:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-24.04
     if: startsWith(github.ref, 'refs/tags/v')
     steps:
       - uses: actions/checkout@v4

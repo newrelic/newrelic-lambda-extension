@@ -456,7 +456,7 @@ func pollLogAPMServer(logServer *logserver.LogServer, conf *config.Configuration
 // pollLogServer polls for platform logs, and annotates telemetry
 func pollLogServer(logServer *logserver.LogServer, batch *telemetry.Batch) {
 	for _, platformLog := range logServer.PollPlatformChannel() {
-		inv := batch.AddTelemetry(platformLog.RequestID, platformLog.Content)
+		inv := batch.AddTelemetry(platformLog.RequestID, platformLog.Content, false)
 		if inv == nil {
 			util.Debugf("Skipping platform log for request %v", platformLog.RequestID)
 		}

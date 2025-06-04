@@ -291,12 +291,6 @@ func TestLogServerShutdownDuringRequests(t *testing.T) {
     done := make(chan struct{})
     
     go func() {
-        defer func() {
-            if r := recover(); r != nil {
-                panicChan <- r
-            }
-        }()
-        
         for {
             _, more := logServer.AwaitFunctionLogs()
             if !more {
@@ -305,28 +299,11 @@ func TestLogServerShutdownDuringRequests(t *testing.T) {
         }
     }()
     
-    go func() {
-        defer func() {
-            if r := recover(); r != nil {
-                panicChan <- r
-            }
-        }()
-        
-        SendFunctionLogsContinuously(logServer, t)
-    }()
-    
-    go func() {
-        defer func() {
-            if r := recover(); r != nil {
-                panicChan <- r
-            }
-            close(done)
-        }()
-         time.Sleep(10 * time.Millisecond)
-        err := logServer.Close()
-        assert.NoError(t, err, "Server should close without errors")
-    }()
-    
+	SendFunctionLogsContinuously(logServer, t)
+	time.Sleep(10 * time.Millisecond)
+	err = logServer.Close()
+	assert.NoError(t, err, "Server should close without errors")
+	close(done)
     select {
     case <-done:
     case panicVal := <-panicChan:

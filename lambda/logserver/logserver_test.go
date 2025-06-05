@@ -4,18 +4,18 @@
 package logserver
 
 import (
-    "bytes"
-    "encoding/json"
-    "fmt"
-    "net/http"
-    "net/http/httptest"
-    "testing"
-    "time"
-    
-    "github.com/newrelic/newrelic-lambda-extension/config"
-    "github.com/newrelic/newrelic-lambda-extension/lambda/extension/api"
-    "github.com/stretchr/testify/assert"
-    "github.com/stretchr/testify/require"
+	"bytes"
+	"encoding/json"
+	"fmt"
+	"net/http"
+	"net/http/httptest"
+	"testing"
+	"time"
+
+	"github.com/newrelic/newrelic-lambda-extension/config"
+	"github.com/newrelic/newrelic-lambda-extension/lambda/extension/api"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestLogServer(t *testing.T) {
@@ -264,51 +264,47 @@ func TestLogServerHandlerDuringShutdown(t *testing.T) {
 
 func SendFunctionLogsContinuously(logServer *LogServer, t *testing.T) {
 	for i := 0; i < 5000; i++ {
-        logEvent := []api.LogEvent{
-            {
-                Time:   time.Now(),
-                Type:   "function",
-                Record: fmt.Sprintf("test log event %d", i),
-            },
-        }
-        
-        jsonData, err := json.Marshal(logEvent)
-        require.NoError(t, err)
-        
-        request := httptest.NewRequest("POST", "/", bytes.NewBuffer(jsonData))
-        recorder := httptest.NewRecorder()
-        logServer.handler(recorder, request)
-    }
+		logEvent := []api.LogEvent{
+			{
+				Time:   time.Now(),
+				Type:   "function",
+				Record: fmt.Sprintf("test log event %d", i),
+			},
+		}
+
+		jsonData, err := json.Marshal(logEvent)
+		require.NoError(t, err)
+
+		request := httptest.NewRequest("POST", "/", bytes.NewBuffer(jsonData))
+		recorder := httptest.NewRecorder()
+		logServer.handler(recorder, request)
+	}
 }
 
 func TestLogServerShutdownDuringRequests(t *testing.T) {
-    logServer, err := startInternal("localhost")
-    require.NoError(t, err)
-    require.NotNil(t, logServer)
-    
-    panicChan := make(chan interface{})
-    
-    done := make(chan struct{})
-    
-    go func() {
-        for {
-            _, more := logServer.AwaitFunctionLogs()
-            if !more {
-                return
-            }
-        }
-    }()
-    
-	SendFunctionLogsContinuously(logServer, t)
+	logServer, err := startInternal("localhost")
+	require.NoError(t, err)
+	require.NotNil(t, logServer)
+
+	done := make(chan struct{})
+
+	go func() {
+		for {
+			_, more := logServer.AwaitFunctionLogs()
+			if !more {
+				return
+			}
+		}
+	}()
+
+	go SendFunctionLogsContinuously(logServer, t)
 	time.Sleep(10 * time.Millisecond)
 	err = logServer.Close()
 	assert.NoError(t, err, "Server should close without errors")
 	close(done)
-    select {
-    case <-done:
-    case panicVal := <-panicChan:
-        t.Fatalf("Panic during test: %v", panicVal)
-    case <-time.After(5 * time.Second):
-        t.Fatal("Test timed out")
-    }
+	select {
+	case <-done:
+	case <-time.After(5 * time.Second):
+		t.Fatal("Test timed out")
+	}
 }

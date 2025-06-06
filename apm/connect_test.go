@@ -136,3 +136,44 @@ func TestGetLambdaARN_UsesDefaultRegionIfRegionUnset(t *testing.T) {
 	expected := "arn:aws:lambda:ap-southeast-2:111222333444:function:default-func"
 	assert.Equal(t, expected, arn)
 }
+
+func TestCheckRuntime_NodeExists(t *testing.T) {
+	origRuntimeLookupPath := runtimeLookupPath
+	defer func() { runtimeLookupPath = origRuntimeLookupPath }()
+
+	tmpDir := t.TempDir()
+	runtimeLookupPath = tmpDir
+
+	nodePath := filepath.Join(tmpDir, "node")
+	err := os.WriteFile(nodePath, []byte{}, 0755)
+	assert.NoError(t, err)
+
+	got := checkRuntime()
+	assert.Equal(t, NodeLambda, got)
+}
+
+func TestCheckRuntime_PythonExists(t *testing.T) {
+	origRuntimeLookupPath := runtimeLookupPath
+	defer func() { runtimeLookupPath = origRuntimeLookupPath }()
+
+	tmpDir := t.TempDir()
+	runtimeLookupPath = tmpDir
+
+	pythonPath := filepath.Join(tmpDir, "python")
+	err := os.WriteFile(pythonPath, []byte{}, 0755)
+	assert.NoError(t, err)
+
+	got := checkRuntime()
+	assert.Equal(t, PythonLambda, got)
+}
+
+func TestCheckRuntime_NoneExists_ReturnsDefault(t *testing.T) {
+	origRuntimeLookupPath := runtimeLookupPath
+	defer func() { runtimeLookupPath = origRuntimeLookupPath }()
+
+	tmpDir := t.TempDir()
+	runtimeLookupPath = tmpDir
+
+	got := checkRuntime()
+	assert.Equal(t, DefaultLambda, got)
+}

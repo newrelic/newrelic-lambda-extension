@@ -122,7 +122,7 @@ func getUtilizationData(cmd RpmCmd) map[string]interface{} {
 type AgentRuntime string
 
 var (
-	Node 	AgentRuntime = "node"
+	Node 	AgentRuntime = "nodejs"
 	Python 	AgentRuntime = "python"
 	Go 		AgentRuntime = "go"
 	Dotnet 	AgentRuntime = "dotnet"

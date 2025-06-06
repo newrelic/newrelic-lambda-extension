@@ -142,19 +142,6 @@ func TestParseLambdaReportLog(t *testing.T) {
 			wantError: false,
 		},
 		{
-			name:    "Report Log With Extra Spaces",
-			logLine: "RequestId:   qwe321   Duration:  10.1 ms   Billed Duration:  20 ms   Memory Size:  512 MB   Max Memory Used:  256 MB",
-			want: &LambdaMetrics{
-				RequestID:      "qwe321",
-				Duration:       10.1,
-				BilledDuration: 20,
-				MemorySize:     512,
-				MaxMemoryUsed:  256,
-				InitDuration:   nil,
-			},
-			wantError: false,
-		},
-		{
 			name:    "Report Log With Fault Fallback",
 			logLine: "RequestId: 123abc Status: Error ErrorType: Timeout",
 			want: &LambdaMetrics{

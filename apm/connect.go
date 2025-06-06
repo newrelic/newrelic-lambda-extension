@@ -13,6 +13,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/newrelic/newrelic-lambda-extension/checks"
 	"github.com/newrelic/newrelic-lambda-extension/config"
 	"github.com/newrelic/newrelic-lambda-extension/util"
 )
@@ -119,66 +120,71 @@ func getUtilizationData(cmd RpmCmd) map[string]interface{} {
 	return utilizationData
 }
 
-type AgentRuntime string
+
+type LambdaRuntime string
 
 var (
-	Node 	AgentRuntime = "nodejs"
-	Python 	AgentRuntime = "python"
-	Go 		AgentRuntime = "go"
-	Dotnet 	AgentRuntime = "dotnet"
-	Ruby   	AgentRuntime = "ruby"
-	Java 	AgentRuntime = "java"
+	NodeLambda   	LambdaRuntime = "node"
+	PythonLambda  	LambdaRuntime = "python"
+	DefaultLambda	LambdaRuntime = "go" 
 	runtimeLookupPath     = "/var/lang/bin"
 )
 
-var LambdaRuntimes = []AgentRuntime{Node, Python, Go, Dotnet, Ruby, Java}
+var LambdaRuntimes = []LambdaRuntime{NodeLambda, PythonLambda}
 
-func checkRuntime() (AgentRuntime) {
+func checkRuntime() (LambdaRuntime) {
 	for _, runtime := range LambdaRuntimes {
 		p := filepath.Join(runtimeLookupPath, string(runtime))
 		if util.PathExists(p) {
 			return runtime
 		}
 	}
-	return Go
+	return DefaultLambda
 }
 
-type agentConfig struct {
-	language            AgentRuntime
-	agentVersion        string
-}
+func getAgentVersion(runtime string) (string, string, error) {
+	var layerAgentPaths []string
+	var agentVersionFile string
+	if runtime == "node" {
+		layerAgentPaths = checks.LayerAgentPathNode
+		agentVersionFile = "package.json"
+	} else if runtime == "python" {
+		layerAgentPaths = checks.LayerAgentPathsPython
+		agentVersionFile = "version.txt"
+	}
 
-var agentRuntimeConfig = map[AgentRuntime]agentConfig{
-	Node: {
-		language:     Node,
-		agentVersion: "12.17.0",
-	},
-	Python: {
-		language:     Python,
-		agentVersion: "10.8.1",
-	},
-	Ruby: {
-		language:     Ruby,
-		agentVersion: "9.18.0",
-	},
-	Go: {
-		language:     Go,
-		agentVersion: "3.38.0",
-	},
-	Dotnet: {
-		language:    Dotnet,
-		agentVersion: "10.40.0",
-	},
-	Java: {
-		language:   Java,
-		agentVersion: "2.2.0",
-	},
-}
+	for i := range layerAgentPaths {
+		f := filepath.Join(layerAgentPaths[i], agentVersionFile)
+		if !util.PathExists(f) {
+			continue
+		}
 
+		b, err := os.ReadFile(f)
+		if err != nil {
+			return "", "", err
+		}
+
+		if runtime == "python" {
+			return "python", string(b), nil
+		} else {
+			v := checks.LayerAgentVersion{}
+			err = json.Unmarshal([]byte(b), &v)
+			if err != nil {
+				return "", "", err
+			}
+			return "nodejs", v.Version, nil
+		}
+	}
+
+	return "", "", fmt.Errorf("agent version file not found in layer paths: %v", layerAgentPaths)
+}
 
 func Connect(cmd RpmCmd, cs *RpmControls) (string, string, error) {
-	runtime := checkRuntime()
-	runtimeConfig := agentRuntimeConfig[runtime]
+	runtimeLanguage := checkRuntime()
+	NRAgentLanguage, NRAgentVersion, err := getAgentVersion(string(runtimeLanguage))
+	if err != nil {
+		NRAgentVersion = "unknown"
+	}
 	pid := os.Getpid()
 	appName := os.Getenv("AWS_LAMBDA_FUNCTION_NAME")
 	if appName == "" {
@@ -187,8 +193,8 @@ func Connect(cmd RpmCmd, cs *RpmControls) (string, string, error) {
 	data := []map[string]interface{}{
 		{
 			"pid":           pid,
-			"language":      runtimeConfig.language,
-			"agent_version": runtimeConfig.agentVersion,
+			"language":      NRAgentLanguage,
+			"agent_version": NRAgentVersion,
 			"host":          "AWS Lambda",
 			"app_name":      []string{appName},
 			"identifier":    appName,
@@ -196,9 +202,9 @@ func Connect(cmd RpmCmd, cs *RpmControls) (string, string, error) {
 		},
 	}
 	marshaledData, err := json.Marshal(data)
-	util.Debugf("Marshalled Data for Connect Call for runtime %s: %s\n", string(runtime), string(marshaledData))
+	util.Debugf("APM Connect Call for runtime %s: %s\n", string(runtimeLanguage), string(marshaledData))
 	if err != nil {
-		return "", "", fmt.Errorf("failed to marshal connect data: %w", err)
+		util.Fatal(fmt.Errorf("Extension shutdown: failed to perform APM connect: %w", err))
 	}
 	cmd.Data = marshaledData
 	cmd.Name = cmdConnect

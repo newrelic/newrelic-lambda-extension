@@ -120,6 +120,19 @@ func getUtilizationData(cmd RpmCmd) map[string]interface{} {
 	return utilizationData
 }
 
+type Label struct {
+	LabelType  string `json:"label_type"`
+	LabelValue string `json:"label_value"`
+}
+
+func getLabels(cmd RpmCmd) []Label {
+	lambdaARN := getLambdaARN(cmd)
+	labels := []Label{
+		{LabelType: "aws.arn", LabelValue: lambdaARN},
+		{LabelType: "isLambdaFunction", LabelValue: "true"},
+	}
+	return labels
+}
 
 type LambdaRuntime string
 
@@ -199,6 +212,7 @@ func Connect(cmd RpmCmd, cs *RpmControls) (string, string, error) {
 			"app_name":      []string{appName},
 			"identifier":    appName,
 			"utilization":   getUtilizationData(cmd),
+			"labels": 		 getLabels(cmd),
 		},
 	}
 	marshaledData, err := json.Marshal(data)

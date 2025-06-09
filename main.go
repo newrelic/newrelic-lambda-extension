@@ -93,7 +93,7 @@ func main() {
 	}
 
 	if conf.APMLambdaMode {
-		util.Logf("APM Lambda mode enabled")
+		util.Logln("APM Lambda mode enabled")
 	}
 
 	// Attempt to find the license key for telemetry sending
@@ -452,8 +452,8 @@ func pollLogAPMServer(logServer *logserver.LogServer, conf *config.Configuration
 		if err != nil {
 			util.Logf("Error sending metric: %v", err)
 		}
-		util.Logf("Response Status: %d\n", statusCode)
-		util.Logf("Response Body: %s\n", responseBody)
+		util.Debugf("Response Status: %d\n", statusCode)
+		util.Debugf("Response Body: %s\n", responseBody)
 	}
 }
 

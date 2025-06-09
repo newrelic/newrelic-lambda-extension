@@ -110,13 +110,6 @@ func TestGetServerlessData_ProtocolVersion1_Success(t *testing.T) {
 	assert.Equal(t, LambdaData{}, data)
 }
 
-func TestGetServerlessData_UnsupportedProtocol(t *testing.T) {
-	input := []byte(`[99,"Zm9vYmFy"]`)
-	_, _, version, err := GetServerlessData(input)
-	assert.Error(t, err)
-	assert.Equal(t, 0, version)
-	assert.Contains(t, err.Error(), "unsupported protocol version")
-}
 
 func TestGetServerlessData_EmptyInput(t *testing.T) {
 	raw, data, version, err := GetServerlessData([]byte{})

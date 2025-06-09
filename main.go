@@ -92,6 +92,10 @@ func main() {
 		return
 	}
 
+	if conf.APMLambdaMode {
+		util.Logf("APM Lambda mode enabled")
+	}
+
 	// Attempt to find the license key for telemetry sending
 	var timeout = 1 * time.Second
 	ctxLicenseKey, cancelLicenseKey := context.WithTimeout(ctx, timeout)

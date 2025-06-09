@@ -68,29 +68,6 @@ func decodeUncompress(input string) ([]byte, error) {
 
 type UnCompressedData map[string]map[string]json.RawMessage
 
-// This code is essential for processing the payload data received from the Agent
-// and extracting the relevant information for further analysis or processing.
-func parsePayload(data []byte) (uncompressedData UnCompressedData, err error) {
-	var arr [3]json.RawMessage
-	if err = json.Unmarshal(data, &arr); err != nil {
-		return nil, fmt.Errorf("unable to unmarshal payload data array: %v", err)
-	}
-
-	compressed := strings.Trim(string(arr[2]), `"`)
-
-	// Decode and decompress the data
-	dataJSON, err := decodeUncompress(compressed)
-	if err != nil {
-		return nil, fmt.Errorf("unable to uncompress payload: %v", err)
-	}
-
-	var result UnCompressedData
-	if err = json.Unmarshal(dataJSON, &result); err != nil {
-		return nil, fmt.Errorf("unable to unmarshal uncompressed payload: %v", err)
-	}
-
-	return result, nil
-}
 
 func GetServerlessData(data []byte) (LambdaRawData, LambdaData, int, error) {
 	if len(data) == 0 || data[0] != '[' {

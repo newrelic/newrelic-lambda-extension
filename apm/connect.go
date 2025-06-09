@@ -262,10 +262,10 @@ func SendErrorEvent(cmd RpmCmd, cs *RpmControls, errorData []interface{}) {
 		cmd.Data = finalData
 		cmd.RunID = cs.GetRunId()
 		rpmResponse := CollectorRequest(cmd, cs)
-		fmt.Printf("Status Code %v telemetry: %d\n", CmdErrorEvents, rpmResponse.GetStatusCode())
+		util.Debugf("Status Code %v telemetry: %d\n", CmdErrorEvents, rpmResponse.GetStatusCode())
 		endTimeMetric := time.Now()
 		durationMetric := endTimeMetric.Sub(startTimeMetric)
-		fmt.Printf("Send %v duration: %s\n", CmdErrorEvents, durationMetric)
+		util.Debugf("Send %v duration: %s\n", CmdErrorEvents, durationMetric)
 	}
 }
 

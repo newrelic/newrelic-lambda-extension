@@ -2,33 +2,47 @@ package apm
 
 import (
 	"testing"
-
-	"github.com/stretchr/testify/assert"
 )
 
-func TestGenerateID(t *testing.T) {
-	seed := int64(12345)
-	tg := NewTraceIDGenerator(seed)
+func TestTraceIDGenerator(t *testing.T) {
+	tg := NewTraceIDGenerator(112233)
+	traceID := tg.GenerateTraceID()
+	if traceID != "ddd5ddce8b8426988b123ebc9ab968e3" {
+		t.Error(traceID)
+	}
+	spanID := tg.GenerateSpanID()
+	if spanID != "9cfe63dc9910e170" {
+		t.Error(spanID)
+	}
+	if p := tg.Float32(); p != 0.117286205 {
+		t.Error(p)
+	}
+}
 
-	t.Run("GenerateTraceID", func(t *testing.T) {
-		traceID := tg.GenerateTraceID()
-		assert.NotEmpty(t, traceID, "TraceID should not be empty")
-		assert.Equal(t, TraceIDHexStringLen, len(traceID), "TraceID should have the correct length")
-	})
+func BenchmarkTraceIDGenerator(b *testing.B) {
+	tg := NewTraceIDGenerator(12345)
 
-	t.Run("GenerateSpanID", func(t *testing.T) {
-		spanID := tg.GenerateSpanID()
-		assert.NotEmpty(t, spanID, "SpanID should not be empty")
-		assert.Equal(t, spanIDByteLen*2, len(spanID), "SpanID should have the correct length")
-	})
+	b.ResetTimer()
+	b.ReportAllocs()
 
-	t.Run("GenerateUniqueIDs", func(t *testing.T) {
-		id1 := tg.GenerateTraceID()
-		id2 := tg.GenerateTraceID()
-		assert.NotEqual(t, id1, id2, "Generated TraceIDs should be unique")
+	for i := 0; i < b.N; i++ {
+		if id := tg.GenerateSpanID(); id == "" {
+			b.Fatal(id)
+		}
+	}
+}
 
-		id3 := tg.GenerateSpanID()
-		id4 := tg.GenerateSpanID()
-		assert.NotEqual(t, id3, id4, "Generated SpanIDs should be unique")
+func BenchmarkTraceIDGeneratorParallel(b *testing.B) {
+	tg := NewTraceIDGenerator(112233)
+
+	b.ResetTimer()
+	b.ReportAllocs()
+
+	b.RunParallel(func(p *testing.PB) {
+		for p.Next() {
+			if id := tg.GenerateSpanID(); id == "" {
+				b.Fatal(id)
+			}
+		}
 	})
 }

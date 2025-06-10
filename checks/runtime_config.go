@@ -9,7 +9,8 @@ var (
 		"/opt/python/lib/python3.12/site-packages/newrelic",
 		"/opt/python/lib/python3.13/site-packages/newrelic",
 	}
-	layerAgentPathsRuby    = []string{
+	LayerAgentPathDotnet = []string{"/opt/lib"}
+	LayerAgentPathsRuby    = []string{
     "/opt/ruby/gems/3.2.0/gems/newrelic_rpm",
     "/opt/ruby/gems/3.3.0/gems/newrelic_rpm",
   }
@@ -65,7 +66,7 @@ var runtimeConfigs = map[Runtime]runtimeConfig{
 		language:        Ruby,
 		wrapperName:     "newrelic_lambda_wrapper.handler",
 		fileType:        "rb",
-		layerAgentPaths: layerAgentPathsRuby,
+		layerAgentPaths: LayerAgentPathsRuby,
 		vendorAgentPath: vendorAgentPathRuby,
 		// TODO: requires Ruby to parse out the version
 		agentVersionFile:    "lib/new_relic/version.rb",

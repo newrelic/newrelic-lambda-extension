@@ -10,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"strings"
 	"sync"
 	"time"
 
@@ -182,11 +183,13 @@ func getAgentVersion(runtime string) (string, string, error) {
 		if err != nil {
 			return "", "", err
 		}
-
+		var version string
 		if runtime == "python" {
-			return "python", string(b), nil
+			version = strings.TrimSpace(string(b))
+			return "python", version, nil
 		} else if runtime == "dotnet" {
-			return "dotnet", string(b), nil
+			version = strings.TrimSpace(string(b))
+			return "dotnet", version, nil
 		} else {
 			v := checks.LayerAgentVersion{}
 			err = json.Unmarshal([]byte(b), &v)
@@ -205,7 +208,8 @@ func Connect(cmd RpmCmd, cs *RpmControls) (string, string, error) {
 	NRAgentLanguage, NRAgentVersion, err := getAgentVersion(string(runtimeLanguage))
 	util.Logf("Connect: Detected runtime %s with agent language %s and version %s", runtimeLanguage, NRAgentLanguage, NRAgentVersion)
 	if err != nil {
-		NRAgentVersion = "unknown"
+		NRAgentLanguage = "go"
+		NRAgentVersion = "3.39.0"
 	}
 	pid := os.Getpid()
 	appName := os.Getenv("AWS_LAMBDA_FUNCTION_NAME")

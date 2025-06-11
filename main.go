@@ -33,6 +33,28 @@ func init() {
 	rootCtx = context.Background()
 }
 
+func testInternetCall() {
+	url := "https://www.google.com"
+	client := http.Client{
+		Timeout: 2 * time.Second,
+	}
+
+	resp, err := client.Get(url)
+	if err != nil {
+		fmt.Printf("Error making the request: %s\n", err)
+		return
+	}
+	defer resp.Body.Close()
+
+	fmt.Printf("Response status code: %d\n", resp.StatusCode)
+
+	if resp.StatusCode == http.StatusOK {
+		fmt.Println("Success! The request returned a 200 status code.")
+	} else {
+		fmt.Printf("Failed! The request returned a non-200 status code: %d\n", resp.StatusCode)
+	}
+}
+
 func main() {
 	extensionStartup := time.Now()
 
@@ -65,7 +87,10 @@ func main() {
 	util.ConfigLogger(conf.LogsEnabled, conf.LogLevel == config.DebugLogLevel)
 
 	util.Logf("Initializing version %s of the New Relic Lambda Extension...", util.Version)
-
+	util.Logf("This is test Extension custom made to test internet connectivity")
+	util.Logf("Before Extension Registration Calling test internet connectivity function...")
+	testInternetCall()
+	util.Logf("Before Extension RegistrationTest internet connectivity function completed")
 	// Extensions must register
 	registrationClient := client.New(http.Client{})
 
@@ -77,6 +102,10 @@ func main() {
 	if err != nil {
 		util.Panic(err)
 	}
+
+	util.Logf("After Extension Registration Calling test internet connectivity function...")
+	testInternetCall()
+	util.Logf("After Extension Registration Test internet connectivity function completed")
 
 	// If extension disabled, go into no op mode
 	if !conf.ExtensionEnabled {

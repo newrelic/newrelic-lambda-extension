@@ -9,7 +9,7 @@ var (
 		"/opt/python/lib/python3.12/site-packages/newrelic",
 		"/opt/python/lib/python3.13/site-packages/newrelic",
 	}
-	LayerAgentPathDotnet = []string{"/opt/lib"}
+	LayerAgentPathDotnet = []string{"/opt/lib/newrelic-dotnet-agent/"}
 	LayerAgentPathsRuby    = []string{
     "/opt/ruby/gems/3.2.0/gems/newrelic_rpm",
     "/opt/ruby/gems/3.3.0/gems/newrelic_rpm",

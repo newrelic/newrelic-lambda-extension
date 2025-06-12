@@ -10,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"strings"
 	"sync"
 	"time"
 
@@ -139,11 +140,13 @@ type LambdaRuntime string
 var (
 	NodeLambda   	LambdaRuntime = "node"
 	PythonLambda  	LambdaRuntime = "python"
+	DotnetLambda 	LambdaRuntime = "dotnet"
+	RubyLambda   	LambdaRuntime = "ruby"
 	DefaultLambda	LambdaRuntime = "go" 
 	runtimeLookupPath     = "/var/lang/bin"
 )
 
-var LambdaRuntimes = []LambdaRuntime{NodeLambda, PythonLambda}
+var LambdaRuntimes = []LambdaRuntime{NodeLambda, PythonLambda, DotnetLambda, RubyLambda}
 
 func checkRuntime() (LambdaRuntime) {
 	for _, runtime := range LambdaRuntimes {
@@ -164,7 +167,11 @@ func getAgentVersion(runtime string) (string, string, error) {
 	} else if runtime == "python" {
 		layerAgentPaths = checks.LayerAgentPathsPython
 		agentVersionFile = "version.txt"
-	}
+	} else if runtime == "dotnet" {
+		layerAgentPaths = checks.LayerAgentPathDotnet
+		agentVersionFile = "version.txt"
+	} 
+		
 
 	for i := range layerAgentPaths {
 		f := filepath.Join(layerAgentPaths[i], agentVersionFile)
@@ -176,9 +183,13 @@ func getAgentVersion(runtime string) (string, string, error) {
 		if err != nil {
 			return "", "", err
 		}
-
+		var version string
 		if runtime == "python" {
-			return "python", string(b), nil
+			version = strings.TrimSpace(string(b))
+			return "python", version, nil
+		} else if runtime == "dotnet" {
+			version = strings.TrimSpace(string(b))
+			return "dotnet", version, nil
 		} else {
 			v := checks.LayerAgentVersion{}
 			err = json.Unmarshal([]byte(b), &v)
@@ -195,8 +206,10 @@ func getAgentVersion(runtime string) (string, string, error) {
 func Connect(cmd RpmCmd, cs *RpmControls) (string, string, error) {
 	runtimeLanguage := checkRuntime()
 	NRAgentLanguage, NRAgentVersion, err := getAgentVersion(string(runtimeLanguage))
+	util.Logf("Connect: Detected runtime %s with agent language %s and version %s", runtimeLanguage, NRAgentLanguage, NRAgentVersion)
 	if err != nil {
-		NRAgentVersion = "unknown"
+		NRAgentLanguage = "go"
+		NRAgentVersion = "3.39.0"
 	}
 	pid := os.Getpid()
 	appName := os.Getenv("AWS_LAMBDA_FUNCTION_NAME")

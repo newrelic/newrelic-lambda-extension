@@ -47,6 +47,24 @@ func TestGetAgentVersion_Python_Success(t *testing.T) {
 	assert.Equal(t, expectedVersion, version)
 }
 
+func TestGetAgentVersion_Dotnet_Success(t *testing.T) {
+	tmpDir := t.TempDir()
+	versionTxtPath := filepath.Join(tmpDir, "version.txt")
+	agentVersion := "10.3.4\n"
+	expectedVersion := "10.3.4"
+	err := os.WriteFile(versionTxtPath, []byte(agentVersion), 0644)
+	assert.NoError(t, err)
+
+	origPaths := checks.LayerAgentPathDotnet
+	checks.LayerAgentPathDotnet = []string{tmpDir}
+	defer func() { checks.LayerAgentPathsPython = origPaths }()
+
+	lang, version, err := getAgentVersion("dotnet")
+	assert.NoError(t, err)
+	assert.Equal(t, "dotnet", lang)
+	assert.Equal(t, expectedVersion, version)
+}
+
 func TestGetAgentVersion_Node_FileNotFound(t *testing.T) {
 	tmpDir := t.TempDir()
 	origPaths := checks.LayerAgentPathNode

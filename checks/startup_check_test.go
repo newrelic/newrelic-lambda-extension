@@ -23,7 +23,7 @@ type TestLogSender struct {
 	sent []logserver.LogLine
 }
 
-func (c *TestLogSender) SendFunctionLogs(ctx context.Context, invokedFunctionARN string, lines []logserver.LogLine) error {
+func (c *TestLogSender) SendFunctionLogs(ctx context.Context, invokedFunctionARN string, lines []logserver.LogLine, isAPMLambdaMode bool) error {
 	c.sent = append(c.sent, lines...)
 	return nil
 }

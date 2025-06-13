@@ -29,6 +29,7 @@ const (
 	LambdaHostPortEnvVar = "AWS_LAMBDA_RUNTIME_API"
 
 	ExtensionNameHeader      = "Lambda-Extension-Name"
+	ExtensionFeatureHeader   = "Lambda-Extension-Accept-Feature"
 	ExtensionIdHeader        = "Lambda-Extension-Identifier"
 	ExtensionErrorTypeHeader = "Lambda-Extension-Function-Error-Type"
 
@@ -60,6 +61,7 @@ type RegistrationResponse struct {
 	FunctionName    string `json:"functionName"`
 	FunctionVersion string `json:"functionVersion"`
 	Handler         string `json:"handler"`
+	AccountId 		string `json:"accountId"`
 }
 
 type LogSubscription struct {

@@ -33,6 +33,7 @@ type RegistrationClient struct {
 	version       string
 	baseUrl       string
 	httpClient    http.Client
+	extensionFeature string
 }
 
 // Constructs a new RegistrationClient. This is the entry point.
@@ -49,6 +50,7 @@ func New(httpClient http.Client) *RegistrationClient {
 		version:       api.Version,
 		baseUrl:       os.Getenv(api.LambdaHostPortEnvVar),
 		httpClient:    httpClient,
+		extensionFeature: "accountId",
 	}
 }
 
@@ -77,6 +79,7 @@ func (rc *RegistrationClient) Register(ctx context.Context, registrationRequest 
 	}
 
 	req.Header.Set(api.ExtensionNameHeader, rc.extensionName)
+	req.Header.Set(api.ExtensionFeatureHeader, rc.extensionFeature)
 
 	res, err := rc.httpClient.Do(req)
 	if err != nil {

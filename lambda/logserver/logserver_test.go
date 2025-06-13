@@ -8,12 +8,14 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"net/http/httptest"
 	"testing"
 	"time"
 
 	"github.com/newrelic/newrelic-lambda-extension/config"
 	"github.com/newrelic/newrelic-lambda-extension/lambda/extension/api"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestLogServer(t *testing.T) {
@@ -202,4 +204,107 @@ func TestLogServerStart(t *testing.T) {
 	logs, err := Start(&config.Configuration{LogServerHost: "localhost"})
 	assert.NoError(t, err)
 	assert.Nil(t, logs.Close())
+}
+
+func TestLogServerCloseShutdownFlag(t *testing.T) {
+	logServer, err := startInternal("localhost")
+	require.NoError(t, err)
+	require.NotNil(t, logServer)
+
+	logServer.shutdownLock.RLock()
+	initialShutdownState := logServer.isShuttingDown
+	logServer.shutdownLock.RUnlock()
+	assert.False(t, initialShutdownState, "LogServer should not be in shutdown state initially")
+
+	err = logServer.Close()
+	assert.NoError(t, err)
+
+	logServer.shutdownLock.RLock()
+	finalShutdownState := logServer.isShuttingDown
+	logServer.shutdownLock.RUnlock()
+	assert.True(t, finalShutdownState, "LogServer should be in shutdown state after Close()")
+}
+
+func TestLogServerHandlerDuringShutdown(t *testing.T) {
+	logServer, err := startInternal("localhost")
+	require.NoError(t, err)
+	require.NotNil(t, logServer)
+
+	recorder := httptest.NewRecorder()
+
+	logEvent := []api.LogEvent{
+		{
+			Time:   time.Now(),
+			Type:   "function",
+			Record: "test log event",
+		},
+	}
+
+	jsonData, err := json.Marshal(logEvent)
+	require.NoError(t, err)
+
+	request := httptest.NewRequest("POST", "/", bytes.NewBuffer(jsonData))
+
+	logServer.shutdownLock.Lock()
+	logServer.isShuttingDown = true
+	logServer.shutdownLock.Unlock()
+
+	logServer.handler(recorder, request)
+
+	assert.Equal(t, http.StatusOK, recorder.Code)
+
+	select {
+	case logs := <-logServer.functionLogChan:
+		t.Fatalf("Expected no logs to be processed, but got: %v", logs)
+	default:
+	}
+
+	logServer.Close()
+}
+
+func SendFunctionLogsContinuously(logServer *LogServer, t *testing.T) {
+	for i := 0; i < 5000; i++ {
+		logEvent := []api.LogEvent{
+			{
+				Time:   time.Now(),
+				Type:   "function",
+				Record: fmt.Sprintf("test log event %d", i),
+			},
+		}
+
+		jsonData, err := json.Marshal(logEvent)
+		require.NoError(t, err)
+
+		request := httptest.NewRequest("POST", "/", bytes.NewBuffer(jsonData))
+		recorder := httptest.NewRecorder()
+		logServer.handler(recorder, request)
+	}
+}
+
+func TestLogServerShutdownDuringRequests(t *testing.T) {
+	logServer, err := startInternal("localhost")
+	require.NoError(t, err)
+	require.NotNil(t, logServer)
+
+	done := make(chan struct{})
+
+	go func() {
+		for {
+			_, more := logServer.AwaitFunctionLogs()
+			if !more {
+				return
+			}
+		}
+	}()
+
+	go SendFunctionLogsContinuously(logServer, t)
+	time.Sleep(10 * time.Millisecond)
+	err = logServer.Close()
+	assert.NoError(t, err, "Server should close without errors")
+	close(done)
+	select {
+	case <-done:
+	case <-time.After(5 * time.Second):
+		t.Fatal("Test timed out")
+	}
 }

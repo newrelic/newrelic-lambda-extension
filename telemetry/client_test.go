@@ -338,9 +338,9 @@ func TestSendFunctionLogsEmpty(t *testing.T) {
 
 	// empty log bundle
 	logLines := []logserver.LogLine{}
-
+	var isAPMLambdaMode bool
 	startSendLogs := time.Now()
-	err := client.SendFunctionLogs(context.Background(), testARN, logLines)
+	err := client.SendFunctionLogs(context.Background(), testARN, logLines, isAPMLambdaMode)
 	sendDuration := time.Since(startSendLogs)
 
 	if err != nil {
@@ -386,7 +386,8 @@ func TestSendFunctionLogsSendingTimeout(t *testing.T) {
 	}
 
 	startSendLogs := time.Now()
-	err := client.SendFunctionLogs(context.Background(), testARN, logLines)
+	var isAPMLambdaMode bool
+	err := client.SendFunctionLogs(context.Background(), testARN, logLines, isAPMLambdaMode)
 	sendDuration := time.Since(startSendLogs)
 
 	if err != nil {

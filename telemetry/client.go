@@ -16,6 +16,7 @@ import (
 	crypto_rand "crypto/rand"
 	math_rand "math/rand"
 
+	"github.com/newrelic/newrelic-lambda-extension/apm"
 	"github.com/newrelic/newrelic-lambda-extension/lambda/logserver"
 
 	"github.com/newrelic/newrelic-lambda-extension/util"
@@ -257,14 +258,19 @@ func (c *Client) attemptSend(ctx context.Context, currentPayloadBytes []byte, bu
 }
 
 // SendFunctionLogs constructs log payloads and sends them to new relic
-func (c *Client) SendFunctionLogs(ctx context.Context, invokedFunctionARN string, lines []logserver.LogLine) error {
+func (c *Client) SendFunctionLogs(ctx context.Context, invokedFunctionARN string, lines []logserver.LogLine, isAPMLambdaMode bool) error {
 	start := time.Now()
+	var entityGuid string
+	if isAPMLambdaMode {
+		<-apm.ConnectDone
+		entityGuid = apm.GetEntityGuid()
+	}
 	if len(lines) == 0 {
 		util.Debugln("client.SendFunctionLogs invoked with 0 log lines. Returning without sending a payload to New Relic")
 		return nil
 	}
 
-	compressedPayloads, builder, err := c.buildLogPayloads(ctx, invokedFunctionARN, lines)
+	compressedPayloads, builder, err := c.buildLogPayloads(ctx, invokedFunctionARN, lines, entityGuid)
 	if err != nil {
 		return err
 	}
@@ -310,13 +316,17 @@ func getNewRelicTags(common map[string]interface{}) {
 }
 
 // buildLogPayloads is a helper function that improves readability of the SendFunctionLogs method
-func (c *Client) buildLogPayloads(ctx context.Context, invokedFunctionARN string, lines []logserver.LogLine) ([]*bytes.Buffer, requestBuilder, error) {
+func (c *Client) buildLogPayloads(ctx context.Context, invokedFunctionARN string, lines []logserver.LogLine, entityGuid string) ([]*bytes.Buffer, requestBuilder, error) {
 	common := map[string]interface{}{
 		"plugin":    util.Id,
 		"faas.arn":  invokedFunctionARN,
 		"faas.name": c.functionName,
 	}
-	
+	if entityGuid != "" {
+		common["entity.guid"] = entityGuid
+		common["entity.type"] = "APM"
+		common["entity.name"] = c.functionName
+	}
 	getNewRelicTags(common)
 
 	logMessages := make([]FunctionLogMessage, 0, len(lines))

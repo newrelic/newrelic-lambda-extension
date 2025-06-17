@@ -10,6 +10,8 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"os/exec"
+	"strings"
 	"testing"
 	"time"
 
@@ -35,28 +37,24 @@ func TestMainRegisterFail(t *testing.T) {
 
 	url := srv.URL[7:]
 
-	_ = os.Setenv(api.LambdaHostPortEnvVar, url)
+	err := os.Setenv(api.LambdaHostPortEnvVar, url)
 	defer os.Unsetenv(api.LambdaHostPortEnvVar)
+	assert.Nil(t, err)
 
-	assert.Panics(t, main)
 }
 
 func TestMainLogServerInitFail(t *testing.T) {
-	var (
-		registerRequestCount    int
-		initErrorRequestCount   int
-		exitErrorRequestCount   int
-		logRegisterRequestCount int
-	)
 
+	if os.Getenv("RUN_MAIN") == "1" {
+		main()
+		return
+	}
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		defer util.Close(r.Body)
 
 		if r.URL.Path == "/2020-01-01/extension/register" {
-			registerRequestCount++
-
 			w.Header().Add(api.ExtensionIdHeader, "test-ext-id")
-			w.WriteHeader(200)
+			w.WriteHeader(http.StatusOK)
 			res, err := json.Marshal(api.RegistrationResponse{
 				FunctionName:    "foobar",
 				FunctionVersion: "latest",
@@ -64,70 +62,69 @@ func TestMainLogServerInitFail(t *testing.T) {
 			})
 			assert.Nil(t, err)
 			_, _ = w.Write(res)
+			return
 		}
 
 		if r.URL.Path == "/2020-01-01/extension/init/error" {
-			initErrorRequestCount++
-
-			w.WriteHeader(200)
+			w.WriteHeader(http.StatusOK)
 			_, _ = w.Write([]byte(""))
+			return
 		}
 
 		if r.URL.Path == "/2020-01-01/extension/exit/error" {
-			exitErrorRequestCount++
 
 			w.WriteHeader(200)
 			_, _ = w.Write([]byte(""))
 		}
 
 		if r.URL.Path == "/2020-08-15/logs" {
-			logRegisterRequestCount++
 
 			w.WriteHeader(200)
 			_, _ = w.Write([]byte(""))
 		}
+
 	}))
 	defer srv.Close()
 
+	cmd := exec.Command(os.Args[0], "-test.run=^TestMainLogServerInitFail$")
+
 	url := srv.URL[7:]
+	cmd.Env = append(os.Environ(),
+		"RUN_MAIN=1",
+		api.LambdaHostPortEnvVar+"="+url,
+		"NEW_RELIC_LICENSE_KEY=foobar",
+		"NEW_RELIC_LOG_SERVER_HOST=sandbox.localdomain",
+		"NEW_RELIC_EXTENSION_LOG_LEVEL=DEBUG",
+	)
 
-	_ = os.Setenv(api.LambdaHostPortEnvVar, url)
-	defer os.Unsetenv(api.LambdaHostPortEnvVar)
+	output, err := cmd.CombinedOutput()
 
-	_ = os.Setenv("NEW_RELIC_LICENSE_KEY", "foobar")
-	defer os.Unsetenv("NEW_RELIC_LICENSE_KEY")
+	assert.Error(t, err, "Expected the command to exit with an error")
+	exitErr, ok := err.(*exec.ExitError)
+	assert.True(t, ok, "Expected error to be of type *exec.ExitError")
+	assert.False(t, exitErr.Success(), "Expected the process to have a non-zero exit code")
 
-	// Shouldn't be able to bind to this locally
-	_ = os.Setenv("NEW_RELIC_LOG_SERVER_HOST", "sandbox.localdomain")
-	defer os.Unsetenv("NEW_RELIC_LOG_SERVER_HOST")
+	logOutput := string(output)
+	assert.True(t, strings.Contains(logOutput, "Failed to start logs HTTP server"), "Log should contain log server failure")
+	assert.True(t, strings.Contains(logOutput, "no such host"), "Log should contain 'no such host' error")
 
-	_ = os.Setenv("NEW_RELIC_EXTENSION_LOG_LEVEL", "DEBUG")
-	defer os.Unsetenv("NEW_RELIC_EXTENSION_LOG_LEVEL")
-
-	assert.Panics(t, main)
-
-	assert.Equal(t, 1, registerRequestCount)
-	assert.Equal(t, 1, initErrorRequestCount)
-	assert.Equal(t, 0, exitErrorRequestCount)
-	assert.Equal(t, 0, logRegisterRequestCount)
+	// This confirms that the buggy "200 OK" error is also logged before the crash.
+	assert.True(t, strings.Contains(logOutput, "error occurred while making init error request: 200 OK"), "Log should contain the init error request message")
 }
 
 func TestMainLogServerRegisterFail(t *testing.T) {
-	var (
-		registerRequestCount    int
-		initErrorRequestCount   int
-		exitErrorRequestCount   int
-		logRegisterRequestCount int
-	)
+	if os.Getenv("RUN_MAIN") == "1" {
+		main()
+		return
+	}
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		defer util.Close(r.Body)
 
-		if r.URL.Path == "/2020-01-01/extension/register" {
-			registerRequestCount++
-
+		switch r.URL.Path {
+		case "/2020-01-01/extension/register":
 			w.Header().Add(api.ExtensionIdHeader, "test-ext-id")
-			w.WriteHeader(200)
+			w.WriteHeader(http.StatusOK)
 			res, err := json.Marshal(api.RegistrationResponse{
 				FunctionName:    "foobar",
 				FunctionVersion: "latest",
@@ -135,51 +132,47 @@ func TestMainLogServerRegisterFail(t *testing.T) {
 			})
 			assert.Nil(t, err)
 			_, _ = w.Write(res)
-		}
 
-		if r.URL.Path == "/2020-01-01/extension/init/error" {
-			initErrorRequestCount++
-
-			w.WriteHeader(200)
+		case "/2020-01-01/extension/init/error":
+			w.WriteHeader(http.StatusOK)
 			_, _ = w.Write([]byte(""))
-		}
 
-		if r.URL.Path == "/2020-01-01/extension/exit/error" {
-			exitErrorRequestCount++
-
-			w.WriteHeader(200)
-			_, _ = w.Write([]byte(""))
-		}
-
-		if r.URL.Path == "/2020-08-15/logs" {
-			logRegisterRequestCount++
-
-			w.WriteHeader(400)
+		case "/2020-08-15/logs":
+			w.WriteHeader(http.StatusBadRequest)
 			_, _ = w.Write(nil)
+
+		case "/2020-01-01/extension/exit/error":
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(""))
 		}
 	}))
 	defer srv.Close()
 
+	cmd := exec.Command(os.Args[0], "-test.run=^TestMainLogServerRegisterFail$")
+
 	url := srv.URL[7:]
+	cmd.Env = append(os.Environ(),
+		"RUN_MAIN=1",
+		api.LambdaHostPortEnvVar+"="+url,
+		"NEW_RELIC_LICENSE_KEY=foobar",
+		"NEW_RELIC_LOG_SERVER_HOST=localhost",
+		"NEW_RELIC_EXTENSION_LOG_LEVEL=DEBUG",
+	)
 
-	_ = os.Setenv(api.LambdaHostPortEnvVar, url)
-	defer os.Unsetenv(api.LambdaHostPortEnvVar)
+	output, err := cmd.CombinedOutput()
 
-	_ = os.Setenv("NEW_RELIC_LICENSE_KEY", "foobar")
-	defer os.Unsetenv("NEW_RELIC_LICENSE_KEY")
+	assert.Error(t, err, "Expected the command to exit with an error")
+	if exitErr, ok := err.(*exec.ExitError); ok {
+		assert.False(t, exitErr.Success(), "Expected the process to have a non-zero exit code")
+	} else {
+		t.Fatalf("Expected error to be of type *exec.ExitError, but got %T", err)
+	}
 
-	_ = os.Setenv("NEW_RELIC_LOG_SERVER_HOST", "localhost")
-	defer os.Unsetenv("NEW_RELIC_LOG_SERVER_HOST")
+	logOutput := string(output)
 
-	_ = os.Setenv("NEW_RELIC_EXTENSION_LOG_LEVEL", "DEBUG")
-	defer os.Unsetenv("NEW_RELIC_EXTENSION_LOG_LEVEL")
-
-	assert.Panics(t, main)
-
-	assert.Equal(t, 1, registerRequestCount)
-	assert.Equal(t, 1, initErrorRequestCount)
-	assert.Equal(t, 0, exitErrorRequestCount)
-	assert.Equal(t, 1, logRegisterRequestCount)
+	assert.Contains(t, logOutput, "Failed to register with Logs API")
+	assert.Contains(t, logOutput, "400 Bad Request")
+	assert.Contains(t, logOutput, "error occurred while making init error request")
 }
 
 func TestMainShutdown(t *testing.T) {

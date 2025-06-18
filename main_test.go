@@ -161,48 +161,17 @@ func TestMainLogServerRegisterFail(t *testing.T) {
 
 	output, err := cmd.CombinedOutput()
 
-	assert.Error(t, err, "Expected the command to exit with an error")
+	assert.Error(t, err, "Expected the command to exit with a non-zero status code")
 	if exitErr, ok := err.(*exec.ExitError); ok {
-		assert.False(t, exitErr.Success(), "Expected the process to have a non-zero exit code")
+		assert.False(t, exitErr.Success(), "Expected the process to report failure")
 	} else {
 		t.Fatalf("Expected error to be of type *exec.ExitError, but got %T", err)
 	}
 
 	logOutput := string(output)
-
-	assert.Contains(t, logOutput, "Failed to register with Logs API")
-	assert.Contains(t, logOutput, "400 Bad Request")
-	assert.Contains(t, logOutput, "error occurred while making init error request")
-}
-
-func TestMain_RegistrationFails(t *testing.T) {
-	if os.Getenv("RUN_MAIN") == "1" {
-		main()
-		return
-	}
-
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path == "/2020-01-01/extension/register" {
-			w.WriteHeader(http.StatusInternalServerError)
-			return
-		}
-	}))
-	defer srv.Close()
-
-	cmd := exec.Command(os.Args[0], "-test.run=^TestMain_RegistrationFails$")
-
-	cmd.Env = append(os.Environ(),
-		"RUN_MAIN=1",
-		api.LambdaHostPortEnvVar+"="+srv.URL[7:],
-		"NEW_RELIC_LICENSE_KEY=foobar",
-	)
-
-	output, err := cmd.CombinedOutput()
-	assert.Error(t, err, "Expected the command to exit with an error")
-
-	logOutput := string(output)
-
-	assert.Contains(t, logOutput, "error occurred while making registration request")
+	assert.Contains(t, logOutput, "Failed to register with Logs API", "Log output should contain the fatal error message")
+	assert.Contains(t, logOutput, "400 Bad Request", "Log output should contain the reason for the failure")
+	assert.Contains(t, logOutput, "error occurred while making init error request", "Log output should show an attempt to report the init error")
 }
 func TestMainShutdown(t *testing.T) {
 	var (

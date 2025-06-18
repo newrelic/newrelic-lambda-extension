@@ -113,77 +113,115 @@ func TestMainLogServerInitFail(t *testing.T) {
 }
 
 func TestMainLogServerRegisterFail(t *testing.T) {
-    if os.Getenv("RUN_MAIN") == "1" {
-        main()
-        return
-    }
+	if os.Getenv("RUN_MAIN") == "1" {
+		main()
+		return
+	}
 
-    srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-        defer util.Close(r.Body)
+	var (
+		registerRequestCount    int
+		initErrorRequestCount   int
+		logRegisterRequestCount int
+		exitErrorRequestCount   int
+	)
 
-        switch r.URL.Path {
-        case "/2020-01-01/extension/register":
-            w.Header().Add(api.ExtensionIdHeader, "test-ext-id")
-            w.WriteHeader(http.StatusOK)
-            res, err := json.Marshal(api.RegistrationResponse{
-                FunctionName:    "foobar",
-                FunctionVersion: "latest",
-                Handler:         "lambda.handler",
-            })
-            assert.Nil(t, err)
-            _, _ = w.Write(res)
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		defer util.Close(r.Body)
 
-        case "/2020-01-01/extension/init/error":
-            w.WriteHeader(http.StatusOK)
-            _, _ = w.Write([]byte(""))
+		fmt.Printf("Request received: %s %s\n", r.Method, r.URL.Path)
 
-        case "/2020-08-15/logs":
-            // Return 400 Bad Request to trigger the fatal error
-            w.WriteHeader(http.StatusBadRequest)
-            _, _ = w.Write([]byte("Bad Request"))
+		switch r.URL.Path {
+		case "/2020-01-01/extension/register":
+			registerRequestCount++
+			fmt.Printf("Extension register request #%d\n", registerRequestCount)
+			w.Header().Add(api.ExtensionIdHeader, "test-ext-id")
+			w.WriteHeader(http.StatusOK)
+			res, err := json.Marshal(api.RegistrationResponse{
+				FunctionName:    "foobar",
+				FunctionVersion: "latest",
+				Handler:         "lambda.handler",
+			})
+			if err != nil {
+				fmt.Printf("Error marshaling registration response: %v\n", err)
+				return
+			}
+			_, _ = w.Write(res)
 
-        case "/2020-01-01/extension/exit/error":
-            w.WriteHeader(http.StatusOK)
-            _, _ = w.Write([]byte(""))
-        }
-    }))
-    defer srv.Close()
+		case "/2020-01-01/extension/init/error":
+			initErrorRequestCount++
+			fmt.Printf("Init error request #%d\n", initErrorRequestCount)
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(""))
 
-    cmd := exec.Command(os.Args[0], "-test.run=^TestMainLogServerRegisterFail$")
+		case "/2020-08-15/logs":
+			logRegisterRequestCount++
+			fmt.Printf("Logs register request #%d - returning 400\n", logRegisterRequestCount)
+			w.WriteHeader(http.StatusBadRequest)
+			_, _ = w.Write([]byte("Logs API registration failed"))
 
-    url := srv.URL[7:]
-    cmd.Env = append(os.Environ(),
-        "RUN_MAIN=1",
-        api.LambdaHostPortEnvVar+"="+url,
-        "NEW_RELIC_LICENSE_KEY=foobar",
-        "NEW_RELIC_LOG_SERVER_HOST=localhost",
-        "NEW_RELIC_EXTENSION_LOG_LEVEL=DEBUG",
-    )
+		case "/2020-01-01/extension/exit/error":
+			exitErrorRequestCount++
+			fmt.Printf("Exit error request #%d\n", exitErrorRequestCount)
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(""))
 
-    output, err := cmd.CombinedOutput()
+		case "/2020-01-01/extension/event/next":
+			fmt.Printf("Event next request - should not be reached if fatal occurs\n")
+			w.WriteHeader(http.StatusOK)
+			res, err := json.Marshal(api.InvocationEvent{
+				EventType:          api.Shutdown,
+				DeadlineMs:         1,
+				RequestID:          "12345",
+				InvokedFunctionARN: "arn:aws:lambda:us-east-1:12345:foobar",
+				ShutdownReason:     api.Timeout,
+				Tracing:            nil,
+			})
+			if err != nil {
+				fmt.Printf("Error marshaling shutdown event: %v\n", err)
+				return
+			}
+			_, _ = w.Write(res)
 
-    assert.Error(t, err, "Expected the command to exit with a non-zero status code")
-    if exitErr, ok := err.(*exec.ExitError); ok {
-        assert.False(t, exitErr.Success(), "Expected the process to report failure")
-    } else {
-        t.Fatalf("Expected error to be of type *exec.ExitError, but got %T", err)
-    }
+		default:
+			fmt.Printf("Unexpected request path: %s\n", r.URL.Path)
+			w.WriteHeader(http.StatusNotFound)
+		}
+	}))
+	defer srv.Close()
 
-    logOutput := string(output)
-    
-    // Debug: Print the actual log output to see what's being generated
-    t.Logf("Actual log output:\n%s", logOutput)
-    
-    // Check for the fatal error message
-    assert.Contains(t, logOutput, "Failed to register with Logs API", "Log output should contain the fatal error message")
-    
-    // Check for the HTTP error (might be "400" or "Bad Request" depending on how the error is formatted)
-    assert.True(t, 
-        strings.Contains(logOutput, "400") || strings.Contains(logOutput, "Bad Request"),
-        "Log output should contain HTTP 400 error information")
-    
-    // This should show an attempt to report the init error before the fatal exit
-    assert.Contains(t, logOutput, "error occurred while making init error request", "Log output should show an attempt to report the init error")
+	cmd := exec.Command(os.Args[0], "-test.run=^TestMainLogServerRegisterFail$")
+
+	url := srv.URL[7:]
+	cmd.Env = append(os.Environ(),
+		"RUN_MAIN=1",
+		api.LambdaHostPortEnvVar+"="+url,
+		"NEW_RELIC_LICENSE_KEY=foobar",
+		"NEW_RELIC_LOG_SERVER_HOST=localhost",
+		"NEW_RELIC_EXTENSION_LOG_LEVEL=DEBUG",
+		"NEW_RELIC_LAMBDA_EXTENSION_ENABLED=true",
+		"NEW_RELIC_EXTENSION_SEND_FUNCTION_LOGS=true",
+	)
+
+	output, err := cmd.CombinedOutput()
+
+	assert.Error(t, err, "Expected the command to exit with a non-zero status code")
+	if exitErr, ok := err.(*exec.ExitError); ok {
+		assert.False(t, exitErr.Success(), "Expected the process to report failure")
+	} else {
+		t.Fatalf("Expected error to be of type *exec.ExitError, but got %T", err)
+	}
+
+	logOutput := string(output)
+
+	t.Logf("=== FULL LOG OUTPUT ===\n%s\n=== END LOG OUTPUT ===", logOutput)
+
+	assert.Contains(t, logOutput, "Failed to register with Logs API", "Log output should contain the fatal error message")
+
+	assert.True(t,
+		strings.Contains(logOutput, "400") || strings.Contains(logOutput, "Bad Request"),
+		"Log output should contain HTTP 400 error information")
+
+	assert.Contains(t, logOutput, "error occurred while making init error request", "Log output should show an attempt to report the init error")
 }
 
 func TestMainShutdown(t *testing.T) {

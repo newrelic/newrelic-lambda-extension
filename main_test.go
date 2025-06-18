@@ -175,6 +175,35 @@ func TestMainLogServerRegisterFail(t *testing.T) {
 	assert.Contains(t, logOutput, "error occurred while making init error request")
 }
 
+func TestMain_RegistrationFails(t *testing.T) {
+	if os.Getenv("RUN_MAIN") == "1" {
+		main()
+		return
+	}
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/2020-01-01/extension/register" {
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+	}))
+	defer srv.Close()
+
+	cmd := exec.Command(os.Args[0], "-test.run=^TestMain_RegistrationFails$")
+
+	cmd.Env = append(os.Environ(),
+		"RUN_MAIN=1",
+		api.LambdaHostPortEnvVar+"="+srv.URL[7:],
+		"NEW_RELIC_LICENSE_KEY=foobar",
+	)
+
+	output, err := cmd.CombinedOutput()
+	assert.Error(t, err, "Expected the command to exit with an error")
+
+	logOutput := string(output)
+
+	assert.Contains(t, logOutput, "error occurred while making registration request")
+}
 func TestMainShutdown(t *testing.T) {
 	var (
 		registerRequestCount    int

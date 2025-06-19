@@ -19,7 +19,7 @@ import (
 )
 
 func TestLogServer(t *testing.T) {
-	logs, err := startInternal("localhost")
+	logs, err := startInternal("localhost", "Go")
 	assert.NoError(t, err)
 
 	testEvents := []api.LogEvent{
@@ -62,7 +62,7 @@ func TestLogServer(t *testing.T) {
 }
 
 func TestFunctionLogs(t *testing.T) {
-	logs, err := startInternal("localhost")
+	logs, err := startInternal("localhost", "Node")
 	assert.NoError(t, err)
 
 	testEvents := []api.LogEvent{
@@ -336,7 +336,7 @@ func TestFunctionLogs(t *testing.T) {
 }
 
 func TestExtensionLogs(t *testing.T) {
-	logs, err := startInternal("localhost")
+	logs, err := startInternal("localhost", "Go")
 	assert.NoError(t, err)
 
 	testEvents := []api.LogEvent{
@@ -400,13 +400,13 @@ func TestExtensionLogs(t *testing.T) {
 }
 
 func TestLogServerStart(t *testing.T) {
-	logs, err := Start(&config.Configuration{LogServerHost: "localhost"})
+	logs, err := Start(&config.Configuration{LogServerHost: "localhost"}, "Go")
 	assert.NoError(t, err)
 	assert.Nil(t, logs.Close())
 }
 
 func TestLogServerCloseShutdownFlag(t *testing.T) {
-	logServer, err := startInternal("localhost")
+	logServer, err := startInternal("localhost", "Go")
 	require.NoError(t, err)
 	require.NotNil(t, logServer)
 
@@ -425,7 +425,7 @@ func TestLogServerCloseShutdownFlag(t *testing.T) {
 }
 
 func TestLogServerHandlerDuringShutdown(t *testing.T) {
-	logServer, err := startInternal("localhost")
+	logServer, err := startInternal("localhost", "Go")
 	require.NoError(t, err)
 	require.NotNil(t, logServer)
 
@@ -481,7 +481,7 @@ func SendFunctionLogsContinuously(logServer *LogServer, t *testing.T) {
 }
 
 func TestLogServerShutdownDuringRequests(t *testing.T) {
-	logServer, err := startInternal("localhost")
+	logServer, err := startInternal("localhost", "Go")
 	require.NoError(t, err)
 	require.NotNil(t, logServer)
 

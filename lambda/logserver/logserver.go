@@ -37,7 +37,7 @@ type LogServer struct {
 	lastRequestIdLock *sync.Mutex
 	isShuttingDown    bool
 	shutdownLock      sync.RWMutex
-
+	runtime           string
 	wg                sync.WaitGroup
 }
 
@@ -213,9 +213,16 @@ func (ls *LogServer) handler(res http.ResponseWriter, req *http.Request) {
 			util.Logf("Platform dropped logs: %v", event.Record)
 		case "function":
 			recordString := event.Record.(string)
-
-			requestId, err := ExtractRequestId(recordString)
-			if err != nil {
+			var requestId string
+			var err error
+			if ls.runtime != "" && strings.ToLower(ls.runtime) == "node" {
+				requestId, err = ExtractRequestId(recordString)
+				if err != nil {
+					ls.lastRequestIdLock.Lock()
+					requestId = ls.lastRequestId
+					ls.lastRequestIdLock.Unlock()
+				}
+			} else {
 				ls.lastRequestIdLock.Lock()
 				requestId = ls.lastRequestId
 				ls.lastRequestIdLock.Unlock()
@@ -248,11 +255,11 @@ func (ls *LogServer) handler(res http.ResponseWriter, req *http.Request) {
 	_, _ = res.Write(nil)
 }
 
-func Start(conf *config.Configuration) (*LogServer, error) {
-	return startInternal(conf.LogServerHost)
+func Start(conf *config.Configuration, currentRuntime string) (*LogServer, error) {
+	return startInternal(conf.LogServerHost, currentRuntime)
 }
 
-func startInternal(host string) (*LogServer, error) {
+func startInternal(host string, currentRuntime string) (*LogServer, error) {
 	listener, err := net.Listen("tcp", host+":")
 	if err != nil {
 		return nil, err
@@ -266,6 +273,7 @@ func startInternal(host string) (*LogServer, error) {
 		platformLogChan:   make(chan LogLine, platformLogBufferSize),
 		functionLogChan:   make(chan []LogLine),
 		lastRequestIdLock: &sync.Mutex{},
+		runtime:           currentRuntime,
 	}
 
 	mux := http.NewServeMux()

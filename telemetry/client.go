@@ -257,9 +257,8 @@ func (c *Client) attemptSend(ctx context.Context, currentPayloadBytes []byte, bu
 }
 
 // SendFunctionLogs constructs log payloads and sends them to new relic
-func (c *Client) SendFunctionLogs(ctx context.Context, invokedFunctionARN string, lines []logserver.LogLine, isAPMLambdaMode string) error {
+func (c *Client) SendFunctionLogs(ctx context.Context, invokedFunctionARN string, lines []logserver.LogLine, entityGuid string) error {
 	start := time.Now()
-	var entityGuid string
 	if len(lines) == 0 {
 		util.Debugln("client.SendFunctionLogs invoked with 0 log lines. Returning without sending a payload to New Relic")
 		return nil

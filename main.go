@@ -452,7 +452,6 @@ func mainAPMLoop(ctx context.Context, invocationClient *client.InvocationClient,
 				// timed out, this will catch us up to the current state of telemetry, allowing us to resume.
 				select {
 				case telemetryBytes := <-telemetryChan:
-					util.Debugf("TELEMETRY BYTES RECEEIVED>>>")
 					app.DataChan <- telemetryBytes
 				default:
 				}
@@ -504,7 +503,6 @@ func mainAPMLoop(ctx context.Context, invocationClient *client.InvocationClient,
 				probablyTimeout = true
 				continue
 			case telemetryBytes := <-telemetryChan:
-				util.Debugf("TELEMETRY BYTES RECEEIVED>>>")
 				app.DataChan <- telemetryBytes
 			}
 

@@ -24,8 +24,7 @@ to install the managed secret, and then add the permission for the secret to you
     newrelic-lambda integrations install \
         --nr-account-id <account id> \
         --nr-api-key <api key> \
-        --linked-account-name <linked account name> \
-        --enable-license-key-secret
+        --linked-account-name <linked account name> 
 
 Each of the example functions in the `examples` directory has the appropriate license key secret permission. 
 

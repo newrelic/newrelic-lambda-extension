@@ -24,12 +24,12 @@ import (
 )
 
 var (
-	invokedFunctionARN string
-	lastEventStart     time.Time
-	lastRequestId      string
-	rootCtx            context.Context
-	LambdaFunctionName string
-	LambdaAccountId    string
+	invokedFunctionARN    string
+	lastEventStart        time.Time
+	lastRequestId         string
+	rootCtx               context.Context
+	LambdaFunctionName    string
+	LambdaAccountId       string
 	LambdaFunctionVersion string
 )
 
@@ -148,11 +148,10 @@ func main() {
 	batch := telemetry.NewBatch(int64(conf.RipeMillis), int64(conf.RotMillis), conf.CollectTraceID)
 	// In APM Lambda mode, we don't send telemetry
 	telemetryClient := telemetry.New(registrationResponse.FunctionName, licenseKey, conf.TelemetryEndpoint, conf.LogEndpoint, batch, conf.CollectTraceID, conf.ClientTimeout)
-	
 
 	// Run startup checks
 	go func() {
-		if conf.IgnoreExtensionChecks["all"] && conf.APMLambdaMode{
+		if conf.IgnoreExtensionChecks["all"] && conf.APMLambdaMode {
 			// Ignore extension checks in APM Mode
 			util.Debugf("Ignoring all extension checks")
 			return
@@ -206,6 +205,9 @@ func logShipLoop(ctx context.Context, logServer *logserver.LogServer, telemetryC
 		functionLogs, more := logServer.AwaitFunctionLogs()
 		if !more {
 			return
+		}
+		if invokedFunctionARN == "" && !isAPMLambdaMode && LambdaAccountId != "" && LambdaFunctionName != "" {
+			invokedFunctionARN = getLambdaARN(LambdaAccountId, LambdaFunctionName)
 		}
 		err := telemetryClient.SendFunctionLogs(ctx, invokedFunctionARN, functionLogs, isAPMLambdaMode)
 		if err != nil {
@@ -335,7 +337,6 @@ func mainLoop(ctx context.Context, invocationClient *client.InvocationClient, ba
 	}
 }
 
-
 // mainAPMLoop repeatedly calls the /next api, and processes telemetry and platform logs. The timing is rather complicated.
 func mainAPMLoop(ctx context.Context, invocationClient *client.InvocationClient, batch *telemetry.Batch, telemetryChan chan []byte, logServer *logserver.LogServer, conf *config.Configuration, telemetryClient *telemetry.Client) int {
 	eventCounter := 0
@@ -390,23 +391,23 @@ func mainAPMLoop(ctx context.Context, invocationClient *client.InvocationClient,
 						"Task timed out after %.2f seconds",
 						timeoutSecs,
 					)
-					apm.SendErrorEvent(apmCmd, apmControls, []interface{}{"Lambda.Timedout", 
-																		fmt.Sprintf("%f", timeoutSecs), 
-																		lastRequestId, 
-																		errorMessage,
-																		LambdaFunctionName, 
-																		LambdaAccountId, 
-																		LambdaFunctionVersion})
+					apm.SendErrorEvent(apmCmd, apmControls, []interface{}{"Lambda.Timedout",
+						fmt.Sprintf("%f", timeoutSecs),
+						lastRequestId,
+						errorMessage,
+						LambdaFunctionName,
+						LambdaAccountId,
+						LambdaFunctionVersion})
 				} else if event.ShutdownReason == api.Failure {
 					errorMessage := fmt.Sprintf("RequestId: %s AWS Lambda platform fault caused a shutdown", lastRequestId)
 					timeoutSecs := eventStart.Sub(lastEventStart).Seconds()
-					apm.SendErrorEvent(apmCmd, apmControls, []interface{}{"Lambda.PlatformFault", 
-																		fmt.Sprintf("%f", timeoutSecs), 
-																		lastRequestId, 
-																		errorMessage,
-																		LambdaFunctionName, 
-																		LambdaAccountId, 
-																		LambdaFunctionVersion})
+					apm.SendErrorEvent(apmCmd, apmControls, []interface{}{"Lambda.PlatformFault",
+						fmt.Sprintf("%f", timeoutSecs),
+						lastRequestId,
+						errorMessage,
+						LambdaFunctionName,
+						LambdaAccountId,
+						LambdaFunctionVersion})
 				}
 
 				return eventCounter
@@ -514,4 +515,12 @@ func noopLoop(ctx context.Context, invocationClient *client.InvocationClient) {
 			}
 		}
 	}
+}
+
+func getLambdaARN(awsAccountId string, awsLambdaName string) string {
+	awsRegion := os.Getenv("AWS_REGION")
+	if awsRegion == "" {
+		awsRegion = os.Getenv("AWS_DEFAULT_REGION")
+	}
+	return fmt.Sprintf("arn:aws:lambda:%s:%s:function:%s", awsRegion, awsAccountId, awsLambdaName)
 }

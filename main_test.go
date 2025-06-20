@@ -793,3 +793,146 @@ func TestMainTimeoutNoPipeWrite(t *testing.T) {
 func overrideContext(ctx context.Context) {
 	rootCtx = ctx
 }
+
+func TestGetLambdaARN(t *testing.T) {
+	originalRegion := os.Getenv("AWS_REGION")
+	originalDefaultRegion := os.Getenv("AWS_DEFAULT_REGION")
+
+	defer func() {
+		os.Setenv("AWS_REGION", originalRegion)
+		os.Setenv("AWS_DEFAULT_REGION", originalDefaultRegion)
+	}()
+
+	tests := []struct {
+		name             string
+		awsAccountId     string
+		awsLambdaName    string
+		awsRegion        string
+		awsDefaultRegion string
+		expectedARN      string
+	}{
+		{
+			name:             "Standard case with AWS_REGION set",
+			awsAccountId:     "123456789012",
+			awsLambdaName:    "my-function",
+			awsRegion:        "us-east-1",
+			awsDefaultRegion: "",
+			expectedARN:      "arn:aws:lambda:us-east-1:123456789012:function:my-function",
+		},
+		{
+			name:             "AWS_REGION not set, fallback to AWS_DEFAULT_REGION",
+			awsAccountId:     "123456789012",
+			awsLambdaName:    "my-function",
+			awsRegion:        "",
+			awsDefaultRegion: "us-west-2",
+			expectedARN:      "arn:aws:lambda:us-west-2:123456789012:function:my-function",
+		},
+		{
+			name:             "Both AWS_REGION and AWS_DEFAULT_REGION set, AWS_REGION takes precedence",
+			awsAccountId:     "123456789012",
+			awsLambdaName:    "my-function",
+			awsRegion:        "us-east-1",
+			awsDefaultRegion: "us-west-2",
+			expectedARN:      "arn:aws:lambda:us-east-1:123456789012:function:my-function",
+		},
+		{
+			name:             "Neither region environment variable set",
+			awsAccountId:     "123456789012",
+			awsLambdaName:    "my-function",
+			awsRegion:        "",
+			awsDefaultRegion: "",
+			expectedARN:      "arn:aws:lambda::123456789012:function:my-function",
+		},
+		{
+			name:             "Function name with hyphens and underscores",
+			awsAccountId:     "987654321098",
+			awsLambdaName:    "my-complex_function-name",
+			awsRegion:        "eu-west-1",
+			awsDefaultRegion: "",
+			expectedARN:      "arn:aws:lambda:eu-west-1:987654321098:function:my-complex_function-name",
+		},
+		{
+			name:             "Different AWS region",
+			awsAccountId:     "555666777888",
+			awsLambdaName:    "test-function",
+			awsRegion:        "ap-southeast-1",
+			awsDefaultRegion: "",
+			expectedARN:      "arn:aws:lambda:ap-southeast-1:555666777888:function:test-function",
+		},
+		{
+			name:             "Empty account ID",
+			awsAccountId:     "",
+			awsLambdaName:    "my-function",
+			awsRegion:        "us-east-1",
+			awsDefaultRegion: "",
+			expectedARN:      "arn:aws:lambda:us-east-1::function:my-function",
+		},
+		{
+			name:             "Empty function name",
+			awsAccountId:     "123456789012",
+			awsLambdaName:    "",
+			awsRegion:        "us-east-1",
+			awsDefaultRegion: "",
+			expectedARN:      "arn:aws:lambda:us-east-1:123456789012:function:",
+		},
+		{
+			name:             "Long function name",
+			awsAccountId:     "123456789012",
+			awsLambdaName:    "very-long-function-name-that-might-be-used-in-some-cases",
+			awsRegion:        "us-east-1",
+			awsDefaultRegion: "",
+			expectedARN:      "arn:aws:lambda:us-east-1:123456789012:function:very-long-function-name-that-might-be-used-in-some-cases",
+		},
+		{
+			name:             "GovCloud region",
+			awsAccountId:     "123456789012",
+			awsLambdaName:    "gov-function",
+			awsRegion:        "us-gov-west-1",
+			awsDefaultRegion: "",
+			expectedARN:      "arn:aws:lambda:us-gov-west-1:123456789012:function:gov-function",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			os.Setenv("AWS_REGION", tt.awsRegion)
+			os.Setenv("AWS_DEFAULT_REGION", tt.awsDefaultRegion)
+
+			result := getLambdaARN(tt.awsAccountId, tt.awsLambdaName)
+
+			if result != tt.expectedARN {
+				t.Errorf("getLambdaARN() = %v, want %v", result, tt.expectedARN)
+			}
+		})
+	}
+}
+
+func TestGetLambdaARN_EnvironmentVariableHandling(t *testing.T) {
+	originalRegion := os.Getenv("AWS_REGION")
+	originalDefaultRegion := os.Getenv("AWS_DEFAULT_REGION")
+
+	defer func() {
+		os.Setenv("AWS_REGION", originalRegion)
+		os.Setenv("AWS_DEFAULT_REGION", originalDefaultRegion)
+	}()
+
+	os.Setenv("AWS_REGION", "primary-region")
+	os.Setenv("AWS_DEFAULT_REGION", "fallback-region")
+
+	result := getLambdaARN("123456789012", "test-function")
+	expected := "arn:aws:lambda:primary-region:123456789012:function:test-function"
+
+	if result != expected {
+		t.Errorf("Expected AWS_REGION to take precedence. Got %v, want %v", result, expected)
+	}
+
+	os.Setenv("AWS_REGION", "")
+	os.Setenv("AWS_DEFAULT_REGION", "fallback-region")
+
+	result = getLambdaARN("123456789012", "test-function")
+	expected = "arn:aws:lambda:fallback-region:123456789012:function:test-function"
+
+	if result != expected {
+		t.Errorf("Expected fallback to AWS_DEFAULT_REGION. Got %v, want %v", result, expected)
+	}
+}

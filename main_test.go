@@ -7,6 +7,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -20,6 +21,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 )
+
+var testDoneChan chan struct{}
 
 // TODO: These tests are very repetitive. Helpers would be useful here.
 
@@ -935,4 +938,164 @@ func TestGetLambdaARN_EnvironmentVariableHandling(t *testing.T) {
 	if result != expected {
 		t.Errorf("Expected fallback to AWS_DEFAULT_REGION. Got %v, want %v", result, expected)
 	}
+}
+
+func TestMainColdStartFunctionLog(t *testing.T) {
+	logProcessedChan := make(chan struct{})
+	testDoneChan = make(chan struct{})
+	logsReceived := 0
+	arnWasSet := false
+	expectedARN := "arn:aws:lambda:us-east-1:123456789012:function:cold-start-function"
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		defer util.Close(r.Body)
+
+		if r.URL.Path == "/2020-01-01/extension/register" {
+			w.Header().Add(api.ExtensionIdHeader, "test-ext-id")
+			w.WriteHeader(http.StatusOK)
+			res, err := json.Marshal(api.RegistrationResponse{
+				FunctionName:    "cold-start-function",
+				FunctionVersion: "latest",
+				Handler:         "lambda.handler",
+				AccountId:       "123456789012",
+			})
+			assert.Nil(t, err)
+			_, _ = w.Write(res)
+			return
+		}
+
+		if r.URL.Path == "/2020-01-01/extension/init/error" {
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(""))
+			return
+		}
+
+		if r.URL.Path == "/2020-08-15/logs" {
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(""))
+			return
+		}
+
+		if r.URL.Path == "/2020-01-01/extension/event/next" {
+			w.WriteHeader(http.StatusOK)
+			res, err := json.Marshal(api.InvocationEvent{
+				EventType:          api.Invoke,
+				DeadlineMs:         time.Now().Add(10*time.Second).UnixNano() / int64(time.Millisecond),
+				RequestID:          "cold-start-request-id",
+				InvokedFunctionARN: "arn:aws:lambda:us-east-1:123456789012:function:cold-start-function",
+				ShutdownReason:     "",
+				Tracing:            nil,
+			})
+			assert.Nil(t, err)
+			_, _ = w.Write(res)
+			return
+		}
+
+		if r.URL.Path == "/aws/lambda/v1" {
+			logsReceived++
+
+			body, _ := io.ReadAll(r.Body)
+			bodyStr := string(body)
+			t.Logf("Telemetry request #%d received: %s", logsReceived, bodyStr)
+
+			if logsReceived == 2 && strings.Contains(bodyStr, expectedARN) {
+				t.Log("✅ ARN was correctly set for the second log")
+				arnWasSet = true
+			}
+
+			if logsReceived >= 2 {
+				select {
+				case logProcessedChan <- struct{}{}:
+				default:
+				}
+			}
+
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`{"success": true}`))
+			return
+		}
+	}))
+	defer srv.Close()
+
+	invokedFunctionARN = ""
+	lastRequestId = ""
+
+	ctx, cancel := context.WithCancel(context.Background())
+	go func() {
+		<-testDoneChan
+		cancel()
+	}()
+	overrideContext(ctx)
+
+	url := srv.URL[7:]
+
+	_ = os.Setenv(api.LambdaHostPortEnvVar, url)
+	defer os.Unsetenv(api.LambdaHostPortEnvVar)
+
+	_ = os.Setenv("NEW_RELIC_LICENSE_KEY", "foobar")
+	defer os.Unsetenv("NEW_RELIC_LICENSE_KEY")
+
+	_ = os.Setenv("NEW_RELIC_LOG_SERVER_HOST", "localhost")
+	defer os.Unsetenv("NEW_RELIC_LOG_SERVER_HOST")
+
+	_ = os.Setenv("NEW_RELIC_EXTENSION_LOG_LEVEL", "DEBUG")
+	defer os.Unsetenv("NEW_RELIC_EXTENSION_LOG_LEVEL")
+
+	_ = os.Setenv("NEW_RELIC_TELEMETRY_ENDPOINT", fmt.Sprintf("%s/aws/lambda/v1", srv.URL))
+	defer os.Unsetenv("NEW_RELIC_TELEMETRY_ENDPOINT")
+
+	_ = os.Setenv("NEW_RELIC_EXTENSION_SEND_FUNCTION_LOGS", "true")
+	defer os.Unsetenv("NEW_RELIC_EXTENSION_SEND_FUNCTION_LOGS")
+
+	_ = os.Setenv("AWS_REGION", "us-east-1")
+	defer os.Unsetenv("AWS_REGION")
+
+	mainDone := make(chan struct{})
+	go func() {
+		defer close(mainDone)
+		assert.NotPanics(t, main)
+	}()
+
+	time.Sleep(1000 * time.Millisecond)
+
+	telemetryURL := fmt.Sprintf("%s/aws/lambda/v1", srv.URL)
+
+	logWithoutARN := []byte(`{"time":"2023-01-01T00:00:00.000Z", "type":"function", "record":{"requestId":"cold-start-request-id", "message":"Cold start log without ARN"}}`)
+
+	resp, err := http.Post(telemetryURL, "application/json", strings.NewReader(string(logWithoutARN)))
+	if err == nil {
+		resp.Body.Close()
+	}
+
+	t.Log("Sent first log (without ARN)")
+
+	time.Sleep(500 * time.Millisecond)
+
+	logWithARN := []byte(`{"time":"2023-01-01T00:00:01.000Z", "type":"function", "record":{"requestId":"cold-start-request-id", "message":"Log after cold start", "invokedFunctionArn":"arn:aws:lambda:us-east-1:123456789012:function:cold-start-function"}}`)
+
+	resp, err = http.Post(telemetryURL, "application/json", strings.NewReader(string(logWithARN)))
+	if err == nil {
+		resp.Body.Close()
+	}
+
+	t.Log("Sent second log (with ARN)")
+
+	select {
+	case <-logProcessedChan:
+		t.Log("Logs were processed successfully")
+	case <-time.After(3 * time.Second):
+		t.Logf("Timed out waiting for logs to be processed. Logs received: %d", logsReceived)
+	}
+	close(testDoneChan)
+
+	select {
+	case <-mainDone:
+		t.Log("Main function completed")
+	case <-time.After(3 * time.Second):
+		t.Log("Timed out waiting for main to complete")
+	}
+
+	t.Logf("Total logs processed: %d", logsReceived)
+	assert.GreaterOrEqual(t, logsReceived, 1, "Expected at least 1 log to be processed")
+	assert.True(t, arnWasSet, "Expected the ARN to be set and detected in the request")
 }

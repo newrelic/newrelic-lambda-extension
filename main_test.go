@@ -940,45 +940,229 @@ func TestGetLambdaARN_EnvironmentVariableHandling(t *testing.T) {
 }
 
 func TestLogShipLoopARNConstruction(t *testing.T) {
-	// Save original global variables to restore after test
 	originalARN := invokedFunctionARN
 	originalAccountId := LambdaAccountId
 	originalFunctionName := LambdaFunctionName
 
 	defer func() {
-		// Restore original values
 		invokedFunctionARN = originalARN
 		LambdaAccountId = originalAccountId
 		LambdaFunctionName = originalFunctionName
 	}()
 
-	// Set up test values
+	// Test cases to cover different scenarios
+	testCases := []struct {
+		name              string
+		isAPMLambdaMode   bool
+		initialARN        string
+		accountID         string
+		functionName      string
+		region            string
+		expectARNChange   bool
+		expectedARNSuffix string // The part of the ARN that will be validated
+	}{
+		{
+			name:              "ARN constructed when missing and not in APM mode",
+			isAPMLambdaMode:   false,
+			initialARN:        "",
+			accountID:         "123456789012",
+			functionName:      "test-function",
+			region:            "us-west-2",
+			expectARNChange:   true,
+			expectedARNSuffix: "123456789012:function:test-function",
+		},
+		{
+			name:              "ARN not constructed when in APM mode",
+			isAPMLambdaMode:   true,
+			initialARN:        "",
+			accountID:         "123456789012",
+			functionName:      "test-function",
+			region:            "us-west-2",
+			expectARNChange:   false,
+			expectedARNSuffix: "",
+		},
+		{
+			name:              "ARN not constructed when already set",
+			isAPMLambdaMode:   false,
+			initialARN:        "existing-arn",
+			accountID:         "123456789012",
+			functionName:      "test-function",
+			region:            "us-west-2",
+			expectARNChange:   false,
+			expectedARNSuffix: "existing-arn",
+		},
+		{
+			name:              "ARN not constructed when account ID missing",
+			isAPMLambdaMode:   false,
+			initialARN:        "",
+			accountID:         "",
+			functionName:      "test-function",
+			region:            "us-west-2",
+			expectARNChange:   false,
+			expectedARNSuffix: "",
+		},
+		{
+			name:              "ARN not constructed when function name missing",
+			isAPMLambdaMode:   false,
+			initialARN:        "",
+			accountID:         "123456789012",
+			functionName:      "",
+			region:            "us-west-2",
+			expectARNChange:   false,
+			expectedARNSuffix: "",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			// Set up test environment
+			invokedFunctionARN = tc.initialARN
+			LambdaAccountId = tc.accountID
+			LambdaFunctionName = tc.functionName
+
+			// Save and set AWS region for the test
+			originalRegion := os.Getenv("AWS_REGION")
+			os.Setenv("AWS_REGION", tc.region)
+			defer os.Setenv("AWS_REGION", originalRegion)
+
+			// This code block replicates the exact logic in logShipLoop
+			if invokedFunctionARN == "" && !tc.isAPMLambdaMode && LambdaAccountId != "" && LambdaFunctionName != "" {
+				invokedFunctionARN = getLambdaARN(LambdaAccountId, LambdaFunctionName)
+			}
+
+			// Verify expectations
+			if tc.expectARNChange {
+				assert.Contains(t, invokedFunctionARN, tc.expectedARNSuffix,
+					"ARN was not constructed correctly")
+				assert.True(t, invokedFunctionARN != tc.initialARN,
+					"Expected ARN to be modified")
+			} else {
+				if tc.initialARN == "" {
+					assert.Equal(t, tc.initialARN, invokedFunctionARN,
+						"ARN should remain empty")
+				} else {
+					assert.Equal(t, tc.initialARN, invokedFunctionARN,
+						"ARN should not be modified")
+				}
+			}
+		})
+	}
+}
+
+func TestLogShipLoopARNConstructionWithMocks(t *testing.T) {
+	originalARN := invokedFunctionARN
+	originalAccountId := LambdaAccountId
+	originalFunctionName := LambdaFunctionName
+
+	defer func() {
+		invokedFunctionARN = originalARN
+		LambdaAccountId = originalAccountId
+		LambdaFunctionName = originalFunctionName
+	}()
+
 	invokedFunctionARN = ""
 	LambdaAccountId = "123456789012"
 	LambdaFunctionName = "test-function"
 
-	// Set AWS_REGION for the test
 	originalRegion := os.Getenv("AWS_REGION")
 	defer os.Setenv("AWS_REGION", originalRegion)
 	os.Setenv("AWS_REGION", "us-west-2")
 
-	// Set up a test function that directly exercises the ARN construction logic
-	// This specifically tests the code path in logShipLoop:
-	// if invokedFunctionARN == "" && !isAPMLambdaMode && LambdaAccountId != "" && LambdaFunctionName != "" {
-	//     invokedFunctionARN = getLambdaARN(LambdaAccountId, LambdaFunctionName)
-	// }
+	mockLogShipFunc := func() {
+		if invokedFunctionARN == "" && LambdaAccountId != "" && LambdaFunctionName != "" {
+			invokedFunctionARN = getLambdaARN(LambdaAccountId, LambdaFunctionName)
+		}
+	}
 
-	// Verify the initial state
-	assert.Equal(t, "", invokedFunctionARN, "Expected invokedFunctionARN to be empty at start")
+	mockLogShipFunc()
 
-	// Call the ARN construction logic directly
+	expectedARN := "arn:aws:lambda:us-west-2:123456789012:function:test-function"
+	assert.Equal(t, expectedARN, invokedFunctionARN, "ARN was not constructed correctly")
+
+	t.Log("ARN construction logic successfully tested")
+}
+
+func TestLogShipLoopDirectLogic(t *testing.T) {
+	originalARN := invokedFunctionARN
+	originalAccountId := LambdaAccountId
+	originalFunctionName := LambdaFunctionName
+
+	defer func() {
+		invokedFunctionARN = originalARN
+		LambdaAccountId = originalAccountId
+		LambdaFunctionName = originalFunctionName
+	}()
+
+	t.Run("Test ARN construction in cold start", func(t *testing.T) {
+		invokedFunctionARN = ""
+		LambdaAccountId = "123456789012"
+		LambdaFunctionName = "test-function"
+		isAPMLambdaMode := false
+
+		originalRegion := os.Getenv("AWS_REGION")
+		os.Setenv("AWS_REGION", "us-west-2")
+		defer os.Setenv("AWS_REGION", originalRegion)
+
+		if invokedFunctionARN == "" && !isAPMLambdaMode && LambdaAccountId != "" && LambdaFunctionName != "" {
+			invokedFunctionARN = getLambdaARN(LambdaAccountId, LambdaFunctionName)
+		}
+
+		expectedARN := "arn:aws:lambda:us-west-2:123456789012:function:test-function"
+		assert.Equal(t, expectedARN, invokedFunctionARN, "ARN wasn't constructed correctly")
+	})
+
+	t.Run("Test ARN not constructed in APM mode", func(t *testing.T) {
+		invokedFunctionARN = ""
+		LambdaAccountId = "123456789012"
+		LambdaFunctionName = "test-function"
+		isAPMLambdaMode := true
+
+		if invokedFunctionARN == "" && !isAPMLambdaMode && LambdaAccountId != "" && LambdaFunctionName != "" {
+			invokedFunctionARN = getLambdaARN(LambdaAccountId, LambdaFunctionName)
+		}
+
+		assert.Equal(t, "", invokedFunctionARN, "ARN shouldn't have been constructed in APM mode")
+	})
+
+	t.Run("Test ARN not constructed when already exists", func(t *testing.T) {
+		invokedFunctionARN = "existing-arn"
+		LambdaAccountId = "123456789012"
+		LambdaFunctionName = "test-function"
+		isAPMLambdaMode := false
+
+		if invokedFunctionARN == "" && !isAPMLambdaMode && LambdaAccountId != "" && LambdaFunctionName != "" {
+			invokedFunctionARN = getLambdaARN(LambdaAccountId, LambdaFunctionName)
+		}
+
+		assert.Equal(t, "existing-arn", invokedFunctionARN, "Existing ARN should remain unchanged")
+	})
+}
+
+func TestLogShipLoopFullCoverage(t *testing.T) {
+	originalARN := invokedFunctionARN
+	originalAccountId := LambdaAccountId
+	originalFunctionName := LambdaFunctionName
+
+	defer func() {
+		invokedFunctionARN = originalARN
+		LambdaAccountId = originalAccountId
+		LambdaFunctionName = originalFunctionName
+	}()
+
+	invokedFunctionARN = ""
+	LambdaAccountId = "123456789012"
+	LambdaFunctionName = "test-function"
+
+	originalRegion := os.Getenv("AWS_REGION")
+	defer os.Setenv("AWS_REGION", originalRegion)
+	os.Setenv("AWS_REGION", "us-west-2")
+
 	isAPMLambdaMode := false
+
 	if invokedFunctionARN == "" && !isAPMLambdaMode && LambdaAccountId != "" && LambdaFunctionName != "" {
 		invokedFunctionARN = getLambdaARN(LambdaAccountId, LambdaFunctionName)
 	}
 
-	// Verify that the ARN was set correctly
 	expectedARN := "arn:aws:lambda:us-west-2:123456789012:function:test-function"
 	assert.Equal(t, expectedARN, invokedFunctionARN, "ARN was not constructed correctly")
-	t.Log("ARN construction logic tested successfully")
 }

@@ -217,7 +217,7 @@ func (ls *LogServer) handler(res http.ResponseWriter, req *http.Request) {
 			var err error
 			if ls.runtime != "" && strings.ToLower(ls.runtime) == "node" {
 				requestId, err = ExtractRequestId(recordString)
-				if err != nil {
+				if err != nil || requestId == "" {
 					ls.lastRequestIdLock.Lock()
 					requestId = ls.lastRequestId
 					ls.lastRequestIdLock.Unlock()

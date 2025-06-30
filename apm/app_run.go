@@ -6,7 +6,7 @@ import (
 
 type appRun struct {
 	Reply       *ConnectReply
-	firstAppame string
+	firstAppName string
 	mu           sync.RWMutex
 }
 

@@ -68,14 +68,15 @@ func NewApp(ctx context.Context ,c *config.Configuration, LambdaFunctionName str
 
 		shutdownStarted:    make(chan struct{}),
 		shutdownComplete:   make(chan struct{}),
+		apmHarvest:         &harvest{data: [][]byte{}},	 
 		connectChan:        make(chan *appRun, 1),
 		collectorErrorChan: make(chan rpmResponse, 1),
-		DataChan:           make(chan []byte, 1),
+		DataChan:           make(chan []byte, 5),
 		LambdaLogChan:      make(chan string, 1),
 		rpmControls: rpmControls{
 			License: c.LicenseKey,
 			Client: &http.Client{
-				Timeout: 1000 * time.Second,
+				Timeout: 20 * time.Second,
 			},
 			GzipWriterPool: &sync.Pool{
 				New: func() interface{} {
@@ -105,14 +106,14 @@ func (app *InternalAPMApp) connectAttempt() (*ConnectReply, *rpmResponse) {
 	}
 	redirectHost, PreConnectErr := PreConnect(cmd, &app.rpmControls)
 	if PreConnectErr != nil {
-		return nil, nil
+		return nil, &rpmResponse{err: PreConnectErr}
 	}
 	app.apmConfig.hostname = redirectHost
 	cmd.Collector = redirectHost
 	cmd.Name = cmdConnect
 	runId, entityGuid, ConnectErr := Connect(cmd, &app.rpmControls)
 	if ConnectErr != nil {
-		return nil, nil
+		return nil, &rpmResponse{err: ConnectErr}
 	}
 
 	return &ConnectReply{

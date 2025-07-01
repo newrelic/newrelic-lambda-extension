@@ -24,12 +24,12 @@ import (
 )
 
 var (
-	invokedFunctionARN    string
-	lastEventStart        time.Time
-	lastRequestId         string
-	rootCtx               context.Context
-	LambdaFunctionName    string
-	LambdaAccountId       string
+	invokedFunctionARN string
+	lastEventStart     time.Time
+	lastRequestId      string
+	rootCtx            context.Context
+	LambdaFunctionName string
+	LambdaAccountId    string
 	LambdaFunctionVersion string
 )
 
@@ -112,6 +112,7 @@ func main() {
 		noopLoop(ctx, invocationClient)
 		return
 	}
+
 	// Start the Logs API server, and register it
 	logServer, err := logserver.Start(conf)
 	if err != nil {
@@ -155,9 +156,7 @@ func main() {
 
 	// Run startup checks
 	go func() {
-    
 		if conf.IgnoreExtensionChecks["all"] || conf.APMLambdaMode{
-
 			// Ignore extension checks in APM Mode
 			util.Debugf("Ignoring all extension checks")
 			return
@@ -416,6 +415,7 @@ func mainLoop(ctx context.Context, invocationClient *client.InvocationClient, ba
 	}
 }
 
+
 // mainAPMLoop repeatedly calls the /next api, and processes telemetry and platform logs. The timing is rather complicated.
 func mainAPMLoop(ctx context.Context, invocationClient *client.InvocationClient, telemetryChan chan []byte, logServer *logserver.LogServer, conf *config.Configuration, app *apm.InternalAPMApp) int {
 	eventCounter := 0
@@ -463,7 +463,6 @@ func mainAPMLoop(ctx context.Context, invocationClient *client.InvocationClient,
 						"Task timed out after %.2f seconds",
 						timeoutSecs,
 					)
-
 					app.ErrorEventChan <- []interface{}{"Lambda.Timedout", 
 																		fmt.Sprintf("%f", timeoutSecs), 
 																		lastRequestId, 
@@ -481,7 +480,6 @@ func mainAPMLoop(ctx context.Context, invocationClient *client.InvocationClient,
 																		LambdaFunctionName, 
 																		LambdaAccountId, 
 																		LambdaFunctionVersion}
-
 				}
 
 				return eventCounter

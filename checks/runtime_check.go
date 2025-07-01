@@ -40,6 +40,8 @@ func checkAndReturnRuntime() (runtimeConfig, error) {
 		}
 	}
 
+	// If we make it here that means the runtime is not one we
+	// currently validate so we don't want to warn against anything
 	return runtimeConfig{}, nil
 }
 

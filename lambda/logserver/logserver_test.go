@@ -520,45 +520,69 @@ func mockStatFound(path string) (os.FileInfo, error) {
 	return nil, nil
 }
 
-func mockReadDirEmpty(path string) ([]os.DirEntry, error) {
-	return []os.DirEntry{}, nil
-}
-
-func TestDetectRuntimeWithFileSystem_NodeFound(t *testing.T) {
-	runtime := detectRuntimeWithFileSystem(mockStatFound, mockReadDirEmpty)
-	assert.Equal(t, "Node", runtime)
-}
-
-func TestDetectRuntimeWithFileSystem_Unknown(t *testing.T) {
-	runtime := detectRuntimeWithFileSystem(mockStatNotFound, mockReadDirEmpty)
-	assert.Equal(t, "Unknown", runtime)
-}
-
 func TestDetectRuntime_NodeFound(t *testing.T) {
-	origStat := osStatFunc
-	origReadDir := osReadDirFunc
+	origTestMode := testMode
+	origTestRuntime := testRuntime
 	defer func() {
-		osStatFunc = origStat
-		osReadDirFunc = origReadDir
+		testMode = origTestMode
+		testRuntime = origTestRuntime
 	}()
 
-	osStatFunc = mockStatFound
-	osReadDirFunc = mockReadDirEmpty
+	testMode = true
+	testRuntime = "Node"
 
 	runtime := detectRuntime()
 	assert.Equal(t, "Node", runtime)
 }
 
 func TestDetectRuntime_Unknown(t *testing.T) {
-	origStat := osStatFunc
-	origReadDir := osReadDirFunc
+	origTestMode := testMode
+	origTestRuntime := testRuntime
 	defer func() {
-		osStatFunc = origStat
-		osReadDirFunc = origReadDir
+		testMode = origTestMode
+		testRuntime = origTestRuntime
 	}()
 
+	testMode = true
+	testRuntime = "Unknown"
+
+	runtime := detectRuntime()
+	assert.Equal(t, "Unknown", runtime)
+}
+
+func TestDetectRuntime_ProductionMode(t *testing.T) {
+	origTestMode := testMode
+	origTestRuntime := testRuntime
+	origStat := osStatFunc
+	defer func() {
+		testMode = origTestMode
+		testRuntime = origTestRuntime
+		osStatFunc = origStat
+	}()
+
+	testMode = false
+	testRuntime = ""
+
+	osStatFunc = mockStatFound
+
+	runtime := detectRuntime()
+	assert.Equal(t, "Node", runtime)
+}
+
+func TestDetectRuntime_ProductionModeUnknown(t *testing.T) {
+	origTestMode := testMode
+	origTestRuntime := testRuntime
+	origStat := osStatFunc
+	defer func() {
+		testMode = origTestMode
+		testRuntime = origTestRuntime
+		osStatFunc = origStat
+	}()
+
+	testMode = false
+	testRuntime = ""
+
 	osStatFunc = mockStatNotFound
-	osReadDirFunc = mockReadDirEmpty
 
 	runtime := detectRuntime()
 	assert.Equal(t, "Unknown", runtime)

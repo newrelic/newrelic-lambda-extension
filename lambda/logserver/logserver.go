@@ -24,8 +24,9 @@ const (
 )
 
 var (
-	osStatFunc    = os.Stat
-	osReadDirFunc = os.ReadDir
+	osStatFunc  = os.Stat
+	testMode    = false
+	testRuntime = ""
 )
 
 type LogLine struct {
@@ -221,7 +222,7 @@ func (ls *LogServer) handler(res http.ResponseWriter, req *http.Request) {
 			recordString := event.Record.(string)
 			var requestId string
 			var err error
-			if ls.runtime != "" && strings.ToLower(ls.runtime) == "node" {
+			if ls.runtime != "" && ls.runtime == "Node" {
 				requestId, err = ExtractRequestId(recordString)
 				if err != nil || requestId == "" {
 					ls.lastRequestIdLock.Lock()
@@ -297,16 +298,16 @@ func startInternal(host string) (*LogServer, error) {
 }
 
 func detectRuntime() string {
-	return detectRuntimeWithFileSystem(osStatFunc, osReadDirFunc)
-}
+	if testMode {
+		return testRuntime
+	}
 
-func detectRuntimeWithFileSystem(statFunc func(string) (os.FileInfo, error), readDirFunc func(string) ([]os.DirEntry, error)) string {
 	runtimeBinaries := map[string]string{
 		"/var/lang/bin/node": "Node",
 	}
 
 	for path, runtime := range runtimeBinaries {
-		if _, err := statFunc(path); err == nil {
+		if _, err := osStatFunc(path); err == nil {
 			return runtime
 		}
 	}

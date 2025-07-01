@@ -107,9 +107,8 @@ func main() {
 		noopLoop(ctx, invocationClient)
 		return
 	}
-	currentRuntime := checks.DetectRuntime()
 	// Start the Logs API server, and register it
-	logServer, err := logserver.Start(conf, currentRuntime)
+	logServer, err := logserver.Start(conf)
 	if err != nil {
 		err2 := invocationClient.InitError(ctx, "logServer.start", err)
 		if err2 != nil {

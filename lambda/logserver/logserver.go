@@ -7,6 +7,7 @@ import (
 	"io"
 	"net"
 	"net/http"
+	"os"
 	"regexp"
 	"strconv"
 	"strings"
@@ -20,6 +21,11 @@ import (
 
 const (
 	platformLogBufferSize = 100
+)
+
+var (
+	osStatFunc    = os.Stat
+	osReadDirFunc = os.ReadDir
 )
 
 type LogLine struct {
@@ -217,7 +223,7 @@ func (ls *LogServer) handler(res http.ResponseWriter, req *http.Request) {
 			var err error
 			if ls.runtime != "" && strings.ToLower(ls.runtime) == "node" {
 				requestId, err = ExtractRequestId(recordString)
-				if err != nil {
+				if err != nil || requestId == "" {
 					ls.lastRequestIdLock.Lock()
 					requestId = ls.lastRequestId
 					ls.lastRequestIdLock.Unlock()
@@ -255,17 +261,19 @@ func (ls *LogServer) handler(res http.ResponseWriter, req *http.Request) {
 	_, _ = res.Write(nil)
 }
 
-func Start(conf *config.Configuration, currentRuntime string) (*LogServer, error) {
-	return startInternal(conf.LogServerHost, currentRuntime)
+func Start(conf *config.Configuration) (*LogServer, error) {
+	return startInternal(conf.LogServerHost)
 }
 
-func startInternal(host string, currentRuntime string) (*LogServer, error) {
+func startInternal(host string) (*LogServer, error) {
 	listener, err := net.Listen("tcp", host+":")
 	if err != nil {
 		return nil, err
 	}
 
 	server := &http.Server{}
+
+	currentRuntime := detectRuntime()
 
 	logServer := &LogServer{
 		listenString:      listener.Addr().String(),
@@ -286,4 +294,21 @@ func startInternal(host string, currentRuntime string) (*LogServer, error) {
 	}()
 
 	return logServer, nil
+}
+
+func detectRuntime() string {
+	return detectRuntimeWithFileSystem(osStatFunc, osReadDirFunc)
+}
+
+func detectRuntimeWithFileSystem(statFunc func(string) (os.FileInfo, error), readDirFunc func(string) ([]os.DirEntry, error)) string {
+	runtimeBinaries := map[string]string{
+		"/var/lang/bin/node": "Node",
+	}
+
+	for path, runtime := range runtimeBinaries {
+		if _, err := statFunc(path); err == nil {
+			return runtime
+		}
+	}
+	return "Unknown"
 }

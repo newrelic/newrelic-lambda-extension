@@ -6,9 +6,11 @@ package logserver
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"testing"
 	"time"
 
@@ -19,7 +21,7 @@ import (
 )
 
 func TestLogServer(t *testing.T) {
-	logs, err := startInternal("localhost", "Go")
+	logs, err := startInternal("localhost")
 	assert.NoError(t, err)
 
 	testEvents := []api.LogEvent{
@@ -62,8 +64,10 @@ func TestLogServer(t *testing.T) {
 }
 
 func TestFunctionLogs(t *testing.T) {
-	logs, err := startInternal("localhost", "Node")
+	logs, err := startInternal("localhost")
 	assert.NoError(t, err)
+
+	logs.runtime = "Node"
 
 	testEvents := []api.LogEvent{
 		{
@@ -336,7 +340,7 @@ func TestFunctionLogs(t *testing.T) {
 }
 
 func TestExtensionLogs(t *testing.T) {
-	logs, err := startInternal("localhost", "Go")
+	logs, err := startInternal("localhost")
 	assert.NoError(t, err)
 
 	testEvents := []api.LogEvent{
@@ -400,13 +404,13 @@ func TestExtensionLogs(t *testing.T) {
 }
 
 func TestLogServerStart(t *testing.T) {
-	logs, err := Start(&config.Configuration{LogServerHost: "localhost"}, "Go")
+	logs, err := Start(&config.Configuration{LogServerHost: "localhost"})
 	assert.NoError(t, err)
 	assert.Nil(t, logs.Close())
 }
 
 func TestLogServerCloseShutdownFlag(t *testing.T) {
-	logServer, err := startInternal("localhost", "Go")
+	logServer, err := startInternal("localhost")
 	require.NoError(t, err)
 	require.NotNil(t, logServer)
 
@@ -425,7 +429,7 @@ func TestLogServerCloseShutdownFlag(t *testing.T) {
 }
 
 func TestLogServerHandlerDuringShutdown(t *testing.T) {
-	logServer, err := startInternal("localhost", "Go")
+	logServer, err := startInternal("localhost")
 	require.NoError(t, err)
 	require.NotNil(t, logServer)
 
@@ -481,7 +485,7 @@ func SendFunctionLogsContinuously(logServer *LogServer, t *testing.T) {
 }
 
 func TestLogServerShutdownDuringRequests(t *testing.T) {
-	logServer, err := startInternal("localhost", "Go")
+	logServer, err := startInternal("localhost")
 	require.NoError(t, err)
 	require.NotNil(t, logServer)
 
@@ -506,4 +510,56 @@ func TestLogServerShutdownDuringRequests(t *testing.T) {
 	case <-time.After(5 * time.Second):
 		t.Fatal("Test timed out")
 	}
+}
+
+func mockStatNotFound(path string) (os.FileInfo, error) {
+	return nil, errors.New("file not found")
+}
+
+func mockStatFound(path string) (os.FileInfo, error) {
+	return nil, nil
+}
+
+func mockReadDirEmpty(path string) ([]os.DirEntry, error) {
+	return []os.DirEntry{}, nil
+}
+
+func TestDetectRuntimeWithFileSystem_NodeFound(t *testing.T) {
+	runtime := detectRuntimeWithFileSystem(mockStatFound, mockReadDirEmpty)
+	assert.Equal(t, "Node", runtime)
+}
+
+func TestDetectRuntimeWithFileSystem_Unknown(t *testing.T) {
+	runtime := detectRuntimeWithFileSystem(mockStatNotFound, mockReadDirEmpty)
+	assert.Equal(t, "Unknown", runtime)
+}
+
+func TestDetectRuntime_NodeFound(t *testing.T) {
+	origStat := osStatFunc
+	origReadDir := osReadDirFunc
+	defer func() {
+		osStatFunc = origStat
+		osReadDirFunc = origReadDir
+	}()
+
+	osStatFunc = mockStatFound
+	osReadDirFunc = mockReadDirEmpty
+
+	runtime := detectRuntime()
+	assert.Equal(t, "Node", runtime)
+}
+
+func TestDetectRuntime_Unknown(t *testing.T) {
+	origStat := osStatFunc
+	origReadDir := osReadDirFunc
+	defer func() {
+		osStatFunc = origStat
+		osReadDirFunc = origReadDir
+	}()
+
+	osStatFunc = mockStatNotFound
+	osReadDirFunc = mockReadDirEmpty
+
+	runtime := detectRuntime()
+	assert.Equal(t, "Unknown", runtime)
 }

@@ -7,8 +7,10 @@ import (
 	"io"
 	"net"
 	"net/http"
+	"os"
 	"regexp"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -19,6 +21,12 @@ import (
 
 const (
 	platformLogBufferSize = 100
+)
+
+var (
+	osStatFunc  = os.Stat
+	testMode    = false
+	testRuntime = ""
 )
 
 type LogLine struct {
@@ -36,8 +44,13 @@ type LogServer struct {
 	lastRequestIdLock *sync.Mutex
 	isShuttingDown    bool
 	shutdownLock      sync.RWMutex
-
+	runtime           string
 	wg                sync.WaitGroup
+}
+
+type functionLogJSON struct {
+	RequestId string `json:"requestId"`
+	Message   string `json:"message"`
 }
 
 func (ls *LogServer) Port() uint16 {
@@ -111,6 +124,20 @@ func formatReport(metrics map[string]interface{}) string {
 	}
 	util.Debugf("Formatted Return Report: %s", ret)
 	return ret
+}
+func ExtractRequestId(recordString string) (string, error) {
+	fields := strings.Split(recordString, "\t")
+	if len(fields) >= 2 {
+		return fields[1], nil
+	}
+
+	var functionLogJSON functionLogJSON
+	err := json.Unmarshal([]byte(recordString), &functionLogJSON)
+	if err == nil {
+		return functionLogJSON.RequestId, nil
+	}
+
+	return "", err
 }
 
 var reportStringRegExp, _ = regexp.Compile("RequestId: ([a-fA-F0-9-]+)(.*)")
@@ -191,7 +218,30 @@ func (ls *LogServer) handler(res http.ResponseWriter, req *http.Request) {
 			ls.platformLogChan <- reportLine
 		case "platform.logsDropped":
 			util.Logf("Platform dropped logs: %v", event.Record)
-		case "function", "extension", "platform.fault":
+		case "function":
+			recordString := event.Record.(string)
+			var requestId string
+			var err error
+			if ls.runtime != "" && ls.runtime == "Node" {
+				requestId, err = ExtractRequestId(recordString)
+				if err != nil || requestId == "" {
+					ls.lastRequestIdLock.Lock()
+					requestId = ls.lastRequestId
+					ls.lastRequestIdLock.Unlock()
+				}
+			} else {
+				ls.lastRequestIdLock.Lock()
+				requestId = ls.lastRequestId
+				ls.lastRequestIdLock.Unlock()
+			}
+
+			functionLogs = append(functionLogs, LogLine{
+				Time:      event.Time,
+				RequestID: requestId,
+				Content:   []byte(recordString),
+			})
+
+		case "extension", "platform.fault":
 			record := event.Record.(string)
 			ls.lastRequestIdLock.Lock()
 			functionLogs = append(functionLogs, LogLine{
@@ -224,12 +274,15 @@ func startInternal(host string) (*LogServer, error) {
 
 	server := &http.Server{}
 
+	currentRuntime := detectRuntime()
+
 	logServer := &LogServer{
 		listenString:      listener.Addr().String(),
 		server:            server,
 		platformLogChan:   make(chan LogLine, platformLogBufferSize),
 		functionLogChan:   make(chan []LogLine),
 		lastRequestIdLock: &sync.Mutex{},
+		runtime:           currentRuntime,
 	}
 
 	mux := http.NewServeMux()
@@ -242,4 +295,21 @@ func startInternal(host string) (*LogServer, error) {
 	}()
 
 	return logServer, nil
+}
+
+func detectRuntime() string {
+	if testMode {
+		return testRuntime
+	}
+
+	runtimeBinaries := map[string]string{
+		"/var/lang/bin/node": "Node",
+	}
+
+	for path, runtime := range runtimeBinaries {
+		if _, err := osStatFunc(path); err == nil {
+			return runtime
+		}
+	}
+	return "Unknown"
 }

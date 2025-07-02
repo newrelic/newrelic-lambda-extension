@@ -6,12 +6,10 @@ import (
 	"os"
 	"testing"
 
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/request"
-	"github.com/aws/aws-sdk-go/service/secretsmanager"
-	"github.com/aws/aws-sdk-go/service/secretsmanager/secretsmanageriface"
-	"github.com/aws/aws-sdk-go/service/ssm"
-	"github.com/aws/aws-sdk-go/service/ssm/ssmiface"
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/service/secretsmanager"
+	"github.com/aws/aws-sdk-go-v2/service/ssm"
+	"github.com/aws/aws-sdk-go-v2/service/ssm/types"
 	"github.com/newrelic/newrelic-lambda-extension/config"
 	"github.com/newrelic/newrelic-lambda-extension/credentials"
 	"github.com/newrelic/newrelic-lambda-extension/lambda/extension/api"
@@ -19,11 +17,10 @@ import (
 )
 
 type mockSecretManager struct {
-	secretsmanageriface.SecretsManagerAPI
 	validSecrets []string
 }
 
-func (m mockSecretManager) GetSecretValueWithContext(_ context.Context, input *secretsmanager.GetSecretValueInput, _ ...request.Option) (*secretsmanager.GetSecretValueOutput, error) {
+func (m mockSecretManager) GetSecretValue(_ context.Context, input *secretsmanager.GetSecretValueInput, _ ...func(*secretsmanager.Options)) (*secretsmanager.GetSecretValueOutput, error) {
 	for _, secret := range m.validSecrets {
 		if secret == *input.SecretId {
 			return &secretsmanager.GetSecretValueOutput{
@@ -36,17 +33,16 @@ func (m mockSecretManager) GetSecretValueWithContext(_ context.Context, input *s
 }
 
 type mockSSM struct {
-	ssmiface.SSMAPI
 	validParameters   []string
 	IsParameterCalled bool
 }
 
-func (m *mockSSM) GetParameterWithContext(_ context.Context, input *ssm.GetParameterInput, _ ...request.Option) (*ssm.GetParameterOutput, error) {
+func (m *mockSSM) GetParameter(_ context.Context, input *ssm.GetParameterInput, _ ...func(*ssm.Options)) (*ssm.GetParameterOutput, error) {
 	m.IsParameterCalled = true
 	for _, parameter := range m.validParameters {
 		if parameter == *input.Name {
 			return &ssm.GetParameterOutput{
-				Parameter: &ssm.Parameter{
+				Parameter: &types.Parameter{
 					Value: aws.String("bar"),
 				},
 			}, nil
@@ -62,8 +58,8 @@ func TestSanityCheck(t *testing.T) {
 
 		Conf           config.Configuration
 		Environment    map[string]string
-		SecretsManager secretsmanageriface.SecretsManagerAPI
-		SSM            ssmiface.SSMAPI
+		SecretsManager credentials.SecretsManagerAPI
+		SSM            credentials.SSMAPI
 
 		ExpectedErr string
 	}{

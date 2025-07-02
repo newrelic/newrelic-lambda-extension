@@ -6,35 +6,46 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/newrelic/newrelic-lambda-extension/config"
 	"github.com/newrelic/newrelic-lambda-extension/util"
 
-	"github.com/newrelic/newrelic-lambda-extension/config"
-
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/session"
-	"github.com/aws/aws-sdk-go/service/secretsmanager"
-	"github.com/aws/aws-sdk-go/service/secretsmanager/secretsmanageriface"
-	"github.com/aws/aws-sdk-go/service/ssm"
-	"github.com/aws/aws-sdk-go/service/ssm/ssmiface"
+	"github.com/aws/aws-sdk-go-v2/aws"
+	awsconfig "github.com/aws/aws-sdk-go-v2/config"
+	"github.com/aws/aws-sdk-go-v2/service/secretsmanager"
+	"github.com/aws/aws-sdk-go-v2/service/ssm"
 )
 
 type licenseKeySecret struct {
 	LicenseKey string
 }
 
+// SecretsManagerAPI defines the interface for Secrets Manager operations
+type SecretsManagerAPI interface {
+	GetSecretValue(ctx context.Context, params *secretsmanager.GetSecretValueInput, optFns ...func(*secretsmanager.Options)) (*secretsmanager.GetSecretValueOutput, error)
+}
+
+// SSMAPI defines the interface for SSM operations
+type SSMAPI interface {
+	GetParameter(ctx context.Context, params *ssm.GetParameterInput, optFns ...func(*ssm.Options)) (*ssm.GetParameterOutput, error)
+}
+
 var (
-	sess = session.Must(session.NewSessionWithOptions(session.Options{
-		SharedConfigState: session.SharedConfigEnable,
-	}))
-	secrets   secretsmanageriface.SecretsManagerAPI
-	ssmClient ssmiface.SSMAPI
+	cfg        aws.Config
+	secretsAPI SecretsManagerAPI
+	ssmAPI     SSMAPI
 )
 
 const defaultSecretId = "NEW_RELIC_LICENSE_KEY"
 
 func init() {
-	secrets = secretsmanager.New(sess)
-	ssmClient = ssm.New(sess)
+	var err error
+	cfg, err = awsconfig.LoadDefaultConfig(context.TODO())
+	if err != nil {
+		util.Logf("Failed to load AWS config: %v", err)
+		return
+	}
+	secretsAPI = secretsmanager.NewFromConfig(cfg)
+	ssmAPI = ssm.NewFromConfig(cfg)
 }
 
 func getLicenseKeySecretId(conf *config.Configuration) string {
@@ -73,7 +84,7 @@ func IsSecretConfigured(ctx context.Context, conf *config.Configuration) bool {
 	secretId := getLicenseKeySecretId(conf)
 	secretValueInput := secretsmanager.GetSecretValueInput{SecretId: &secretId}
 
-	_, err := secrets.GetSecretValueWithContext(ctx, &secretValueInput)
+	_, err := secretsAPI.GetSecretValue(ctx, &secretValueInput)
 	if err != nil {
 		return false
 	}
@@ -140,7 +151,7 @@ func tryLicenseKeyFromSecret(ctx context.Context, secretId string) (string, erro
 
 	secretValueInput := secretsmanager.GetSecretValueInput{SecretId: &secretId}
 
-	secretValueOutput, err := secrets.GetSecretValueWithContext(ctx, &secretValueInput)
+	secretValueOutput, err := secretsAPI.GetSecretValue(ctx, &secretValueInput)
 	if err != nil {
 		return "", err
 	}
@@ -151,9 +162,9 @@ func tryLicenseKeyFromSecret(ctx context.Context, secretId string) (string, erro
 func tryLicenseKeyFromSSMParameter(ctx context.Context, parameterName string) (string, error) {
 	util.Debugf("fetching '%s' from SSM Parameter Store\n", parameterName)
 
-	parameterValueInput := ssm.GetParameterInput{Name: &parameterName, WithDecryption: aws.Bool(true)}
+	parameterValueInput := ssm.GetParameterInput{Name: &parameterName, WithDecryption: true}
 
-	parameterValueOutput, err := ssmClient.GetParameterWithContext(ctx, &parameterValueInput)
+	parameterValueOutput, err := ssmAPI.GetParameter(ctx, &parameterValueInput)
 	if err != nil {
 		return "", err
 	}
@@ -162,11 +173,11 @@ func tryLicenseKeyFromSSMParameter(ctx context.Context, parameterName string) (s
 }
 
 // OverrideSecretsManager overrides the default Secrets Manager implementation
-func OverrideSecretsManager(override secretsmanageriface.SecretsManagerAPI) {
-	secrets = override
+func OverrideSecretsManager(override SecretsManagerAPI) {
+	secretsAPI = override
 }
 
 // OverrideSSM overrides the default SSM implementation
-func OverrideSSM(override ssmiface.SSMAPI) {
-	ssmClient = override
+func OverrideSSM(override SSMAPI) {
+	ssmAPI = override
 }

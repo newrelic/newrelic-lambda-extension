@@ -148,7 +148,7 @@ func main() {
 	batch := telemetry.NewBatch(int64(conf.RipeMillis), int64(conf.RotMillis), conf.CollectTraceID)
 	// In APM Lambda mode, we don't send telemetry
 	telemetryClient := telemetry.New(registrationResponse.FunctionName, licenseKey, conf.TelemetryEndpoint, conf.LogEndpoint, batch, conf.CollectTraceID, conf.ClientTimeout)
-
+	
 
 	// Run startup checks
 	go func() {

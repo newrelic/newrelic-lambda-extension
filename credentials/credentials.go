@@ -81,6 +81,10 @@ func decodeLicenseKey(rawJson *string) (string, error) {
 // IsSecretConfigured returns true if the Secrets Manager secret is configured, false
 // otherwise
 func IsSecretConfigured(ctx context.Context, conf *config.Configuration) bool {
+	if secretsAPI == nil {
+		return false
+	}
+
 	secretId := getLicenseKeySecretId(conf)
 	secretValueInput := secretsmanager.GetSecretValueInput{SecretId: &secretId}
 
@@ -147,6 +151,10 @@ func GetNewRelicLicenseKey(ctx context.Context, conf *config.Configuration) (str
 }
 
 func tryLicenseKeyFromSecret(ctx context.Context, secretId string) (string, error) {
+	if secretsAPI == nil {
+		return "", fmt.Errorf("Secrets Manager client not initialized")
+	}
+
 	util.Debugf("fetching '%s' from Secrets Manager\n", secretId)
 
 	secretValueInput := secretsmanager.GetSecretValueInput{SecretId: &secretId}
@@ -160,6 +168,10 @@ func tryLicenseKeyFromSecret(ctx context.Context, secretId string) (string, erro
 }
 
 func tryLicenseKeyFromSSMParameter(ctx context.Context, parameterName string) (string, error) {
+	if ssmAPI == nil {
+		return "", fmt.Errorf("SSM client not initialized")
+	}
+
 	util.Debugf("fetching '%s' from SSM Parameter Store\n", parameterName)
 
 	parameterValueInput := ssm.GetParameterInput{Name: &parameterName, WithDecryption: true}

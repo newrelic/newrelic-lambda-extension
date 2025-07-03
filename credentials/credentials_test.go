@@ -482,3 +482,84 @@ func TestGetNewRelicLicenseKeyEnvironmentVariableFallback(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, "env_fallback_value", lk)
 }
+
+func TestNilClientHandling(t *testing.T) {
+	// Save original values
+	originalCfg := cfg
+	originalSecretsAPI := secretsAPI
+	originalSSMAPI := ssmAPI
+
+	// Simulate failed init by setting clients to nil
+	cfg = aws.Config{}
+	secretsAPI = nil
+	ssmAPI = nil
+
+	// Defer restoration
+	defer func() {
+		cfg = originalCfg
+		secretsAPI = originalSecretsAPI
+		ssmAPI = originalSSMAPI
+	}()
+
+	// Test that GetNewRelicLicenseKey handles nil clients gracefully
+	// It should fall back to environment variable or return empty string
+	t.Run("GetNewRelicLicenseKey with nil clients", func(t *testing.T) {
+		ctx := context.Background()
+
+		// Clear any existing NEW_RELIC_LICENSE_KEY env var
+		originalEnv := os.Getenv("NEW_RELIC_LICENSE_KEY")
+		os.Unsetenv("NEW_RELIC_LICENSE_KEY")
+		defer func() {
+			if originalEnv != "" {
+				os.Setenv("NEW_RELIC_LICENSE_KEY", originalEnv)
+			}
+		}()
+
+		conf := &config.Configuration{}
+		licenseKey, err := GetNewRelicLicenseKey(ctx, conf)
+
+		// With nil clients and no env var, should return error
+		assert.Equal(t, "", licenseKey)
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "No license key configured")
+	})
+
+	t.Run("GetNewRelicLicenseKey falls back to env var when clients nil", func(t *testing.T) {
+		ctx := context.Background()
+
+		// Set environment variable
+		expectedKey := "test-license-key-from-env"
+		originalEnv := os.Getenv("NEW_RELIC_LICENSE_KEY")
+		os.Setenv("NEW_RELIC_LICENSE_KEY", expectedKey)
+		defer func() {
+			if originalEnv != "" {
+				os.Setenv("NEW_RELIC_LICENSE_KEY", originalEnv)
+			} else {
+				os.Unsetenv("NEW_RELIC_LICENSE_KEY")
+			}
+		}()
+
+		conf := &config.Configuration{}
+		licenseKey, err := GetNewRelicLicenseKey(ctx, conf)
+
+		// Should fall back to environment variable
+		assert.Equal(t, expectedKey, licenseKey)
+		assert.NoError(t, err)
+	})
+
+	t.Run("IsSecretConfigured with nil client", func(t *testing.T) {
+		ctx := context.Background()
+		conf := &config.Configuration{LicenseKeySecretId: "test-secret"}
+
+		// Should return false when secretsAPI is nil
+		assert.False(t, IsSecretConfigured(ctx, conf))
+	})
+
+	t.Run("IsSSMParameterConfigured with nil client", func(t *testing.T) {
+		ctx := context.Background()
+		conf := &config.Configuration{LicenseKeySSMParameterName: "test-param"}
+
+		// Should return false when ssmAPI is nil
+		assert.False(t, IsSSMParameterConfigured(ctx, conf))
+	})
+}

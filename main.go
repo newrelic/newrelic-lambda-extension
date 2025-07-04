@@ -213,16 +213,14 @@ func main() {
 
 // logShipLoop ships function logs to New Relic as they arrive.
 func logShipLoop(ctx context.Context, logServer *logserver.LogServer, telemetryClient *telemetry.Client, isAPMLambdaMode bool) {
+	if invokedFunctionARN == "" && !isAPMLambdaMode && LambdaAccountId != "" && LambdaFunctionName != "" {
+		invokedFunctionARN = getLambdaARN(LambdaAccountId, LambdaFunctionName)
+	}
 	for {
 		functionLogs, more := logServer.AwaitFunctionLogs()
 		if !more {
 			return
 		}
-
-		if invokedFunctionARN == "" && !isAPMLambdaMode && LambdaAccountId != "" && LambdaFunctionName != "" {
-			invokedFunctionARN = getLambdaARN(LambdaAccountId, LambdaFunctionName)
-		}
-
 		err := telemetryClient.SendFunctionLogs(ctx, invokedFunctionARN, functionLogs, "")
 		if err != nil {
 			util.Logf("Failed to send %d function logs", len(functionLogs))
@@ -294,7 +292,6 @@ func APMlogShipLoop(ctx context.Context, logServer *logserver.LogServer, telemet
 			return
 		}
 		err := telemetryClient.SendFunctionLogs(ctx, invokedFunctionARN, functionLogs, entityGuid)
-    
 		if err != nil {
 			util.Logf("Failed to send %d function logs", len(functionLogs))
 		}
@@ -534,8 +531,8 @@ func pollLogAPMServer(ctx context.Context, logServer *logserver.LogServer, conf 
 					break GetEntityLoop
 				}
 				time.Sleep(100 * time.Millisecond)
-			}
 		}
+	}
 
 	for _, platformLog := range logServer.PollPlatformChannel() {
 		lambdaMetrics, _ := apm.ParseLambdaReportLog(string(platformLog.Content))

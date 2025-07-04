@@ -5,8 +5,8 @@ go 1.23.10
 require (
 	github.com/aws/aws-sdk-go-v2 v1.36.5
 	github.com/aws/aws-sdk-go-v2/config v1.29.17
-	github.com/aws/aws-sdk-go-v2/service/secretsmanager v1.15.0
-	github.com/aws/aws-sdk-go-v2/service/ssm v1.27.0
+	github.com/aws/aws-sdk-go-v2/service/secretsmanager v1.35.7
+	github.com/aws/aws-sdk-go-v2/service/ssm v1.60.0
 	github.com/google/go-github/v68 v68.0.0
 	github.com/google/uuid v1.6.0
 	github.com/stretchr/testify v1.10.0

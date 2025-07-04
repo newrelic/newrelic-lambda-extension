@@ -174,7 +174,7 @@ func tryLicenseKeyFromSSMParameter(ctx context.Context, parameterName string) (s
 
 	util.Debugf("fetching '%s' from SSM Parameter Store\n", parameterName)
 
-	parameterValueInput := ssm.GetParameterInput{Name: &parameterName, WithDecryption: true}
+	parameterValueInput := ssm.GetParameterInput{Name: &parameterName, WithDecryption: aws.Bool(true)}
 
 	parameterValueOutput, err := ssmAPI.GetParameter(ctx, &parameterValueInput)
 	if err != nil {

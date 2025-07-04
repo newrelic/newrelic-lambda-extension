@@ -213,7 +213,7 @@ func main() {
 
 // logShipLoop ships function logs to New Relic as they arrive.
 func logShipLoop(ctx context.Context, logServer *logserver.LogServer, telemetryClient *telemetry.Client, isAPMLambdaMode bool) {
-	if invokedFunctionARN == "" && !isAPMLambdaMode && LambdaAccountId != "" && LambdaFunctionName != "" {
+	if LambdaAccountId != "" && LambdaFunctionName != "" {
 		invokedFunctionARN = getLambdaARN(LambdaAccountId, LambdaFunctionName)
 	}
 	for {

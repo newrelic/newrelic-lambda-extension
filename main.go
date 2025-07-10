@@ -97,10 +97,7 @@ func main() {
 	}
 
 	// Attempt to find the license key for telemetry sending
-	var timeout = 1 * time.Second
-	ctxLicenseKey, cancelLicenseKey := context.WithTimeout(ctx, timeout)
-	defer cancelLicenseKey()
-	licenseKey, err := credentials.GetNewRelicLicenseKey(ctxLicenseKey, conf)
+	licenseKey, err := credentials.GetNewRelicLicenseKey(ctx, conf)
 	if err != nil {
 		util.Logln("Failed to retrieve New Relic license key", err)
 		// We fail open; telemetry will go to CloudWatch instead

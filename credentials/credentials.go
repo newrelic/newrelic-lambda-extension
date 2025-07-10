@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"time"
 
 	"github.com/newrelic/newrelic-lambda-extension/config"
 	"github.com/newrelic/newrelic-lambda-extension/util"
@@ -38,8 +39,12 @@ var (
 const defaultSecretId = "NEW_RELIC_LICENSE_KEY"
 
 func init() {
+
+	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
+	defer cancel()
+
 	var err error
-	cfg, err = awsconfig.LoadDefaultConfig(context.TODO())
+	cfg, err = awsconfig.LoadDefaultConfig(ctx)
 	if err != nil {
 		util.Logf("Failed to load AWS config: %v", err)
 		return

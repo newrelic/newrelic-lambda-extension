@@ -213,9 +213,6 @@ func main() {
 
 // logShipLoop ships function logs to New Relic as they arrive.
 func logShipLoop(ctx context.Context, logServer *logserver.LogServer, telemetryClient *telemetry.Client, isAPMLambdaMode bool) {
-	if LambdaAccountId != "" && LambdaFunctionName != "" {
-		invokedFunctionARN = getLambdaARN(LambdaAccountId, LambdaFunctionName)
-	}
 	for {
 		functionLogs, more := logServer.AwaitFunctionLogs()
 		if !more {
@@ -531,8 +528,8 @@ func pollLogAPMServer(ctx context.Context, logServer *logserver.LogServer, conf 
 					break GetEntityLoop
 				}
 				time.Sleep(100 * time.Millisecond)
+			}
 		}
-	}
 
 	for _, platformLog := range logServer.PollPlatformChannel() {
 		lambdaMetrics, _ := apm.ParseLambdaReportLog(string(platformLog.Content))
@@ -596,12 +593,4 @@ func noopLoop(ctx context.Context, invocationClient *client.InvocationClient) {
 			}
 		}
 	}
-}
-
-func getLambdaARN(awsAccountId string, awsLambdaName string) string {
-	awsRegion := os.Getenv("AWS_REGION")
-	if awsRegion == "" {
-		awsRegion = os.Getenv("AWS_DEFAULT_REGION")
-	}
-	return fmt.Sprintf("arn:aws:lambda:%s:%s:function:%s", awsRegion, awsAccountId, awsLambdaName)
 }

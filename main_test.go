@@ -10,8 +10,6 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
-	"os/exec"
-	"strings"
 	"testing"
 	"time"
 
@@ -37,24 +35,28 @@ func TestMainRegisterFail(t *testing.T) {
 
 	url := srv.URL[7:]
 
-	err := os.Setenv(api.LambdaHostPortEnvVar, url)
+	_ = os.Setenv(api.LambdaHostPortEnvVar, url)
 	defer os.Unsetenv(api.LambdaHostPortEnvVar)
-	assert.Nil(t, err)
 
+	assert.Panics(t, main)
 }
 
 func TestMainLogServerInitFail(t *testing.T) {
+	var (
+		registerRequestCount    int
+		initErrorRequestCount   int
+		exitErrorRequestCount   int
+		logRegisterRequestCount int
+	)
 
-	if os.Getenv("RUN_MAIN") == "1" {
-		main()
-		return
-	}
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		defer util.Close(r.Body)
 
 		if r.URL.Path == "/2020-01-01/extension/register" {
+			registerRequestCount++
+
 			w.Header().Add(api.ExtensionIdHeader, "test-ext-id")
-			w.WriteHeader(http.StatusOK)
+			w.WriteHeader(200)
 			res, err := json.Marshal(api.RegistrationResponse{
 				FunctionName:    "foobar",
 				FunctionVersion: "latest",
@@ -62,166 +64,122 @@ func TestMainLogServerInitFail(t *testing.T) {
 			})
 			assert.Nil(t, err)
 			_, _ = w.Write(res)
-			return
 		}
 
 		if r.URL.Path == "/2020-01-01/extension/init/error" {
-			w.WriteHeader(http.StatusOK)
+			initErrorRequestCount++
+
+			w.WriteHeader(200)
 			_, _ = w.Write([]byte(""))
-			return
 		}
 
 		if r.URL.Path == "/2020-01-01/extension/exit/error" {
+			exitErrorRequestCount++
 
 			w.WriteHeader(200)
 			_, _ = w.Write([]byte(""))
 		}
 
 		if r.URL.Path == "/2020-08-15/logs" {
+			logRegisterRequestCount++
 
 			w.WriteHeader(200)
 			_, _ = w.Write([]byte(""))
 		}
-
 	}))
 	defer srv.Close()
 
-	cmd := exec.Command(os.Args[0], "-test.run=^TestMainLogServerInitFail$")
-
 	url := srv.URL[7:]
-	cmd.Env = append(os.Environ(),
-		"RUN_MAIN=1",
-		api.LambdaHostPortEnvVar+"="+url,
-		"NEW_RELIC_LICENSE_KEY=foobar",
-		"NEW_RELIC_LOG_SERVER_HOST=sandbox.localdomain",
-		"NEW_RELIC_EXTENSION_LOG_LEVEL=DEBUG",
-	)
 
-	output, err := cmd.CombinedOutput()
+	_ = os.Setenv(api.LambdaHostPortEnvVar, url)
+	defer os.Unsetenv(api.LambdaHostPortEnvVar)
 
-	assert.Error(t, err, "Expected the command to exit with an error")
-	exitErr, ok := err.(*exec.ExitError)
-	assert.True(t, ok, "Expected error to be of type *exec.ExitError")
-	assert.False(t, exitErr.Success(), "Expected the process to have a non-zero exit code")
+	_ = os.Setenv("NEW_RELIC_LICENSE_KEY", "foobar")
+	defer os.Unsetenv("NEW_RELIC_LICENSE_KEY")
 
-	logOutput := string(output)
-	assert.True(t, strings.Contains(logOutput, "Failed to start logs HTTP server"), "Log should contain log server failure")
-	assert.True(t, strings.Contains(logOutput, "no such host"), "Log should contain 'no such host' error")
+	// Shouldn't be able to bind to this locally
+	_ = os.Setenv("NEW_RELIC_LOG_SERVER_HOST", "sandbox.localdomain")
+	defer os.Unsetenv("NEW_RELIC_LOG_SERVER_HOST")
 
-	// This confirms that the buggy "200 OK" error is also logged before the crash.
-	assert.True(t, strings.Contains(logOutput, "error occurred while making init error request: 200 OK"), "Log should contain the init error request message")
+	_ = os.Setenv("NEW_RELIC_EXTENSION_LOG_LEVEL", "DEBUG")
+	defer os.Unsetenv("NEW_RELIC_EXTENSION_LOG_LEVEL")
+
+	assert.Panics(t, main)
+
+	assert.Equal(t, 1, registerRequestCount)
+	assert.Equal(t, 1, initErrorRequestCount)
+	assert.Equal(t, 0, exitErrorRequestCount)
+	assert.Equal(t, 0, logRegisterRequestCount)
 }
 
 func TestMainLogServerRegisterFail(t *testing.T) {
-	if os.Getenv("RUN_MAIN") == "1" {
-		main()
-		return
-	}
-
 	var (
 		registerRequestCount    int
 		initErrorRequestCount   int
-		logRegisterRequestCount int
 		exitErrorRequestCount   int
+		logRegisterRequestCount int
 	)
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		defer util.Close(r.Body)
 
-		fmt.Printf("Request received: %s %s\n", r.Method, r.URL.Path)
-
-		switch r.URL.Path {
-		case "/2020-01-01/extension/register":
+		if r.URL.Path == "/2020-01-01/extension/register" {
 			registerRequestCount++
-			fmt.Printf("Extension register request #%d\n", registerRequestCount)
+
 			w.Header().Add(api.ExtensionIdHeader, "test-ext-id")
-			w.WriteHeader(http.StatusOK)
+			w.WriteHeader(200)
 			res, err := json.Marshal(api.RegistrationResponse{
 				FunctionName:    "foobar",
 				FunctionVersion: "latest",
 				Handler:         "lambda.handler",
 			})
-			if err != nil {
-				fmt.Printf("Error marshaling registration response: %v\n", err)
-				return
-			}
+			assert.Nil(t, err)
 			_, _ = w.Write(res)
+		}
 
-		case "/2020-01-01/extension/init/error":
+		if r.URL.Path == "/2020-01-01/extension/init/error" {
 			initErrorRequestCount++
-			fmt.Printf("Init error request #%d\n", initErrorRequestCount)
-			w.WriteHeader(http.StatusOK)
+
+			w.WriteHeader(200)
 			_, _ = w.Write([]byte(""))
+		}
 
-		case "/2020-08-15/logs":
-			logRegisterRequestCount++
-			fmt.Printf("Logs register request #%d - returning 400\n", logRegisterRequestCount)
-			w.WriteHeader(http.StatusBadRequest)
-			_, _ = w.Write([]byte("Logs API registration failed"))
-
-		case "/2020-01-01/extension/exit/error":
+		if r.URL.Path == "/2020-01-01/extension/exit/error" {
 			exitErrorRequestCount++
-			fmt.Printf("Exit error request #%d\n", exitErrorRequestCount)
-			w.WriteHeader(http.StatusOK)
+
+			w.WriteHeader(200)
 			_, _ = w.Write([]byte(""))
+		}
 
-		case "/2020-01-01/extension/event/next":
-			fmt.Printf("Event next request - should not be reached if fatal occurs\n")
-			w.WriteHeader(http.StatusOK)
-			res, err := json.Marshal(api.InvocationEvent{
-				EventType:          api.Shutdown,
-				DeadlineMs:         1,
-				RequestID:          "12345",
-				InvokedFunctionARN: "arn:aws:lambda:us-east-1:12345:foobar",
-				ShutdownReason:     api.Timeout,
-				Tracing:            nil,
-			})
-			if err != nil {
-				fmt.Printf("Error marshaling shutdown event: %v\n", err)
-				return
-			}
-			_, _ = w.Write(res)
+		if r.URL.Path == "/2020-08-15/logs" {
+			logRegisterRequestCount++
 
-		default:
-			fmt.Printf("Unexpected request path: %s\n", r.URL.Path)
-			w.WriteHeader(http.StatusNotFound)
+			w.WriteHeader(400)
+			_, _ = w.Write(nil)
 		}
 	}))
 	defer srv.Close()
 
-	cmd := exec.Command(os.Args[0], "-test.run=^TestMainLogServerRegisterFail$")
-
 	url := srv.URL[7:]
-	cmd.Env = append(os.Environ(),
-		"RUN_MAIN=1",
-		api.LambdaHostPortEnvVar+"="+url,
-		"NEW_RELIC_LICENSE_KEY=foobar",
-		"NEW_RELIC_LOG_SERVER_HOST=localhost",
-		"NEW_RELIC_EXTENSION_LOG_LEVEL=DEBUG",
-		"NEW_RELIC_LAMBDA_EXTENSION_ENABLED=true",
-		"NEW_RELIC_EXTENSION_SEND_FUNCTION_LOGS=true",
-	)
 
-	output, err := cmd.CombinedOutput()
+	_ = os.Setenv(api.LambdaHostPortEnvVar, url)
+	defer os.Unsetenv(api.LambdaHostPortEnvVar)
 
-	assert.Error(t, err, "Expected the command to exit with a non-zero status code")
-	if exitErr, ok := err.(*exec.ExitError); ok {
-		assert.False(t, exitErr.Success(), "Expected the process to report failure")
-	} else {
-		t.Fatalf("Expected error to be of type *exec.ExitError, but got %T", err)
-	}
+	_ = os.Setenv("NEW_RELIC_LICENSE_KEY", "foobar")
+	defer os.Unsetenv("NEW_RELIC_LICENSE_KEY")
 
-	logOutput := string(output)
+	_ = os.Setenv("NEW_RELIC_LOG_SERVER_HOST", "localhost")
+	defer os.Unsetenv("NEW_RELIC_LOG_SERVER_HOST")
 
-	t.Logf("=== FULL LOG OUTPUT ===\n%s\n=== END LOG OUTPUT ===", logOutput)
+	_ = os.Setenv("NEW_RELIC_EXTENSION_LOG_LEVEL", "DEBUG")
+	defer os.Unsetenv("NEW_RELIC_EXTENSION_LOG_LEVEL")
 
-	assert.Contains(t, logOutput, "Failed to register with Logs API", "Log output should contain the fatal error message")
+	assert.Panics(t, main)
 
-	assert.True(t,
-		strings.Contains(logOutput, "400") || strings.Contains(logOutput, "Bad Request"),
-		"Log output should contain HTTP 400 error information")
-
-	assert.Contains(t, logOutput, "error occurred while making init error request", "Log output should show an attempt to report the init error")
+	assert.Equal(t, 1, registerRequestCount)
+	assert.Equal(t, 1, initErrorRequestCount)
+	assert.Equal(t, 0, exitErrorRequestCount)
+	assert.Equal(t, 1, logRegisterRequestCount)
 }
 
 func TestMainShutdown(t *testing.T) {

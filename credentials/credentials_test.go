@@ -8,12 +8,10 @@ import (
 
 	"github.com/newrelic/newrelic-lambda-extension/config"
 
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/request"
-	"github.com/aws/aws-sdk-go/service/secretsmanager"
-	"github.com/aws/aws-sdk-go/service/secretsmanager/secretsmanageriface"
-	"github.com/aws/aws-sdk-go/service/ssm"
-	"github.com/aws/aws-sdk-go/service/ssm/ssmiface"
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/service/secretsmanager"
+	"github.com/aws/aws-sdk-go-v2/service/ssm"
+	"github.com/aws/aws-sdk-go-v2/service/ssm/types"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -38,13 +36,12 @@ func TestGetLicenseKeySSMParameterName(t *testing.T) {
 }
 
 type mockSecretManager struct {
-	secretsmanageriface.SecretsManagerAPI
 	validSecrets []string
 }
 
 const mockSecretManagerKeyValue = "licenseKeyStoredAsSecret"
 
-func (m mockSecretManager) GetSecretValueWithContext(_ context.Context, input *secretsmanager.GetSecretValueInput, _ ...request.Option) (*secretsmanager.GetSecretValueOutput, error) {
+func (m mockSecretManager) GetSecretValue(ctx context.Context, input *secretsmanager.GetSecretValueInput, optFns ...func(*secretsmanager.Options)) (*secretsmanager.GetSecretValueOutput, error) {
 	for _, secret := range m.validSecrets {
 		if secret == *input.SecretId {
 			return &secretsmanager.GetSecretValueOutput{
@@ -74,17 +71,16 @@ func TestIsSecretConfigured(t *testing.T) {
 }
 
 type mockSSM struct {
-	ssmiface.SSMAPI
 	validParameters []string
 }
 
 const mockParameterStoreKeyValue = "licenseKeyStoredAsParameter"
 
-func (m mockSSM) GetParameterWithContext(_ context.Context, input *ssm.GetParameterInput, _ ...request.Option) (*ssm.GetParameterOutput, error) {
+func (m mockSSM) GetParameter(ctx context.Context, input *ssm.GetParameterInput, optFns ...func(*ssm.Options)) (*ssm.GetParameterOutput, error) {
 	for _, parameter := range m.validParameters {
 		if parameter == *input.Name {
 			return &ssm.GetParameterOutput{
-				Parameter: &ssm.Parameter{
+				Parameter: &types.Parameter{
 					Value: aws.String(mockParameterStoreKeyValue),
 				},
 			}, nil
@@ -117,8 +113,8 @@ func TestGetNewRelicLicenseKey(t *testing.T) {
 
 		Conf           config.Configuration
 		Environment    map[string]string
-		SecretsManager secretsmanageriface.SecretsManagerAPI
-		SSM            ssmiface.SSMAPI
+		SecretsManager SecretsManagerAPI
+		SSM            SSMAPI
 
 		ExpectedKey string
 		ExpectedErr string
@@ -250,4 +246,382 @@ func TestDecodeLicenseKeyValidButWrong(t *testing.T) {
 	decoded, err := decodeLicenseKey(&badJson)
 	assert.Empty(t, decoded)
 	assert.Error(t, err)
+}
+
+func TestDecodeLicenseKeyValid(t *testing.T) {
+	validJson := "{\"LicenseKey\": \"some_key\"}"
+	decoded, err := decodeLicenseKey(&validJson)
+	assert.Equal(t, "some_key", decoded)
+	assert.NoError(t, err)
+}
+
+func TestDecodeLicenseKeyEmpty(t *testing.T) {
+	emptyJson := "{\"LicenseKey\": \"\"}"
+	decoded, err := decodeLicenseKey(&emptyJson)
+	assert.Empty(t, decoded)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "malformed license key secret; missing \"LicenseKey\" attribute")
+}
+
+func TestDecodeLicenseKeyMissingField(t *testing.T) {
+	missingFieldJson := "{\"NotLicenseKey\": \"some_value\"}"
+	decoded, err := decodeLicenseKey(&missingFieldJson)
+	assert.Empty(t, decoded)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "malformed license key secret; missing \"LicenseKey\" attribute")
+}
+
+func TestGetNewRelicLicenseKeyPriority(t *testing.T) {
+	ctx := context.Background()
+
+	originalSecrets := secretsAPI
+	originalSSM := ssmAPI
+	defer func() {
+		secretsAPI = originalSecrets
+		ssmAPI = originalSSM
+	}()
+
+	os.Setenv("NEW_RELIC_LICENSE_KEY", "env_value")
+	defer os.Unsetenv("NEW_RELIC_LICENSE_KEY")
+
+	OverrideSecretsManager(mockSecretManager{
+		validSecrets: []string{"NEW_RELIC_LICENSE_KEY", "testSecretName"},
+	})
+	OverrideSSM(mockSSM{
+		validParameters: []string{"NEW_RELIC_LICENSE_KEY", "testParameterName"},
+	})
+
+	conf := &config.Configuration{
+		LicenseKey:                 "config_value",
+		LicenseKeySecretId:         "testSecretName",
+		LicenseKeySSMParameterName: "testParameterName",
+	}
+
+	lk, err := GetNewRelicLicenseKey(ctx, conf)
+	assert.NoError(t, err)
+	assert.Equal(t, "config_value", lk)
+}
+
+func TestGetNewRelicLicenseKeySecretPriority(t *testing.T) {
+	ctx := context.Background()
+
+	originalSecrets := secretsAPI
+	originalSSM := ssmAPI
+	defer func() {
+		secretsAPI = originalSecrets
+		ssmAPI = originalSSM
+	}()
+
+	os.Setenv("NEW_RELIC_LICENSE_KEY", "env_value")
+	defer os.Unsetenv("NEW_RELIC_LICENSE_KEY")
+
+	OverrideSecretsManager(mockSecretManager{
+		validSecrets: []string{"NEW_RELIC_LICENSE_KEY", "testSecretName"},
+	})
+	OverrideSSM(mockSSM{
+		validParameters: []string{"NEW_RELIC_LICENSE_KEY", "testParameterName"},
+	})
+
+	conf := &config.Configuration{
+		LicenseKeySecretId:         "testSecretName",
+		LicenseKeySSMParameterName: "testParameterName",
+	}
+
+	lk, err := GetNewRelicLicenseKey(ctx, conf)
+	assert.NoError(t, err)
+	assert.Equal(t, mockSecretManagerKeyValue, lk)
+}
+
+func TestGetNewRelicLicenseKeySSMParameterPriority(t *testing.T) {
+	ctx := context.Background()
+
+	originalSecrets := secretsAPI
+	originalSSM := ssmAPI
+	defer func() {
+		secretsAPI = originalSecrets
+		ssmAPI = originalSSM
+	}()
+
+	os.Setenv("NEW_RELIC_LICENSE_KEY", "env_value")
+	defer os.Unsetenv("NEW_RELIC_LICENSE_KEY")
+
+	OverrideSecretsManager(mockSecretManager{})
+	OverrideSSM(mockSSM{
+		validParameters: []string{"testParameterName"},
+	})
+
+	conf := &config.Configuration{
+		LicenseKeySSMParameterName: "testParameterName",
+	}
+
+	lk, err := GetNewRelicLicenseKey(ctx, conf)
+	assert.NoError(t, err)
+	assert.Equal(t, mockParameterStoreKeyValue, lk)
+}
+
+func TestIsSecretConfiguredWithDefaultId(t *testing.T) {
+	ctx := context.Background()
+
+	originalSecrets := secretsAPI
+	defer func() { secretsAPI = originalSecrets }()
+
+	OverrideSecretsManager(mockSecretManager{
+		validSecrets: []string{defaultSecretId},
+	})
+
+	assert.True(t, IsSecretConfigured(ctx, &config.Configuration{}))
+}
+
+func TestIsSSMParameterConfiguredWithDefaultParameter(t *testing.T) {
+	ctx := context.Background()
+
+	originalSSM := ssmAPI
+	defer func() { ssmAPI = originalSSM }()
+
+	OverrideSSM(mockSSM{
+		validParameters: []string{defaultSecretId},
+	})
+	assert.True(t, IsSSMParameterConfigured(ctx, &config.Configuration{}))
+}
+
+func TestMockSecretManagerMultipleSecrets(t *testing.T) {
+	ctx := context.Background()
+	mock := mockSecretManager{
+		validSecrets: []string{"secret1", "secret2", "secret3"},
+	}
+
+	input1 := &secretsmanager.GetSecretValueInput{SecretId: aws.String("secret1")}
+	output1, err1 := mock.GetSecretValue(ctx, input1)
+	assert.NoError(t, err1)
+	assert.NotNil(t, output1.SecretString)
+
+	input2 := &secretsmanager.GetSecretValueInput{SecretId: aws.String("secret2")}
+	output2, err2 := mock.GetSecretValue(ctx, input2)
+	assert.NoError(t, err2)
+	assert.NotNil(t, output2.SecretString)
+
+	input3 := &secretsmanager.GetSecretValueInput{SecretId: aws.String("nonexistent")}
+	output3, err3 := mock.GetSecretValue(ctx, input3)
+	assert.Error(t, err3)
+	assert.Nil(t, output3)
+	assert.Contains(t, err3.Error(), "Secret not found")
+}
+
+func TestMockSSMMultipleParameters(t *testing.T) {
+	ctx := context.Background()
+	mock := mockSSM{
+		validParameters: []string{"param1", "param2", "param3"},
+	}
+
+	input1 := &ssm.GetParameterInput{Name: aws.String("param1")}
+	output1, err1 := mock.GetParameter(ctx, input1)
+	assert.NoError(t, err1)
+	assert.NotNil(t, output1.Parameter)
+	assert.Equal(t, mockParameterStoreKeyValue, *output1.Parameter.Value)
+
+	input2 := &ssm.GetParameterInput{Name: aws.String("param2")}
+	output2, err2 := mock.GetParameter(ctx, input2)
+	assert.NoError(t, err2)
+	assert.NotNil(t, output2.Parameter)
+
+	input3 := &ssm.GetParameterInput{Name: aws.String("nonexistent")}
+	output3, err3 := mock.GetParameter(ctx, input3)
+	assert.Error(t, err3)
+	assert.Nil(t, output3)
+	assert.Contains(t, err3.Error(), "Parameter not found")
+}
+
+func TestOverrideFunctions(t *testing.T) {
+	originalSecrets := secretsAPI
+	originalSSM := ssmAPI
+	defer func() {
+		secretsAPI = originalSecrets
+		ssmAPI = originalSSM
+	}()
+
+	mockSecretsManager := mockSecretManager{
+		validSecrets: []string{"test-override-secret"},
+	}
+	OverrideSecretsManager(mockSecretsManager)
+
+	ctx := context.Background()
+
+	assert.True(t, IsSecretConfigured(ctx, &config.Configuration{
+		LicenseKeySecretId: "test-override-secret",
+	}))
+
+	mockSSMClient := mockSSM{
+		validParameters: []string{"test-override-parameter"},
+	}
+	OverrideSSM(mockSSMClient)
+
+	assert.True(t, IsSSMParameterConfigured(ctx, &config.Configuration{
+		LicenseKeySSMParameterName: "test-override-parameter",
+	}))
+}
+
+func TestGetNewRelicLicenseKeyEnvironmentVariableFallback(t *testing.T) {
+	ctx := context.Background()
+
+	originalSecrets := secretsAPI
+	originalSSM := ssmAPI
+	defer func() {
+		secretsAPI = originalSecrets
+		ssmAPI = originalSSM
+	}()
+
+	os.Setenv("NEW_RELIC_LICENSE_KEY", "env_fallback_value")
+	defer os.Unsetenv("NEW_RELIC_LICENSE_KEY")
+
+	OverrideSecretsManager(mockSecretManager{})
+	OverrideSSM(mockSSM{})
+
+	conf := &config.Configuration{}
+
+	lk, err := GetNewRelicLicenseKey(ctx, conf)
+	assert.NoError(t, err)
+	assert.Equal(t, "env_fallback_value", lk)
+}
+
+func TestNilClientHandling(t *testing.T) {
+	originalCfg := cfg
+	originalSecretsAPI := secretsAPI
+	originalSSMAPI := ssmAPI
+
+	cfg = aws.Config{}
+	secretsAPI = nil
+	ssmAPI = nil
+
+	defer func() {
+		cfg = originalCfg
+		secretsAPI = originalSecretsAPI
+		ssmAPI = originalSSMAPI
+	}()
+
+	t.Run("GetNewRelicLicenseKey with nil clients", func(t *testing.T) {
+		ctx := context.Background()
+
+		originalEnv := os.Getenv("NEW_RELIC_LICENSE_KEY")
+		os.Unsetenv("NEW_RELIC_LICENSE_KEY")
+		defer func() {
+			if originalEnv != "" {
+				os.Setenv("NEW_RELIC_LICENSE_KEY", originalEnv)
+			}
+		}()
+
+		conf := &config.Configuration{}
+		licenseKey, err := GetNewRelicLicenseKey(ctx, conf)
+
+		assert.Equal(t, "", licenseKey)
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "No license key configured")
+	})
+
+	t.Run("GetNewRelicLicenseKey falls back to env var when clients nil", func(t *testing.T) {
+		ctx := context.Background()
+
+		expectedKey := "test-license-key-from-env"
+		originalEnv := os.Getenv("NEW_RELIC_LICENSE_KEY")
+		os.Setenv("NEW_RELIC_LICENSE_KEY", expectedKey)
+		defer func() {
+			if originalEnv != "" {
+				os.Setenv("NEW_RELIC_LICENSE_KEY", originalEnv)
+			} else {
+				os.Unsetenv("NEW_RELIC_LICENSE_KEY")
+			}
+		}()
+
+		conf := &config.Configuration{}
+		licenseKey, err := GetNewRelicLicenseKey(ctx, conf)
+
+		assert.Equal(t, expectedKey, licenseKey)
+		assert.NoError(t, err)
+	})
+
+	t.Run("IsSecretConfigured with nil client", func(t *testing.T) {
+		ctx := context.Background()
+		conf := &config.Configuration{LicenseKeySecretId: "test-secret"}
+		assert.False(t, IsSecretConfigured(ctx, conf))
+	})
+
+	t.Run("IsSSMParameterConfigured with nil client", func(t *testing.T) {
+		ctx := context.Background()
+		conf := &config.Configuration{LicenseKeySSMParameterName: "test-param"}
+
+		assert.False(t, IsSSMParameterConfigured(ctx, conf))
+	})
+}
+
+func TestInitErrorPath(t *testing.T) {
+	originalCfg := cfg
+	originalSecretsAPI := secretsAPI
+	originalSSMAPI := ssmAPI
+
+	secretsAPI = nil
+	ssmAPI = nil
+
+	defer func() {
+		cfg = originalCfg
+		secretsAPI = originalSecretsAPI
+		ssmAPI = originalSSMAPI
+	}()
+
+	ctx := context.Background()
+
+	t.Run("AWS config load failure - fallback to env var", func(t *testing.T) {
+		expectedKey := "fallback-env-license-key"
+		originalEnv := os.Getenv("NEW_RELIC_LICENSE_KEY")
+		os.Setenv("NEW_RELIC_LICENSE_KEY", expectedKey)
+		defer func() {
+			if originalEnv != "" {
+				os.Setenv("NEW_RELIC_LICENSE_KEY", originalEnv)
+			} else {
+				os.Unsetenv("NEW_RELIC_LICENSE_KEY")
+			}
+		}()
+
+		conf := &config.Configuration{}
+		licenseKey, err := GetNewRelicLicenseKey(ctx, conf)
+
+		assert.Equal(t, expectedKey, licenseKey)
+		assert.NoError(t, err)
+	})
+
+	t.Run("AWS config load failure - no fallback available", func(t *testing.T) {
+		// Clear environment variable
+		originalEnv := os.Getenv("NEW_RELIC_LICENSE_KEY")
+		os.Unsetenv("NEW_RELIC_LICENSE_KEY")
+		defer func() {
+			if originalEnv != "" {
+				os.Setenv("NEW_RELIC_LICENSE_KEY", originalEnv)
+			}
+		}()
+
+		conf := &config.Configuration{}
+		licenseKey, err := GetNewRelicLicenseKey(ctx, conf)
+
+		assert.Equal(t, "", licenseKey)
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "No license key configured")
+	})
+
+	t.Run("AWS config load failure - secret operations fail gracefully", func(t *testing.T) {
+		conf := &config.Configuration{LicenseKeySecretId: "some-secret"}
+
+		assert.False(t, IsSecretConfigured(ctx, conf))
+
+		licenseKey, err := GetNewRelicLicenseKey(ctx, conf)
+		assert.Equal(t, "", licenseKey)
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "Secrets Manager client not initialized")
+	})
+
+	t.Run("AWS config load failure - SSM operations fail gracefully", func(t *testing.T) {
+		conf := &config.Configuration{LicenseKeySSMParameterName: "some-parameter"}
+		assert.False(t, IsSSMParameterConfigured(ctx, conf))
+		licenseKey, err := GetNewRelicLicenseKey(ctx, conf)
+		assert.Equal(t, "", licenseKey)
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "SSM client not initialized")
+	})
 }

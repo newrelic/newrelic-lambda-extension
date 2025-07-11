@@ -196,15 +196,6 @@ function publish_layer {
     echo "export $env_var_name='$full_layer_arn'" >> $TMP_ENV_FILE_NAME
 }
 
-function make_package_json {
-cat <<EOM >fake-package.json
-{
-  "name": "newrelic-esm-lambda-wrapper",
-  "type": "module"
-}
-EOM
-}
-
 
 function build_python_version {
     version=$1
@@ -256,19 +247,13 @@ function build_nodejs_version {
     touch $DIST_DIR/nr-env
     echo "NEWRELIC_AGENT_VERSION=$NEWRELIC_AGENT_VERSION" > $DIST_DIR/nr-env
     
-    # Create wrapper directories and copy files (now from local_testing directory)
+    # Create wrapper directory and copy CommonJS wrapper only
     mkdir -p $NODEJS_BUILD_DIR/node_modules/newrelic-lambda-wrapper
     cp index.js $NODEJS_BUILD_DIR/node_modules/newrelic-lambda-wrapper
-    mkdir -p $NODEJS_BUILD_DIR/node_modules/newrelic-esm-lambda-wrapper
-    cp esm.mjs $NODEJS_BUILD_DIR/node_modules/newrelic-esm-lambda-wrapper/index.js
-    
-    # Create ESM package.json
-    make_package_json
-    cp fake-package.json $NODEJS_BUILD_DIR/node_modules/newrelic-esm-lambda-wrapper/package.json
     
     download_extension $arch
     zip -rq $dist_dir $NODEJS_BUILD_DIR $EXTENSION_DIST_DIR 
-    rm -rf fake-package.json $NODEJS_BUILD_DIR $EXTENSION_DIST_DIR
+    rm -rf $NODEJS_BUILD_DIR $EXTENSION_DIST_DIR
     echo "Build complete: ${dist_dir}"
 }
 
@@ -328,72 +313,72 @@ else
 fi
 
 
-# Build and publish for python3.11 arm64
-echo "Building and publishing for Python 3.11 ARM64..."
-build_python_version "3.11" "arm64" $PY311_DIST_ARM64
-publish_python_version $PY311_DIST_ARM64 "arm64" "3.11" "${REGIONS_ARM[@]}"
+# # Build and publish for python3.11 arm64
+# echo "Building and publishing for Python 3.11 ARM64..."
+# build_python_version "3.11" "arm64" $PY311_DIST_ARM64
+# publish_python_version $PY311_DIST_ARM64 "arm64" "3.11" "${REGIONS_ARM[@]}"
 
-# Build and publish for python3.11 x86_64
-echo "Building and publishing for Python 3.11 x86_64..."
-build_python_version "3.11" "x86_64" $PY311_DIST_X86_64
-publish_python_version $PY311_DIST_X86_64 "x86_64" "3.11" "${REGIONS_X86[@]}"
+# # Build and publish for python3.11 x86_64
+# echo "Building and publishing for Python 3.11 x86_64..."
+# build_python_version "3.11" "x86_64" $PY311_DIST_X86_64
+# publish_python_version $PY311_DIST_X86_64 "x86_64" "3.11" "${REGIONS_X86[@]}"
 
-# Build and publish for python3.12 arm64
-echo "Building and publishing for Python 3.12 ARM64..."
-build_python_version "3.12" "arm64" $PY312_DIST_ARM64
-publish_python_version $PY312_DIST_ARM64 "arm64" "3.12" "${REGIONS_ARM[@]}"
+# # Build and publish for python3.12 arm64
+# echo "Building and publishing for Python 3.12 ARM64..."
+# build_python_version "3.12" "arm64" $PY312_DIST_ARM64
+# publish_python_version $PY312_DIST_ARM64 "arm64" "3.12" "${REGIONS_ARM[@]}"
 
-# Build and publish for python3.12 x86_64
-echo "Building and publishing for Python 3.12 x86_64..."
-build_python_version "3.12" "x86_64" $PY312_DIST_X86_64
-publish_python_version $PY312_DIST_X86_64 "x86_64" "3.12" "${REGIONS_X86[@]}"
+# # Build and publish for python3.12 x86_64
+# echo "Building and publishing for Python 3.12 x86_64..."
+# build_python_version "3.12" "x86_64" $PY312_DIST_X86_64
+# publish_python_version $PY312_DIST_X86_64 "x86_64" "3.12" "${REGIONS_X86[@]}"
 
-# Build and publish for python3.13 arm64
-echo "Building and publishing for Python 3.13 ARM64..."
-build_python_version "3.13" "arm64" $PY313_DIST_ARM64
-publish_python_version $PY313_DIST_ARM64 "arm64" "3.13" "${REGIONS_ARM[@]}"
+# # Build and publish for python3.13 arm64
+# echo "Building and publishing for Python 3.13 ARM64..."
+# build_python_version "3.13" "arm64" $PY313_DIST_ARM64
+# publish_python_version $PY313_DIST_ARM64 "arm64" "3.13" "${REGIONS_ARM[@]}"
 
-# Build and publish for python3.13 x86_64
-echo "Building and publishing for Python 3.13 x86_64..."
-build_python_version "3.13" "x86_64" $PY313_DIST_X86_64
-publish_python_version $PY313_DIST_X86_64 "x86_64" "3.13" "${REGIONS_X86[@]}"
+# # Build and publish for python3.13 x86_64
+# echo "Building and publishing for Python 3.13 x86_64..."
+# build_python_version "3.13" "x86_64" $PY313_DIST_X86_64
+# publish_python_version $PY313_DIST_X86_64 "x86_64" "3.13" "${REGIONS_X86[@]}"
 
-# Build and publish for nodejs18.x arm64
-echo "Building and publishing for Node.js 18.x ARM64..."
-build_nodejs_version "18" "arm64" $NODE18_DIST_ARM64
-publish_nodejs_version $NODE18_DIST_ARM64 "arm64" "18.x" "${REGIONS_ARM[@]}"
+# # Build and publish for nodejs18.x arm64
+# echo "Building and publishing for Node.js 18.x ARM64..."
+# build_nodejs_version "18" "arm64" $NODE18_DIST_ARM64
+# publish_nodejs_version $NODE18_DIST_ARM64 "arm64" "18.x" "${REGIONS_ARM[@]}"
 
-# Build and publish for nodejs18.x x86_64
-echo "Building and publishing for Node.js 18.x x86_64..."
-build_nodejs_version "18" "x86_64" $NODE18_DIST_X86_64
-publish_nodejs_version $NODE18_DIST_X86_64 "x86_64" "18.x" "${REGIONS_X86[@]}"
+# # Build and publish for nodejs18.x x86_64
+# echo "Building and publishing for Node.js 18.x x86_64..."
+# build_nodejs_version "18" "x86_64" $NODE18_DIST_X86_64
+# publish_nodejs_version $NODE18_DIST_X86_64 "x86_64" "18.x" "${REGIONS_X86[@]}"
 
-# Build and publish for nodejs20.x arm64
-echo "Building and publishing for Node.js 20.x ARM64..."
-build_nodejs_version "20" "arm64" $NODE20_DIST_ARM64
-publish_nodejs_version $NODE20_DIST_ARM64 "arm64" "20.x" "${REGIONS_ARM[@]}"
+# # Build and publish for nodejs20.x arm64
+# echo "Building and publishing for Node.js 20.x ARM64..."
+# build_nodejs_version "20" "arm64" $NODE20_DIST_ARM64
+# publish_nodejs_version $NODE20_DIST_ARM64 "arm64" "20.x" "${REGIONS_ARM[@]}"
 
 # Build and publish for nodejs20.x x86_64
 echo "Building and publishing for Node.js 20.x x86_64..."
 build_nodejs_version "20" "x86_64" $NODE20_DIST_X86_64
 publish_nodejs_version $NODE20_DIST_X86_64 "x86_64" "20.x" "${REGIONS_X86[@]}"
 
-# Build and publish for nodejs22.x arm64
-echo "Building and publishing for Node.js 22.x ARM64..."
-build_nodejs_version "22" "arm64" $NODE22_DIST_ARM64
-publish_nodejs_version $NODE22_DIST_ARM64 "arm64" "22.x" "${REGIONS_ARM[@]}"
+# # Build and publish for nodejs22.x arm64
+# echo "Building and publishing for Node.js 22.x ARM64..."
+# build_nodejs_version "22" "arm64" $NODE22_DIST_ARM64
+# publish_nodejs_version $NODE22_DIST_ARM64 "arm64" "22.x" "${REGIONS_ARM[@]}"
 
-# Build and publish for nodejs22.x x86_64
-echo "Building and publishing for Node.js 22.x x86_64..."
-build_nodejs_version "22" "x86_64" $NODE22_DIST_X86_64
-publish_nodejs_version $NODE22_DIST_X86_64 "x86_64" "22.x" "${REGIONS_X86[@]}"
+# # Build and publish for nodejs22.x x86_64
+# echo "Building and publishing for Node.js 22.x x86_64..."
+# build_nodejs_version "22" "x86_64" $NODE22_DIST_X86_64
+# publish_nodejs_version $NODE22_DIST_X86_64 "x86_64" "22.x" "${REGIONS_X86[@]}"
 
-# Build and publish for Extension ARM64
-echo "Building and publishing for Extension ARM64..."
-build_extension_version "arm64" $EXTENSION_DIST_ZIP_ARM64
-publish_extension_version $EXTENSION_DIST_ZIP_ARM64 "arm64" "${REGIONS_ARM[@]}"
+# # Build and publish for Extension ARM64
+# echo "Building and publishing for Extension ARM64..."
+# build_extension_version "arm64" $EXTENSION_DIST_ZIP_ARM64
+# publish_extension_version $EXTENSION_DIST_ZIP_ARM64 "arm64" "${REGIONS_ARM[@]}"
 
-# Build and publish for Extension x86_64
-echo "Building and publishing for Extension x86_64..."
-build_extension_version "x86_64" $EXTENSION_DIST_ZIP_X86_64
-publish_extension_version $EXTENSION_DIST_ZIP_X86_64 "x86_64" "${REGIONS_X86[@]}"
+# # Build and publish for Extension x86_64
+# echo "Building and publishing for Extension x86_64..."
+# build_extension_version "x86_64" $EXTENSION_DIST_ZIP_X86_64
+# publish_extension_version $EXTENSION_DIST_ZIP_X86_64 "x86_64" "${REGIONS_X86[@]}"

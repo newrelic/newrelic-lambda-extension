@@ -40,7 +40,7 @@ const defaultSecretId = "NEW_RELIC_LICENSE_KEY"
 
 func init() {
 
-	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
 
 	var err error

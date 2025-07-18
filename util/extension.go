@@ -2,6 +2,6 @@ package util
 
 const (
 	Name    = "newrelic-lambda-extension"
-	Version = "2.3.23"
+	Version = "2.3.24"
 	Id      = Name + ":" + Version
 )

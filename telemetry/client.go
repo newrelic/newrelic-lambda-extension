@@ -50,6 +50,9 @@ type Client struct {
 func New(functionName string, licenseKey string, telemetryEndpointOverride string, logEndpointOverride string, batch *Batch, collectTraceID bool, clientTimeout time.Duration) *Client {
 	httpClient := &http.Client{
 		Timeout: httpClientTimeout,
+		Transport: &http.Transport{
+			Proxy: http.ProxyFromEnvironment,
+		},
 	}
 
 	// Create random seed for timeout to avoid instances created at the same time

@@ -221,7 +221,6 @@ func Connect(cmd RpmCmd, cs *rpmControls) (string, string, error) {
 			"pid":           pid,
 			"language":      NRAgentLanguage,
 			"agent_version": NRAgentVersion,
-			"host":          "AWS Lambda",
 			"app_name":      []string{appName},
 			"identifier":    appName,
 			"utilization":   getUtilizationData(cmd),

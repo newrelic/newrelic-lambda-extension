@@ -9,6 +9,7 @@ import (
 	"log"
 	"net"
 	"net/http"
+	"net/url"
 	"os"
 	"strings"
 	"time"
@@ -50,11 +51,35 @@ type Client struct {
 func New(functionName string, licenseKey string, telemetryEndpointOverride string, logEndpointOverride string, batch *Batch, collectTraceID bool, clientTimeout time.Duration) *Client {
 	httpClient := &http.Client{
 		Timeout: httpClientTimeout,
-		Transport: &http.Transport{
-			Proxy: http.ProxyFromEnvironment,
-		},
 	}
 
+	proxyUser := os.Getenv("NEW_RELIC_PROXY_USER")
+	proxyPass := os.Getenv("NEW_RELIC_PROXY_PASS")
+	authProxyHost := os.Getenv("NEW_RELIC_PROXY_HOST")
+	authProxyPort := os.Getenv("NEW_RELIC_PROXY_PORT")
+	if authProxyHost == "" {
+		authProxyHost = os.Getenv("HTTPS_PROXY")
+	}
+	if authProxyHost != "" {
+		util.Debugf("Proxy host found: %s. Configuring Extension to use proxy.\n", authProxyHost)
+		proxyAddress := authProxyHost
+		if authProxyPort != "" {
+			proxyAddress = fmt.Sprintf("%s:%s", authProxyHost, authProxyPort)
+		}
+		var authProxyStr string
+		if proxyUser != "" {
+			authProxyStr = fmt.Sprintf("http://%s:%s@%s", proxyUser, proxyPass, proxyAddress)
+		} else {
+			authProxyStr = fmt.Sprintf("http://%s", proxyAddress)
+		}
+		authProxyURL, err := url.Parse(authProxyStr)
+		if err != nil {
+			log.Fatalf("Failed to parse authenticated proxy URL from env: %v", err)
+		}
+		httpClient.Transport = &http.Transport{
+			Proxy: http.ProxyURL(authProxyURL),
+		}
+	}
 	// Create random seed for timeout to avoid instances created at the same time
 	// from creating a wall of retry requests to the collector
 	var b [8]byte

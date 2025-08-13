@@ -32,6 +32,7 @@ func agentVersionCheck(ctx context.Context, conf *config.Configuration, reg *api
 			continue
 		}
 
+		// #nosec G304 - File path is constructed from trusted layer paths and known version file names
 		b, err := os.ReadFile(f)
 		if err != nil {
 			return nil

@@ -3,10 +3,8 @@ package telemetry
 import (
 	"bytes"
 	"context"
-	"encoding/binary"
 	"fmt"
 	"io"
-	"log"
 	"net"
 	"net/http"
 	"os"
@@ -14,7 +12,6 @@ import (
 	"time"
 
 	crypto_rand "crypto/rand"
-	math_rand "math/rand"
 
 	"github.com/newrelic/newrelic-lambda-extension/lambda/logserver"
 
@@ -51,15 +48,6 @@ func New(functionName string, licenseKey string, telemetryEndpointOverride strin
 	httpClient := &http.Client{
 		Timeout: httpClientTimeout,
 	}
-
-	// Create random seed for timeout to avoid instances created at the same time
-	// from creating a wall of retry requests to the collector
-	var b [8]byte
-	_, err := crypto_rand.Read(b[:])
-	if err != nil {
-		log.Fatal("cannot seed math/rand package with cryptographically secure random number generator")
-	}
-	math_rand.Seed(int64(binary.LittleEndian.Uint64(b[:])))
 
 	return NewWithHTTPClient(httpClient, functionName, licenseKey, telemetryEndpointOverride, logEndpointOverride, batch, collectTraceID, clientTimeout)
 }
@@ -234,7 +222,12 @@ func (c *Client) attemptSend(ctx context.Context, currentPayloadBytes []byte, bu
 
 			// if error is http timeout, retry
 			if err, ok := err.(net.Error); ok && err.Timeout() {
-				timeout := baseSleepTime + time.Duration(math_rand.Intn(200))
+				// Use crypto/rand for secure random jitter instead of math/rand
+				var randBytes [1]byte
+				// #nosec G104 - crypto/rand.Read failure is extremely rare and non-critical for jitter
+				crypto_rand.Read(randBytes[:])
+				jitter := time.Duration(int(randBytes[0]) % 200) // 0-199ms jitter
+				timeout := baseSleepTime + jitter
 				util.Debugf("attemptSend: timeout error, retrying after %s: %v", timeout.String(), err)
 				time.Sleep(timeout)
 

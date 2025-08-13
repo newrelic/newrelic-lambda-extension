@@ -531,7 +531,7 @@ func pollLogAPMServer(ctx context.Context, logServer *logserver.LogServer, conf 
 	for _, platformLog := range logServer.PollPlatformChannel() {
 		lambdaMetrics, _ := apm.ParseLambdaReportLog(string(platformLog.Content))
 		metrics := lambdaMetrics.ConvertToMetrics("apm.lambda.transaction", entityGuid, LambdaFunctionName)
-		statusCode, responseBody, err := apm.SendMetrics(conf.LicenseKey, conf.MetricEndpoint, metrics, true)
+		statusCode, responseBody, err := apm.SendMetrics(conf.LicenseKey, conf.MetricEndpoint, metrics, false)
 		if err != nil {
 			util.Logf("Error sending metric: %v", err)
 		}

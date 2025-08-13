@@ -36,7 +36,10 @@ func RunChecks(ctx context.Context, conf *config.Configuration, reg *api.Registr
 		if conf.IgnoreExtensionChecks[checkName] {
 			continue
 		}
-		runCheck(ctx, conf, reg, runtimeConfig, logSender, check)
+		err := runCheck(ctx, conf, reg, runtimeConfig, logSender, check)
+		if err != nil {
+			util.Debugf("Startup check failed: %v", err)
+		}
 	}
 }
 
@@ -47,7 +50,7 @@ func runCheck(ctx context.Context, conf *config.Configuration, reg *api.Registra
 		util.Logln(errLog)
 		var entityGuid string
 		//Send a log line to NR as well
-		logSender.SendFunctionLogs(ctx, "", []logserver.LogLine{
+		logErr := logSender.SendFunctionLogs(ctx, "", []logserver.LogLine{
 			{
 				Time:      time.Now(),
 				RequestID: "0",
@@ -55,6 +58,9 @@ func runCheck(ctx context.Context, conf *config.Configuration, reg *api.Registra
 			},
 		},
 		entityGuid)
+		if logErr != nil {
+			util.Debugf("Failed to send startup check log to New Relic: %v", logErr)
+		}
 	}
 
 	return err

@@ -179,6 +179,7 @@ func getAgentVersion(runtime string) (string, string, error) {
 			continue
 		}
 
+		// #nosec G304 - File path is constructed from trusted layer paths and known version file names
 		b, err := os.ReadFile(f)
 		if err != nil {
 			return "", "", err

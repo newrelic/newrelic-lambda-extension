@@ -36,6 +36,7 @@ var (
 	ssmAPI     SSMAPI
 )
 
+// #nosec G101 - This is a configuration constant, not a hardcoded credential
 const defaultSecretId = "NEW_RELIC_LICENSE_KEY"
 
 func init() {

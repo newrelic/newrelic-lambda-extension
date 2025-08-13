@@ -272,7 +272,9 @@ func startInternal(host string) (*LogServer, error) {
 		return nil, err
 	}
 
-	server := &http.Server{}
+	server := &http.Server{
+		ReadHeaderTimeout: 30 * time.Second, // Prevent Slowloris attacks
+	}
 
 	currentRuntime := detectRuntime()
 

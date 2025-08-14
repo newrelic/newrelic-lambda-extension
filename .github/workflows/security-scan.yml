@@ -4,17 +4,24 @@ on:
   push:
     branches:
       - main
+      - dev
   pull_request:
+    branches:
+      - main
+      - dev
 
 jobs:
   security-scan:
     name: Trivy Security Scan
     runs-on: ubuntu-latest
     permissions:
+      # Required for uploading SARIF results
       security-events: write
+      # Required for checking out the code
       contents: read
-      issues: write
+      # Required for posting PR comments
       pull-requests: write
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v5
@@ -24,7 +31,7 @@ jobs:
         with:
           go-version: '1.23'
           cache-dependency-path: |
-             go.sum
+            go.sum
 
       - name: Build extension
         run: make build
@@ -32,182 +39,75 @@ jobs:
       - name: Download Go modules
         run: go mod download
 
-      - name: Run Trivy vulnerability scanner in table mode
-        # Table output is useful when running on a pull request or push for immediate feedback
-        if: contains(fromJSON('["push", "pull_request"]'), github.event_name)
+      - name: Run Trivy vulnerability scanner
         uses: aquasecurity/trivy-action@0.32.0
-        continue-on-error: true
-        id: trivy_table
+        id: trivy_scan
         with:
           scan-type: 'fs'
           scan-ref: '.'
-          format: 'table'
-          exit-code: '1'
-          ignore-unfixed: true
-          severity: 'CRITICAL,HIGH,MEDIUM,LOW'
-          scanners: 'vuln,secret,config'
-          skip-dirs: 'examples'
-
-      - name: Run Trivy for detailed results
-        # Generate JSON for detailed vulnerability information
-        if: contains(fromJSON('["push", "pull_request"]'), github.event_name)
-        uses: aquasecurity/trivy-action@0.32.0
-        continue-on-error: true
-        id: trivy_json
-        with:
-          scan-type: 'fs'
-          scan-ref: '.'
-          format: 'json'
-          output: 'trivy-results.json'
-          exit-code: '1'
-          ignore-unfixed: true
-          severity: 'CRITICAL,HIGH,MEDIUM,LOW'
-          scanners: 'vuln,secret,config'
-          skip-dirs: 'examples'
-
-      - name: Run Trivy vulnerability scanner in SARIF mode
-        # Generate SARIF report for scheduled runs to upload to GitHub Security tab
-        if: ${{ github.event_name == 'schedule' }}
-        uses: aquasecurity/trivy-action@0.32.0
-        continue-on-error: true
-        with:
-          scan-type: 'fs'
-          scan-ref: '.'
-          format: 'sarif'
+          # Generate multiple report formats
+          format: 'template'
+          template: '@/contrib/sarif.tpl'
           output: 'trivy-results.sarif'
-          ignore-unfixed: true
-          severity: 'CRITICAL,HIGH,MEDIUM,LOW'
-          scanners: 'vuln,secret,config'
-          skip-dirs: 'examples'
-
-      - name: Run Trivy for PR comment
-        # Generate SARIF for PR comments when vulnerabilities are found
-        if: github.event_name == 'pull_request'
-        uses: aquasecurity/trivy-action@0.32.0
-        continue-on-error: true
-        id: trivy_sarif
-        with:
-          scan-type: 'fs'
-          scan-ref: '.'
-          format: 'sarif'
-          output: 'trivy-results.sarif'
+          # Also generate a table for easy viewing in logs and PR comments
+          list-all-pkgs: true
+          # Fail the build if vulnerabilities are found (exit-code: 1)
+          # We use continue-on-error to allow subsequent steps to run.
           exit-code: '1'
+          # Ignore vulnerabilities that don't have a fix yet
           ignore-unfixed: true
+          # Define the severities to scan for
           severity: 'CRITICAL,HIGH,MEDIUM,LOW'
+          # Define which scanners to use
           scanners: 'vuln,secret,config'
+          # Directories to skip
           skip-dirs: 'examples'
+        # Allow the workflow to continue even if Trivy finds issues,
+        # so we can perform actions like uploading results and commenting on PRs.
+        continue-on-error: true
 
-      - name: Upload Trivy scan results to GitHub Security tab
-        # Upload SARIF when running scheduled scans or PR scans
-        if: ${{ github.event_name == 'schedule' || github.event_name == 'pull_request' }}
+      - name: Upload Trivy SARIF report to GitHub Security tab
+        # Upload the SARIF file to the GitHub Security tab
+        # This runs for pushes to main, pull requests, and scheduled runs.
+        if: always() # Run this step even if the previous one failed
         uses: github/codeql-action/upload-sarif@v3
-        continue-on-error: true
         with:
           sarif_file: 'trivy-results.sarif'
 
       - name: Comment on PR with Trivy results
-        if: github.event_name == 'pull_request'
+        # This step only runs for pull request events.
+        if: ${{ github.event_name == 'pull_request' && steps.trivy_scan.outcome == 'failure' }}
         uses: actions/github-script@v7
-        continue-on-error: true
         with:
           script: |
-            const fs = require('fs');
-            let comment = '## 🔒 Trivy Security Scan Results\n\n';
-            
-            // Check Trivy results based on step outcome
-            const trivyTableResult = '${{ steps.trivy_table.outcome }}';
-            const trivyJsonResult = '${{ steps.trivy_json.outcome }}';
-            const trivySarifResult = '${{ steps.trivy_sarif.outcome }}';
-            
-            console.log('Trivy step outcomes:', { trivyTableResult, trivyJsonResult, trivySarifResult });
-            
-            if (trivyTableResult === 'failure' || trivyJsonResult === 'failure' || trivySarifResult === 'failure') {
-              comment += '⚠️ **Trivy Security Scanner detected vulnerabilities**\n\n';
-              
-              // Try to read detailed results from JSON output
-              try {
-                if (fs.existsSync('trivy-results.json')) {
-                  const jsonData = fs.readFileSync('trivy-results.json', 'utf8');
-                  console.log('Trivy JSON data length:', jsonData.length);
-                  const results = JSON.parse(jsonData);
-                  
-                  if (results.Results && results.Results.length > 0) {
-                    comment += '### 📋 Detailed Findings:\n\n';
-                    let criticalCount = 0, highCount = 0, mediumCount = 0, lowCount = 0;
-                    
-                    results.Results.forEach(result => {
-                      if (result.Vulnerabilities && result.Vulnerabilities.length > 0) {
-                        comment += `**📁 File/Package: \`${result.Target}\`**\n\n`;
-                        comment += '| CVE | Severity | Package | Installed | Fixed | Title |\n';
-                        comment += '|-----|----------|---------|-----------|-------|-------|\n';
-                        
-                        result.Vulnerabilities.slice(0, 10).forEach(vuln => {
-                          const severity = vuln.Severity || 'UNKNOWN';
-                          const cve = vuln.VulnerabilityID || 'N/A';
-                          const pkg = vuln.PkgName || 'N/A';
-                          const installed = vuln.InstalledVersion || 'N/A';
-                          const fixed = vuln.FixedVersion || 'Not Fixed';
-                          const title = (vuln.Title || '').substring(0, 50) + (vuln.Title && vuln.Title.length > 50 ? '...' : '');
-                          
-                          // Count by severity
-                          switch(severity) {
-                            case 'CRITICAL': criticalCount++; break;
-                            case 'HIGH': highCount++; break;
-                            case 'MEDIUM': mediumCount++; break;
-                            case 'LOW': lowCount++; break;
-                          }
-                          
-                          const severityEmoji = severity === 'CRITICAL' ? '🔴' : 
-                                               severity === 'HIGH' ? '🟠' : 
-                                               severity === 'MEDIUM' ? '🟡' : '🔵';
-                          
-                          comment += `| ${cve} | ${severityEmoji} ${severity} | ${pkg} | ${installed} | ${fixed} | ${title} |\n`;
-                        });
-                        
-                        if (result.Vulnerabilities.length > 10) {
-                          comment += `\n*... and ${result.Vulnerabilities.length - 10} more vulnerabilities*\n`;
-                        }
-                        comment += '\n';
-                      }
-                    });
-                    
-                    comment += `### 📊 Summary:\n`;
-                    if (criticalCount > 0) comment += `- 🔴 **Critical**: ${criticalCount}\n`;
-                    if (highCount > 0) comment += `- 🟠 **High**: ${highCount}\n`;
-                    if (mediumCount > 0) comment += `- 🟡 **Medium**: ${mediumCount}\n`;
-                    if (lowCount > 0) comment += `- 🔵 **Low**: ${lowCount}\n`;
-                    comment += '\n';
-                  } else {
-                    comment += '*No vulnerabilities found in detailed results.*\n\n';
-                  }
-                } else {
-                  comment += '*trivy-results.json file not found.*\n\n';
-                  console.log('Trivy JSON file does not exist');
-                }
-              } catch (error) {
-                comment += `*Could not parse detailed results: ${error.message}*\n\n`;
-                console.log('Error parsing Trivy JSON:', error.message);
-              }
-              
-              comment += '❌ **Trivy scan failed** - Please address the vulnerabilities found above.\n\n';
-              comment += 'Please check the [Security tab](https://github.com/${{ github.repository }}/security/code-scanning) for complete details.\n\n';
-            } else {
-              comment += '✅ **Trivy Security Scanner**: No vulnerabilities detected\n\n';
-              comment += '✅ **Trivy scan passed**\n\n';
-            }
-            
-            comment += 'View the complete security scan logs in the [Actions tab](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}).';
-            
+            const { readFileSync } = require('fs');
+            const results = readFileSync('trivy-results.sarif', 'utf8');
+            const commentBody = `## 🔒 Trivy Security Scan Results
+
+            ⚠️ **Vulnerabilities have been detected in this pull request.**
+
+            Please review the findings in the [Security tab](https://github.com/${{ github.repository }}/security/code-scanning) for more details.
+
+            <details>
+            <summary>Click to view Trivy Scan Summary</summary>
+
+            \`\`\`json
+            ${results}
+            \`\`\`
+
+            </details>
+            `;
             github.rest.issues.createComment({
-              issue_number: context.issue.number,
               owner: context.repo.owner,
               repo: context.repo.repo,
-              body: comment
+              issue_number: context.issue.number,
+              body: commentBody
             });
 
-      - name: Fail workflow if Trivy vulnerabilities found
-        if: ${{ (github.event_name == 'pull_request' || github.event_name == 'push') && (steps.trivy_table.outcome == 'failure' || steps.trivy_json.outcome == 'failure' || steps.trivy_sarif.outcome == 'failure') }}
+      - name: Fail workflow if vulnerabilities were found
+        # This is the final step that will fail the check if the Trivy scan failed.
+        if: ${{ steps.trivy_scan.outcome == 'failure' }}
         run: |
           echo "❌ Trivy detected security vulnerabilities!"
-          echo "Please review the security scan results above and address the vulnerabilities."
+          echo "Please review the scan results and address the issues."
           exit 1

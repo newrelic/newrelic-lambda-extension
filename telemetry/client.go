@@ -286,7 +286,7 @@ func (c *Client) SendFunctionLogs(ctx context.Context, invokedFunctionARN string
 }
 
 // getNewRelicTags adds tags to the logs if NR_TAGS has values
-func getNewRelicTags(common map[string]interface{}) {
+func GetNewRelicTags(common map[string]interface{}) {
     nrTagsStr := os.Getenv("NR_TAGS")
     nrDelimiter := os.Getenv("NR_ENV_DELIMITER")
     if nrDelimiter == "" {
@@ -321,7 +321,7 @@ func (c *Client) buildLogPayloads(ctx context.Context, invokedFunctionARN string
 		common["entity.type"] = "APM"
 		common["entity.name"] = c.functionName
 	}
-	getNewRelicTags(common)
+	GetNewRelicTags(common)
 
 	logMessages := make([]FunctionLogMessage, 0, len(lines))
 	for _, l := range lines {

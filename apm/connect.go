@@ -16,6 +16,7 @@ import (
 
 	"github.com/newrelic/newrelic-lambda-extension/checks"
 	"github.com/newrelic/newrelic-lambda-extension/config"
+	"github.com/newrelic/newrelic-lambda-extension/telemetry"
 	"github.com/newrelic/newrelic-lambda-extension/util"
 )
 
@@ -131,6 +132,11 @@ func getLabels(cmd RpmCmd) []Label {
 	labels := []Label{
 		{LabelType: "aws.arn", LabelValue: lambdaARN},
 		{LabelType: "isLambdaFunction", LabelValue: "true"},
+	}
+	awsTags := map[string]interface{}{}
+	telemetry.GetNewRelicTags(awsTags)
+	for k, v := range awsTags {
+		labels = append(labels, Label{LabelType: k, LabelValue: fmt.Sprintf("%v", v)})
 	}
 	return labels
 }

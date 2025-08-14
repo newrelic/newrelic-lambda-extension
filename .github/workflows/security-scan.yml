@@ -42,7 +42,7 @@ jobs:
         id: trivy_sarif_scan
         with:
           scan-type: 'fs'
-          scan-ref: './extension'
+          scan-ref: './extensions/newrelic-lambda-extension'
           format: 'sarif'
           output: 'trivy-results.sarif'
           exit-code: '1'
@@ -57,7 +57,7 @@ jobs:
         id: trivy_comment_scan
         with:
           scan-type: 'fs'
-          scan-ref: './extension'
+          scan-ref: './extensions/newrelic-lambda-extension'
           format: 'table'
           exit-code: '0'
           ignore-unfixed: true

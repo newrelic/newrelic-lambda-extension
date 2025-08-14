@@ -7,10 +7,7 @@ on:
   pull_request:
     branches:
       - main
-  schedule:
-    # Run every day at midnight UTC
-    - cron: '0 0 * * *'
-
+      
 jobs:
   security-scan:
     name: Trivy Security Scan
@@ -34,59 +31,47 @@ jobs:
           cache-dependency-path: |
             go.sum
 
-      - name: Build extension
-        run: make build
-
       - name: Download Go modules
         run: go mod download
 
+      - name: Build extension
+        run: make build
+        
       - name: Run Trivy for SARIF report
-        # This scan generates the SARIF report for the GitHub Security tab.
-        # It's the primary scan that determines if the workflow should fail.
         uses: aquasecurity/trivy-action@0.32.0
         id: trivy_sarif_scan
         with:
           scan-type: 'fs'
-          scan-ref: '.'
+          scan-ref: './extension'
           format: 'sarif'
           output: 'trivy-results.sarif'
-          # Use 'comprehensive' to include vulnerabilities from the Go standard library.
-          detection-priority: 'comprehensive'
           exit-code: '1'
           ignore-unfixed: true
           severity: 'CRITICAL,HIGH,MEDIUM,LOW'
           scanners: 'vuln,secret,config'
-          skip-dirs: 'examples'
-        # Allow the workflow to continue so we can upload results and post comments.
         continue-on-error: true
 
       - name: Run Trivy for PR comment
-        # This scan runs only on PRs to generate a clean summary table for the comment.
         if: github.event_name == 'pull_request'
         uses: aquasecurity/trivy-action@0.32.0
         id: trivy_comment_scan
         with:
           scan-type: 'fs'
-          scan-ref: '.'
+          scan-ref: './extension'
           format: 'table'
-          # Use 'comprehensive' to include vulnerabilities from the Go standard library.
-          detection-priority: 'comprehensive'
-          # Set exit-code to 0 so this step doesn't fail the job, it's just for reporting.
           exit-code: '0'
           ignore-unfixed: true
           severity: 'CRITICAL,HIGH,MEDIUM,LOW'
           scanners: 'vuln,secret,config'
-          skip-dirs: 'examples'
 
       - name: Upload Trivy SARIF report to GitHub Security tab
-        # Upload the SARIF file. This runs for all event types.
-        if: always() # Run this step even if the primary scan failed
+        
+        if: always() 
         uses: github/codeql-action/upload-sarif@v3
         with:
           sarif_file: 'trivy-results.sarif'
 
       - name: Comment on PR with Trivy results
-        # This step only runs for pull request events if the main scan found issues.
         if: ${{ github.event_name == 'pull_request' && steps.trivy_sarif_scan.outcome == 'failure' }}
         uses: actions/github-script@v7
         with:

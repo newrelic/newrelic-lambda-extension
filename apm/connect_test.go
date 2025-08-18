@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/newrelic/newrelic-lambda-extension/checks"
+	"github.com/newrelic/newrelic-lambda-extension/telemetry"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -194,4 +195,92 @@ func TestCheckRuntime_NoneExists_ReturnsDefault(t *testing.T) {
 
 	got := checkRuntime()
 	assert.Equal(t, DefaultLambda, got)
+}
+
+func TestGetLabels_ReturnsExpectedLabels(t *testing.T) {
+	origRegion := os.Getenv("AWS_REGION")
+	origDefaultRegion := os.Getenv("AWS_DEFAULT_REGION")
+	defer func() {
+		os.Setenv("AWS_REGION", origRegion)
+		os.Setenv("AWS_DEFAULT_REGION", origDefaultRegion)
+	}()
+
+	os.Setenv("AWS_REGION", "us-east-1")
+	os.Unsetenv("AWS_DEFAULT_REGION")
+
+	cmd := RpmCmd{
+		metaData: map[string]interface{}{
+			"AWSFunctionName": "label-func",
+			"AWSAccountId":    "555666777888",
+		},
+	}
+
+	labels := getLabels(cmd)
+	assert.NotEmpty(t, labels)
+	assert.Equal(t, "aws.arn", labels[0].LabelType)
+	assert.Contains(t, labels[0].LabelValue, "arn:aws:lambda:us-east-1:555666777888:function:label-func")
+	assert.Equal(t, "isLambdaFunction", labels[1].LabelType)
+	assert.Equal(t, "true", labels[1].LabelValue)
+}
+
+func TestGetLabels_UsesDefaultRegionIfUnset(t *testing.T) {
+	origRegion := os.Getenv("AWS_REGION")
+	origDefaultRegion := os.Getenv("AWS_DEFAULT_REGION")
+	defer func() {
+		os.Setenv("AWS_REGION", origRegion)
+		os.Setenv("AWS_DEFAULT_REGION", origDefaultRegion)
+	}()
+
+	os.Unsetenv("AWS_REGION")
+	os.Setenv("AWS_DEFAULT_REGION", "eu-west-1")
+
+	cmd := RpmCmd{
+		metaData: map[string]interface{}{
+			"AWSFunctionName": "default-label-func",
+			"AWSAccountId":    "999888777666",
+		},
+	}
+
+	labels := getLabels(cmd)
+	assert.NotEmpty(t, labels)
+	assert.Equal(t, "aws.arn", labels[0].LabelType)
+	assert.Contains(t, labels[0].LabelValue, "arn:aws:lambda:eu-west-1:999888777666:function:default-label-func")
+	assert.Equal(t, "isLambdaFunction", labels[1].LabelType)
+	assert.Equal(t, "true", labels[1].LabelValue)
+}
+
+func TestGetLabels_IncludesTelemetryTags(t *testing.T) {
+	origNrTags := os.Getenv("NR_TAGS")
+	origNrDelimiter := os.Getenv("NR_ENV_DELIMITER")
+
+	defer func() {
+		os.Setenv("NR_TAGS", origNrTags)
+		os.Setenv("NR_ENV_DELIMITER", origNrDelimiter)
+	}()
+
+	os.Setenv("NR_TAGS", "customTag:customValue")
+	os.Setenv("NR_ENV_DELIMITER", ";")
+
+	testTags := map[string]interface{}{}
+
+	telemetry.GetNewRelicTags(testTags)
+
+	cmd := RpmCmd{
+		metaData: map[string]interface{}{
+			"AWSFunctionName": "tagged-func",
+			"AWSAccountId":    "123123123123",
+		},
+	}
+
+	labels := getLabels(cmd)
+
+	found := false
+	for _, label := range labels {
+		if label.LabelType == "customTag" && label.LabelValue == "customValue" {
+			found = true
+			break
+		}
+	}
+
+	assert.True(t, found, "customTag should be present in labels")
 }

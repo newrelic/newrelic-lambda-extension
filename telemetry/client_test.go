@@ -564,7 +564,7 @@ func TestGetNewRelicTags(t *testing.T) {
 				common[k] = v
 			}
 
-			getNewRelicTags(common)
+			GetNewRelicTags(common)
 
 			for k, v := range tt.expected {
 				if common[k] != v {

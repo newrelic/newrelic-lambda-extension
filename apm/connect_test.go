@@ -101,7 +101,7 @@ func TestGetUtilizationData_ReturnsExpectedData(t *testing.T) {
 		},
 	}
 
-	data := getUtilizationData(cmd)
+	data, _ := getUtilizationData(cmd)
 	vendors, ok := data["vendors"].(map[string]interface{})
 	assert.True(t, ok)
 	awslambda, ok := vendors["awslambda"].(map[string]interface{})

@@ -241,13 +241,13 @@ func CollectorRequest(cmd RpmCmd, cs *rpmControls) *rpmResponse {
 func collectorRequestInternal(url string, cmd RpmCmd, cs *rpmControls) *rpmResponse {
 	compressed, err := compress(cmd.Data, cs.GzipWriterPool)
 	if err != nil {
-		fmt.Printf("Error compressing data: %v", err)
+		util.Debugf("Error compressing data: %v", err)
 		return newRPMResponse(err)
 	}
 
 	req, err := http.NewRequest("POST", url, compressed)
 	if err != nil {
-		fmt.Printf("Error creating request: %v", err)
+		util.Debugf("Error creating request: %v", err)
 		return newRPMResponse(err)
 	}
 
@@ -263,7 +263,7 @@ func collectorRequestInternal(url string, cmd RpmCmd, cs *rpmControls) *rpmRespo
 
 	resp, err := cs.Client.Do(req)
 	if err != nil {
-		fmt.Println("Error connecting:", err)
+		util.Debugf("Error connecting: %v", err)
 		return newRPMResponse(err)
 	}
 

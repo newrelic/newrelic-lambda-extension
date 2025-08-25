@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"io"
 	"strings"
+	"github.com/newrelic/newrelic-lambda-extension/util"
 )
 
 type uncompressedDataVersion2 map[string]json.RawMessage

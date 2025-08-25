@@ -13,6 +13,7 @@ import (
 	"sync"
 
 	"github.com/newrelic/newrelic-lambda-extension/config"
+	"github.com/newrelic/newrelic-lambda-extension/util"
 )
 
 var (

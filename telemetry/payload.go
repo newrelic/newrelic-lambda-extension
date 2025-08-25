@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"io"
 	"strings"
+	"github.com/newrelic/newrelic-lambda-extension/util"
 )
 
 type uncompressedDataVersion2 map[string]json.RawMessage
@@ -39,14 +40,14 @@ func parsePayload(data []byte) (uncompressedData map[string]json.RawMessage, err
 	if payloadVersion == "2" {
 		var uncompressed uncompressedDataVersion2
 		if err = json.Unmarshal(dataJSON, &uncompressed); err != nil {
-			fmt.Printf("unable to unmarshal uncompressed payload: %v", err)
+			util.Debugf("unable to unmarshal uncompressed payload: %v", err)
 			return nil, err
 		}
 		uncompressedData = uncompressed
 	} else {
 		var uncompressed uncompressedDataVersion1
 		if err = json.Unmarshal(dataJSON, &uncompressed); err != nil {
-			fmt.Printf("unable to unmarshal uncompressed payload: %v", err)
+			util.Debugf("unable to unmarshal uncompressed payload: %v", err)
 			return nil, err
 		}
 		uncompressedData = uncompressed["data"]

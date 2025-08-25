@@ -109,7 +109,7 @@ func main() {
 		noopLoop(ctx, invocationClient)
 		return
 	}
-
+	conf.LicenseKey = licenseKey
 	// Start the Logs API server, and register it
 	logServer, err := logserver.Start(conf)
 	if err != nil {

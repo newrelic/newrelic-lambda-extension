@@ -1,6 +1,6 @@
 module github.com/newrelic/newrelic-lambda-extension
 
-go 1.23.10
+go 1.23.12
 
 // Go experimental release X25519Kyber768Draft00 is causing issue with AWS Network Firewall
 godebug tlskyber=0
@@ -30,7 +30,6 @@ require (
 	github.com/aws/smithy-go v1.22.4 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/google/go-querystring v1.1.0 // indirect
-	github.com/jmespath/go-jmespath v0.4.0 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )

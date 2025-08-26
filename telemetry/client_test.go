@@ -19,6 +19,7 @@ import (
 const (
 	clientTestingTimeout = 800 * time.Millisecond
 	testARN              = "arn:aws:lambda:us-east-1:1234:function:newrelic-example-go"
+	logLevel             = "DEBUG"
 )
 
 func TestClientSend(t *testing.T) {
@@ -212,7 +213,7 @@ func TestClientSendRetry(t *testing.T) {
 }
 
 func TestClientSendServerTimeout(t *testing.T) {
-	util.ConfigLogger(true, true)
+	util.ConfigLogger(true, logLevel)
 	var count int32 = 0
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 
@@ -270,7 +271,7 @@ func TestClientSendServerTimeout(t *testing.T) {
 }
 
 func TestClientSendAttemptFailsRetry(t *testing.T) {
-	util.ConfigLogger(true, true)
+	util.ConfigLogger(true, logLevel)
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		time.Sleep(200 * time.Millisecond)
 		w.WriteHeader(http.StatusGatewayTimeout)
@@ -300,7 +301,7 @@ func TestClientSendAttemptFailsRetry(t *testing.T) {
 }
 
 func TestSendFunctionLogsEmpty(t *testing.T) {
-	util.ConfigLogger(true, true)
+	util.ConfigLogger(true, logLevel)
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		time.Sleep(100 * time.Millisecond)
@@ -353,7 +354,7 @@ func TestSendFunctionLogsEmpty(t *testing.T) {
 }
 
 func TestSendFunctionLogsSendingTimeout(t *testing.T) {
-	util.ConfigLogger(true, true)
+	util.ConfigLogger(true, logLevel)
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		time.Sleep(200 * time.Millisecond)

@@ -176,3 +176,111 @@ func TestConfigurationFromEnvironmentLogServerHost(t *testing.T) {
 	conf := ConfigurationFromEnvironment()
 	assert.Equal(t, "foobar", conf.LogServerHost)
 }
+
+func TestLogLevelConfiguration(t *testing.T) {
+    tests := []struct {
+        envValue string
+        expected string
+    }{
+        {"", DefaultLogLevel},
+        {"debug", DebugLogLevel},
+        {"DEBUG", DebugLogLevel},
+        {"info", InfoLogLevel},
+        {"INFO", InfoLogLevel},
+        {"error", DefaultLogLevel},
+        {"ERROR", DefaultLogLevel},
+        {"warn", DefaultLogLevel},
+        {"invalid", DefaultLogLevel},
+    }
+
+    for _, tt := range tests {
+        t.Run("LogLevel_"+tt.envValue, func(t *testing.T) {
+            clearEnvVars()
+            defer clearEnvVars()
+
+            if tt.envValue != "" {
+                os.Setenv("NEW_RELIC_EXTENSION_LOG_LEVEL", tt.envValue)
+            }
+
+            config := ConfigurationFromEnvironment()
+            assert.Equal(t, tt.expected, config.LogLevel)
+        })
+    }
+}
+
+func TestBooleanFlags(t *testing.T) {
+    tests := []struct {
+        envVar   string
+        envValue string
+        getter   func(*Configuration) bool
+    }{
+        {"NEW_RELIC_EXTENSION_SEND_FUNCTION_LOGS", "true", func(c *Configuration) bool { return c.SendFunctionLogs }},
+        {"NEW_RELIC_EXTENSION_SEND_EXTENSION_LOGS", "true", func(c *Configuration) bool { return c.SendExtensionLogs }},
+        {"NEW_RELIC_COLLECT_TRACE_ID", "true", func(c *Configuration) bool { return c.CollectTraceID }},
+        {"NEW_RELIC_APM_LAMBDA_MODE", "true", func(c *Configuration) bool { return c.APMLambdaMode }},
+    }
+
+    for _, tt := range tests {
+        t.Run(tt.envVar, func(t *testing.T) {
+            clearEnvVars()
+            defer clearEnvVars()
+
+            os.Setenv(tt.envVar, tt.envValue)
+            config := ConfigurationFromEnvironment()
+            assert.True(t, tt.getter(config))
+        })
+    }
+}
+
+func TestParseIgnoredExtensionChecks(t *testing.T) {
+    tests := []struct {
+        name      string
+        override  bool
+        checksStr string
+        expected  map[string]bool
+    }{
+        {"No override", false, "", nil},
+        {"Empty string", true, "", nil},
+        {"All checks", true, "all", map[string]bool{"all": true}},
+        {"Valid checks", true, "agent,handler", map[string]bool{"agent": true, "handler": true}},
+        {"Invalid checks", true, "invalid,agent", map[string]bool{"agent": true}},
+    }
+
+    for _, tt := range tests {
+        t.Run(tt.name, func(t *testing.T) {
+            result := parseIgnoredExtensionChecks(tt.override, tt.checksStr)
+            assert.Equal(t, tt.expected, result)
+        })
+    }
+}
+
+func clearEnvVars() {
+    envVars := []string{
+        "NEW_RELIC_ENABLED",
+        "NEW_RELIC_AGENT_ENABLED",
+        "NEW_RELIC_IGNORE_EXTENSION_CHECKS",
+        "NEW_RELIC_LAMBDA_EXTENSION_ENABLED",
+        "NEW_RELIC_LICENSE_KEY",
+        "NEW_RELIC_LICENSE_KEY_SECRET",
+        "NEW_RELIC_LICENSE_KEY_SSM_PARAMETER_NAME",
+        "NEW_RELIC_LAMBDA_HANDLER",
+        "NEW_RELIC_TELEMETRY_ENDPOINT",
+        "NEW_RELIC_LOG_ENDPOINT",
+        "NEW_RELIC_METRIC_ENDPOINT",
+        "NEW_RELIC_DATA_COLLECTION_TIMEOUT",
+        "NEW_RELIC_HARVEST_RIPE_MILLIS",
+        "NEW_RELIC_HARVEST_ROT_MILLIS",
+        "NEW_RELIC_EXTENSION_LOG_LEVEL",
+        "NEW_RELIC_EXTENSION_LOGS_ENABLED",
+        "NEW_RELIC_EXTENSION_SEND_FUNCTION_LOGS",
+        "NEW_RELIC_EXTENSION_SEND_EXTENSION_LOGS",
+        "NEW_RELIC_LOG_SERVER_HOST",
+        "NEW_RELIC_COLLECT_TRACE_ID",
+        "NEW_RELIC_HOST",
+        "NEW_RELIC_APM_LAMBDA_MODE",
+    }
+
+    for _, envVar := range envVars {
+        os.Unsetenv(envVar)
+    }
+}

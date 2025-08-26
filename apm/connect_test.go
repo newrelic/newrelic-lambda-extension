@@ -101,7 +101,7 @@ func TestGetUtilizationData_ReturnsExpectedData(t *testing.T) {
 		},
 	}
 
-	data := getUtilizationData(cmd)
+	data, arn, name := getUtilizationData(cmd)
 	vendors, ok := data["vendors"].(map[string]interface{})
 	assert.True(t, ok)
 	awslambda, ok := vendors["awslambda"].(map[string]interface{})
@@ -109,6 +109,8 @@ func TestGetUtilizationData_ReturnsExpectedData(t *testing.T) {
 	assert.Equal(t, "us-west-2", awslambda["aws.region"])
 	assert.Equal(t, "123456789012", awslambda["aws.accountId"])
 	assert.Equal(t, "my-func", awslambda["aws.functionName"])
+	assert.Equal(t, arn, awslambda["aws.arn"])
+	assert.Equal(t, name, awslambda["aws.functionName"])
 	assert.Contains(t, awslambda["aws.arn"], "arn:aws:lambda:us-west-2:123456789012:function:my-func")
 }
 

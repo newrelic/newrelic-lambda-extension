@@ -101,7 +101,7 @@ func getLambdaARN(cmd RpmCmd) string {
 	return fmt.Sprintf("arn:aws:lambda:%s:%s:function:%s", awsRegion, awsAccountId, awsLambdaName)
 }
 
-func getUtilizationData(cmd RpmCmd) map[string]interface{} {
+func getUtilizationData(cmd RpmCmd) (map[string]interface{}, string, string) {
 	awsLambdaName := cmd.metaData["AWSFunctionName"].(string)
 	awsAccountId := cmd.metaData["AWSAccountId"].(string)
 	awsRegion := os.Getenv("AWS_REGION")
@@ -119,7 +119,7 @@ func getUtilizationData(cmd RpmCmd) map[string]interface{} {
 			},
 		},
 	}
-	return utilizationData
+	return utilizationData, awsUnqualifiedLambdaARN, awsLambdaName
 }
 
 type Label struct {
@@ -222,15 +222,17 @@ func Connect(cmd RpmCmd, cs *rpmControls) (string, string, error) {
 	if appName == "" {
 		return "", "", fmt.Errorf("AWS_LAMBDA_FUNCTION_NAME environment variable not set")
 	}
+	utilizationData, awsUnqualifiedLambdaARN, functionName := getUtilizationData(cmd)
 	data := []map[string]interface{}{
 		{
 			"pid":           pid,
 			"language":      NRAgentLanguage,
 			"agent_version": NRAgentVersion,
-			"host":          "AWS Lambda",
+			"host":          awsUnqualifiedLambdaARN,
+			"display_host":  functionName,
 			"app_name":      []string{appName},
 			"identifier":    appName,
-			"utilization":   getUtilizationData(cmd),
+			"utilization":   utilizationData,
 			"labels": 		 getLabels(cmd),
 		},
 	}

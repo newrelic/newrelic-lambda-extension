@@ -12,6 +12,8 @@ const (
 	DefaultRotMillis     = 12_000
 	DefaultLogLevel      = "INFO"
 	DebugLogLevel        = "DEBUG"
+	InfoLogLevel         = "INFO"
+	WarnLogLevel         = "WARN"
 	defaultLogServerHost = "sandbox.localdomain"
 	DefaultClientTimeout = 10 * time.Second
 )
@@ -186,8 +188,15 @@ func ConfigurationFromEnvironment() *Configuration {
 		ret.RotMillis = DefaultRotMillis
 	}
 
-	if logLevelOverride && logLevelStr == DebugLogLevel {
-		ret.LogLevel = DebugLogLevel
+	if logLevelOverride {
+		switch strings.ToUpper(logLevelStr) {
+		case DebugLogLevel:
+			ret.LogLevel = DebugLogLevel
+		case InfoLogLevel:
+			ret.LogLevel = InfoLogLevel
+		default:
+			ret.LogLevel = DefaultLogLevel
+		}
 	} else {
 		ret.LogLevel = DefaultLogLevel
 	}

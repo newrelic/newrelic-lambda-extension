@@ -71,7 +71,7 @@ func main() {
 	conf := config.ConfigurationFromEnvironment()
 
 	// Optionally enable debug logging, disabled by default
-	util.ConfigLogger(conf.LogsEnabled, conf.LogLevel == config.DebugLogLevel)
+	util.ConfigLogger(conf.LogsEnabled, conf.LogLevel)
 
 	util.Logf("Initializing version %s of the New Relic Lambda Extension...", util.Version)
 

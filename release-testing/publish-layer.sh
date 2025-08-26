@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
-EXTENSION_VERSION="2.3.23"
+EXTENSION_VERSION="2.3.24"
 PRIMARY_REGION="us-west-1"
 REGIONS=(
   us-west-1

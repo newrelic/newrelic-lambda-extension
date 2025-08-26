@@ -45,8 +45,7 @@ func (l Logger) Debugf(format string, v ...interface{}) {
 
 func (l Logger) Debugln(v ...interface{}) {
     if l.isEnabled && l.isDebugEnabled {
-        message := strings.TrimSuffix(fmt.Sprintln(v...), "\n")
-        log.Printf("[NR_EXT %s] %s\n", LogLevelDebug, message)
+        log.Printf("[NR_EXT %s] %s\n", LogLevelDebug, fmt.Sprint(v...))
     }
 }
 
@@ -58,8 +57,7 @@ func (l Logger) Logf(format string, v ...interface{}) {
 
 func (l Logger) Logln(v ...interface{}) {
     if l.isEnabled {
-        message := strings.TrimSuffix(fmt.Sprintln(v...), "\n")
-        log.Printf("[NR_EXT %s] %s\n", LogLevelInfo, message)
+        log.Printf("[NR_EXT %s] %s\n", LogLevelInfo, fmt.Sprint(v...))
     }
 }
 
@@ -71,8 +69,7 @@ func Debugf(format string, v ...interface{}) {
 
 func Debugln(v ...interface{}) {
     if logger.isEnabled && logger.isDebugEnabled {
-        message := strings.TrimSuffix(fmt.Sprintln(v...), "\n")
-        log.Printf("[NR_EXT %s] %s\n", LogLevelDebug, message)
+        log.Printf("[NR_EXT %s] %s\n", LogLevelDebug, fmt.Sprint(v...))
     }
 }
 
@@ -84,17 +81,14 @@ func Logf(format string, v ...interface{}) {
 
 func Logln(v ...interface{}) {
     if logger.isEnabled {
-        message := strings.TrimSuffix(fmt.Sprintln(v...), "\n")
-        log.Printf("[NR_EXT %s] %s\n", LogLevelInfo, message)
+        log.Printf("[NR_EXT %s] %s\n", LogLevelInfo, fmt.Sprint(v...))
     }
 }
 
 func Fatal(v ...interface{}) {
-    message := strings.TrimSuffix(fmt.Sprintln(v...), "\n")
-    log.Fatalf("[NR_EXT ERROR] %s\n", message)
+    log.Fatalf("[NR_EXT ERROR] %s", fmt.Sprint(v...))
 }
 
 func Panic(v ...interface{}) {
-    message := strings.TrimSuffix(fmt.Sprintln(v...), "\n")
-    log.Panicf("[NR_EXT ERROR] %s\n", message)
+    log.Panicf("[NR_EXT ERROR] %s\n", fmt.Sprint(v...))
 }

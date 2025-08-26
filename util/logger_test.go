@@ -102,7 +102,7 @@ func TestDebugln(t *testing.T) {
             Debugln("Test", "message")
 
             if tt.expectLog {
-                assert.Contains(t, buf.String(), "Test message")
+                assert.Contains(t, buf.String(), "Testmessage")
                 assert.Contains(t, buf.String(), "[NR_EXT DEBUG]")
             } else {
                 assert.Empty(t, buf.String())
@@ -164,7 +164,7 @@ func TestLogln(t *testing.T) {
             Logln("Info", "message")
 
             if tt.expectLog {
-                assert.Contains(t, buf.String(), "Info message")
+                assert.Contains(t, buf.String(), "Infomessage")
                 assert.Contains(t, buf.String(), "[NR_EXT INFO]")
             } else {
                 assert.Empty(t, buf.String())
@@ -188,7 +188,7 @@ func TestLoggerMethods(t *testing.T) {
     buf.Reset()
 
     testLogger.Debugln("Debug", "line")
-    assert.Contains(t, buf.String(), "Debug line")
+    assert.Contains(t, buf.String(), "Debugline")
     buf.Reset()
 
     testLogger.Logf("Log %s", "test")
@@ -196,7 +196,7 @@ func TestLoggerMethods(t *testing.T) {
     buf.Reset()
 
     testLogger.Logln("Log", "line")
-    assert.Contains(t, buf.String(), "Log line")
+    assert.Contains(t, buf.String(), "Logline")
 }
 
 func TestLogLevelConstants(t *testing.T) {

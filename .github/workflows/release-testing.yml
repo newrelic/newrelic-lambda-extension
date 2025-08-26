@@ -1,0 +1,61 @@
+name: Publish Lambda Layer
+
+on:
+  workflow_dispatch:
+
+jobs:
+  publish-layers:
+    runs-on: ubuntu-latest
+    outputs:
+      x86_arn: ${{ steps.publish.outputs.x86_arn }}
+      arm_arn: ${{ steps.publish.outputs.arm_arn }}
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.23'
+
+      - name: Install AWS CLI
+        run: pip install -U awscli
+
+      - name: Publish Extension Layer
+        id: publish
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        run: ./release-testing/publish-layer.sh
+
+  invoke-lambda:
+    needs: publish-layers
+    runs-on: ubuntu-latest
+    steps:
+      - name: Invoke for Cold Start
+        env:
+          API_URL: ${{ secrets.API_GATEWAY_URL }}
+          API_KEY: ${{ secrets.API_GATEWAY_KEY }}
+        run: |
+          echo "Invoking Lambda with x86 ARN: ${{ needs.publish-layers.outputs.x86_arn }}"
+          echo "Invoking Lambda with ARM ARN: ${{ needs.publish-layers.outputs.arm_arn }}"
+          curl -X POST \
+            -H "Content-Type: application/json" \
+            -H "x-api-key: $API_KEY" \
+            --data '{ "x86_layer_arn": "${{ needs.publish-layers.outputs.x86_arn }}", "arm_layer_arn": "${{ needs.publish-layers.outputs.arm_arn }}", "execution_phase": "cold" }' \
+            $API_URL
+
+      - name: Wait for 8 minutes
+        run: sleep 480
+
+      - name: Invoke for Warm Start
+        env:
+          API_URL: ${{ secrets.API_GATEWAY_URL }}
+          API_KEY: ${{ secrets.API_GATEWAY_KEY }}
+        run: |
+          echo "Invoking Lambda with x86 ARN: ${{ needs.publish-layers.outputs.x86_arn }}"
+          echo "Invoking Lambda with ARM ARN: ${{ needs.publish-layers.outputs.arm_arn }}"
+          curl -X POST \
+            -H "Content-Type: application/json" \
+            -H "x-api-key: $API_KEY" \
+            --data '{ "x86_layer_arn": "${{ needs.publish-layers.outputs.x86_arn }}", "arm_layer_arn": "${{ needs.publish-layers.outputs.arm_arn }}", "execution_phase": "warm" }' \
+            $API_URL

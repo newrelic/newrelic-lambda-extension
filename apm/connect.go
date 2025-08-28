@@ -358,6 +358,7 @@ func SendAPMTelemetry(ctx context.Context, payload []byte, conf *config.Configur
 func extractTelemetryData(datav1 LambdaRawData, datav2 LambdaData, pv int) (struct {
 	MetricData     	[]interface{}
 	SpanEventData  	[]interface{}
+	SQLTraceData   	[]interface{}
 	ErrorData      	[]interface{}
 	ErrorEventData 	[]interface{}
 	CustomEventData []interface{}
@@ -367,6 +368,7 @@ func extractTelemetryData(datav1 LambdaRawData, datav2 LambdaData, pv int) (stru
 	var telemetryData struct {
 		MetricData     	[]interface{}
 		SpanEventData  	[]interface{}
+		SQLTraceData   	[]interface{}
 		ErrorData      	[]interface{}
 		ErrorEventData 	[]interface{}
 		CustomEventData []interface{}
@@ -383,6 +385,7 @@ func extractTelemetryData(datav1 LambdaRawData, datav2 LambdaData, pv int) (stru
 		telemetryData = struct {
 			MetricData     []interface{}
 			SpanEventData  []interface{}
+			SQLTraceData   []interface{}
 			ErrorData      []interface{}
 			ErrorEventData []interface{}
 			CustomEventData []interface{}
@@ -391,6 +394,7 @@ func extractTelemetryData(datav1 LambdaRawData, datav2 LambdaData, pv int) (stru
 		}{
 			MetricData:     datav2.MetricData,
 			SpanEventData:  datav2.SpanEventData,
+			SQLTraceData:   datav2.SQLTraceData,
 			ErrorData:      datav2.ErrorData,
 			ErrorEventData: datav2.ErrorEventData,
 			CustomEventData: datav2.CustomEventData,
@@ -405,6 +409,7 @@ func extractTelemetryData(datav1 LambdaRawData, datav2 LambdaData, pv int) (stru
 		telemetryData = struct {
 			MetricData     	[]interface{}
 			SpanEventData  	[]interface{}
+			SQLTraceData   	[]interface{}
 			ErrorData      	[]interface{}
 			ErrorEventData 	[]interface{}
 			CustomEventData []interface{}
@@ -413,6 +418,7 @@ func extractTelemetryData(datav1 LambdaRawData, datav2 LambdaData, pv int) (stru
 		}{
 			MetricData:     datav1.LambdaData.MetricData,
 			SpanEventData:  datav1.LambdaData.SpanEventData,
+			SQLTraceData:   datav1.LambdaData.SQLTraceData,
 			ErrorData:      datav1.LambdaData.ErrorData,
 			ErrorEventData: datav1.LambdaData.ErrorEventData,
 			CustomEventData: datav1.LambdaData.CustomEventData,
@@ -427,6 +433,7 @@ func extractTelemetryData(datav1 LambdaRawData, datav2 LambdaData, pv int) (stru
 func sendTelemetryData(ctx context.Context, data struct {
 	MetricData            []interface{}
 	SpanEventData         []interface{}
+	SQLTraceData          []interface{}
 	ErrorData             []interface{}
 	ErrorEventData        []interface{}
 	CustomEventData	      []interface{}
@@ -437,6 +444,7 @@ func sendTelemetryData(ctx context.Context, data struct {
 	telemetryTasks := []telemetryType{
 		{data.MetricData, CmdMetrics},
 		{data.SpanEventData, CmdSpanEvents},
+		{data.SQLTraceData, cmdSlowSQLs},
 		{data.ErrorData, CmdErrorData},
 		{data.ErrorEventData, CmdErrorEvents},
 		{data.CustomEventData, CmdCustomEvents},

@@ -204,18 +204,6 @@ type Metadata struct {
 	FunctionVersion      string `json:"function_version"`
 }
 
-type Data struct {
-	Error_data          []interface{}   `json:"error_data"`
-	AnalyticEventData   []interface{}   `json:"analytic_event_data"`
-	SpanEventData       []interface{}   `json:"span_event_data"`
-	MetricData          []interface{}   `json:"metric_data"`
-}
-
-type Input struct {
-	Metadata Metadata `json:"metadata"`
-	Data     Data     `json:"data"`
-}
-
 
 func compress(b []byte, gzipWriterPool *sync.Pool) (*bytes.Buffer, error) {
 	w := gzipWriterPool.Get().(*gzip.Writer)

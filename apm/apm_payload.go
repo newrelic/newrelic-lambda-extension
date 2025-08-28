@@ -27,6 +27,7 @@ type LambdaData struct {
 	ErrorEventData         []interface{} `json:"error_event_data"`
 	ErrorData              []interface{} `json:"error_data"`
 	SpanEventData          []interface{} `json:"span_event_data"`
+	SQLTraceData           []interface{} `json:"sql_trace_data"`
 	UpdateLoadedModules    []interface{} `json:"update_loaded_modules"`
 	TransactionSampleData  []interface{} `json:"transaction_sample_data"`
 }

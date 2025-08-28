@@ -151,7 +151,7 @@ func (app *InternalAPMApp) connectRoutine() {
 		}
 
 		backoff := getConnectBackoffTime(attempts)
-		time.Sleep(time.Duration(backoff) * time.Second)
+		time.Sleep(backoff)
 		attempts++
 	}
 
@@ -159,8 +159,12 @@ func (app *InternalAPMApp) connectRoutine() {
 	util.Fatal(fmt.Errorf("failed to connect to collector after %d attempts", maxAttempts))
 }
 
-func getConnectBackoffTime(attempt int) int {
-	connectBackoffTimes := [...]int{15, 15, 30}
+func getConnectBackoffTime(attempt int) time.Duration {
+	connectBackoffTimes := [...]time.Duration{
+		200 * time.Millisecond,
+		500 * time.Millisecond,
+		900 * time.Millisecond,
+	}
 	l := len(connectBackoffTimes)
 	if (attempt < 0) || (attempt >= l) {
 		return connectBackoffTimes[l-1]

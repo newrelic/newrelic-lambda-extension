@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
-EXTENSION_VERSION=${GITHUB_REF_NAME}
+EXTENSION_VERSION=${EXTENSION_VERSION}
 PRIMARY_REGION="us-west-1"
 REGIONS=(
   us-west-1

@@ -40,7 +40,7 @@ type InternalAPMApp struct {
 	shutdownComplete chan struct{}
 
 	DataChan           chan []byte
-	ErrorEventChan	   chan interface{}
+	ErrorEventChan	   chan []interface{}
 	collectorErrorChan chan rpmResponse
 	connectChan        chan *appRun
 	LambdaLogChan      chan string
@@ -71,6 +71,7 @@ func NewApp(ctx context.Context ,c *config.Configuration, LambdaFunctionName str
 		apmHarvest:         &harvest{data: [][]byte{}},	 
 		connectChan:        make(chan *appRun, 1),
 		collectorErrorChan: make(chan rpmResponse, 1),
+		ErrorEventChan:     make(chan []interface{}, 5),
 		DataChan:           make(chan []byte, 5),
 		LambdaLogChan:      make(chan string, 1),
 		rpmControls: rpmControls{
@@ -180,6 +181,15 @@ func (app *InternalAPMApp) setState(run *appRun, err error) {
 	app.err = err
 }
 
+func (app *InternalAPMApp) sendError(errorData []interface{}, run *appRun) {
+	collectorHost := app.apmConfig.hostname
+	runId := run.Reply.RunID
+	cmd := RpmCmd{
+		Name:      CmdErrorEvents,
+		Collector: collectorHost,
+	}
+	SendErrorEvent(cmd, &app.rpmControls, errorData, runId)
+}
 
 func (app *InternalAPMApp) doHarvest(ctx context.Context, payload []byte, run *appRun) {
 	collectorHost := app.apmConfig.hostname 
@@ -243,8 +253,11 @@ func (app *InternalAPMApp) process(ctx context.Context) {
 			util.Debugf("Received run in ConnectChan and setting app state")
 			app.setState(run, nil)
 			app.LambdaLogChan <- run.Reply.EntityGUID
-		case <-app.ErrorEventChan:
+		case errorData := <-app.ErrorEventChan:
 			util.Debugf("Received error event in ErrorEventChan")
+			if nil != run && run.Reply.RunID != "" {
+				app.sendError(errorData, run)
+			}
 		}
 	}
 }

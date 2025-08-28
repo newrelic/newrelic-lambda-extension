@@ -270,18 +270,18 @@ func Connect(cmd RpmCmd, cs *rpmControls) (string, string, error) {
 }
 
 
-func SendErrorEvent(cmd RpmCmd, cs *rpmControls, errorData []interface{}) {
+func SendErrorEvent(cmd RpmCmd, cs *rpmControls, errorData []interface{}, runId string) {
 	tg := NewTraceIDGenerator(1453)
 	spanId := tg.GenerateSpanID()
 	traceId := tg.GenerateTraceID()
 	guid := tg.GenerateTraceID()
 	if len(errorData) > 0 {
 		startTimeMetric := time.Now()
-		updatedData, _ := MapToErrorEventData(errorData, cs.GetRunId(), spanId, traceId, guid)
+		updatedData, _ := MapToErrorEventData(errorData, runId, spanId, traceId, guid)
 		finalData, _ := json.Marshal(updatedData)
 		cmd.Name = CmdErrorEvents
 		cmd.Data = finalData
-		cmd.RunID = cs.GetRunId()
+		cmd.RunID = runId
 		rpmResponse := CollectorRequest(cmd, cs)
 		util.Debugf("Status Code %v telemetry: %d\n", CmdErrorEvents, rpmResponse.GetStatusCode())
 		endTimeMetric := time.Now()

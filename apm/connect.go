@@ -176,7 +176,10 @@ func getAgentVersion(runtime string) (string, string, error) {
 	} else if runtime == "dotnet" {
 		layerAgentPaths = checks.LayerAgentPathDotnet
 		agentVersionFile = "version.txt"
-	} 
+	} else if runtime == "ruby" {
+		layerAgentPaths = checks.LayerAgentPathRuby
+		agentVersionFile = "version.txt"
+	}
 		
 
 	for i := range layerAgentPaths {

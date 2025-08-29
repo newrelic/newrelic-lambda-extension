@@ -196,6 +196,9 @@ func getAgentVersion(runtime string) (string, string, error) {
 		if runtime == "python" {
 			version = strings.TrimSpace(string(b))
 			return "python", version, nil
+		} else if runtime == "ruby" {
+			version = strings.TrimSpace(string(b))
+			return "ruby", version, nil
 		} else if runtime == "dotnet" {
 			version = strings.TrimSpace(string(b))
 			return "dotnet", version, nil

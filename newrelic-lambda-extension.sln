@@ -1,0 +1,39 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.5.002.0
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "examples", "examples", "{7F8A3C64-06CB-4043-9738-6597AC4551ED}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "sam", "sam", "{EC0B92F9-16DB-4394-A8D4-3B7D3541CF36}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "dotnet", "dotnet", "{1524380C-F39A-423F-A8B7-F8E2D2BC736E}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "src", "src", "{A3AA52B5-C871-4D0E-8D78-90C4AEBBF366}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "NewRelicExampleDotnet", "examples\sam\dotnet\src\NewRelicExampleDotnet\NewRelicExampleDotnet.csproj", "{0EEFEC17-210C-4F37-A6EC-9F1924372776}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{0EEFEC17-210C-4F37-A6EC-9F1924372776}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{0EEFEC17-210C-4F37-A6EC-9F1924372776}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{0EEFEC17-210C-4F37-A6EC-9F1924372776}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{0EEFEC17-210C-4F37-A6EC-9F1924372776}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(NestedProjects) = preSolution
+		{EC0B92F9-16DB-4394-A8D4-3B7D3541CF36} = {7F8A3C64-06CB-4043-9738-6597AC4551ED}
+		{1524380C-F39A-423F-A8B7-F8E2D2BC736E} = {EC0B92F9-16DB-4394-A8D4-3B7D3541CF36}
+		{A3AA52B5-C871-4D0E-8D78-90C4AEBBF366} = {1524380C-F39A-423F-A8B7-F8E2D2BC736E}
+		{0EEFEC17-210C-4F37-A6EC-9F1924372776} = {A3AA52B5-C871-4D0E-8D78-90C4AEBBF366}
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {557C3AF1-E6F1-4275-BB83-A3179EBAEDC0}
+	EndGlobalSection
+EndGlobal

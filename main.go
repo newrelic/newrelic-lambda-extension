@@ -183,7 +183,7 @@ func main() {
 		eventCounter = mainAPMLoop(ctx, invocationClient, telemetryChan, logServer, conf, internalAPMApp)
 	} else {
 		// In non-APM mode, we process telemetry and platform logs
-		eventCounter = mainLoop(ctx, invocationClient, batch, telemetryChan, logServer, telemetryClient, extensionStartup)
+		eventCounter = mainLoop(ctx, invocationClient, batch, telemetryChan, logServer, telemetryClient, extensionStartup, conf)
 	}
 
 	util.Logf("New Relic Extension shutting down after %v events\n", eventCounter)
@@ -293,7 +293,7 @@ func APMlogShipLoop(ctx context.Context, logServer *logserver.LogServer, telemet
 }
 
 // mainLoop repeatedly calls the /next api, and processes telemetry and platform logs. The timing is rather complicated.
-func mainLoop(ctx context.Context, invocationClient *client.InvocationClient, batch *telemetry.Batch, telemetryChan chan []byte, logServer *logserver.LogServer, telemetryClient *telemetry.Client, extensionStartup time.Time) int {
+func mainLoop(ctx context.Context, invocationClient *client.InvocationClient, batch *telemetry.Batch, telemetryChan chan []byte, logServer *logserver.LogServer, telemetryClient *telemetry.Client, extensionStartup time.Time, conf *config.Configuration) int {
 	eventCounter := 0
 	probablyTimeout := false
 
@@ -397,9 +397,30 @@ func mainLoop(ctx context.Context, invocationClient *client.InvocationClient, ba
 
 				// We received telemetry
 				util.Debugf("Agent telemetry bytes: %s", base64.URLEncoding.EncodeToString(telemetryBytes))
-				inv := batch.AddTelemetry(lastRequestId, telemetryBytes, true)
-				if inv == nil {
-					util.Logf("Failed to add telemetry for request %v", lastRequestId)
+				if conf.LambdaWebAdapter {
+					awsContext := telemetry.AWSLambdaContext{
+						RequestID:       lastRequestId,
+						ARN:            invokedFunctionARN,
+						FunctionVersion: LambdaFunctionVersion,
+					}
+					finalPayload, err := telemetry.ProcessTelemetry(base64.URLEncoding.EncodeToString(telemetryBytes), awsContext)
+					if err != nil {
+						util.Logf("Error processing telemetry: %v", err)
+						inv := batch.AddTelemetry(lastRequestId, telemetryBytes, true)
+						if inv == nil {
+							util.Logf("Failed to add telemetry for request %v", lastRequestId)
+						}
+					} else {
+						inv := batch.AddTelemetry(lastRequestId, []byte(finalPayload), true)
+						if inv == nil {
+							util.Logf("Failed to add processed telemetry for request %v", lastRequestId)
+						}
+					}
+				} else {
+					inv := batch.AddTelemetry(lastRequestId, telemetryBytes, true)
+					if inv == nil {
+						util.Logf("Failed to add telemetry for request %v", lastRequestId)
+					}
 				}
 
 				// Opportunity for an aggressive harvest, in which case, we definitely want to wait for the HTTP POST

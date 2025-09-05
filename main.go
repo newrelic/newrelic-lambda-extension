@@ -398,10 +398,15 @@ func mainLoop(ctx context.Context, invocationClient *client.InvocationClient, ba
 				// We received telemetry
 				util.Debugf("Agent telemetry bytes: %s", base64.URLEncoding.EncodeToString(telemetryBytes))
 				if conf.LambdaWebAdapter {
+					// Use event counter for reliable cold start detection
+					// First event in this container is always a cold start
+					isColdStart := eventCounter == 1
+					
 					awsContext := telemetry.AWSLambdaContext{
 						RequestID:       lastRequestId,
 						ARN:            invokedFunctionARN,
 						FunctionVersion: LambdaFunctionVersion,
+						ColdStart:       isColdStart,
 					}
 					finalPayload, err := telemetry.ProcessTelemetry(base64.URLEncoding.EncodeToString(telemetryBytes), awsContext)
 					if err != nil {

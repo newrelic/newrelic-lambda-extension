@@ -102,6 +102,8 @@ The New Relic Lambda Extension offers various features, which can be utilised by
 |`NEW_RELIC_DATA_COLLECTION_TIMEOUT`| `10s` | Time such as `5s`. Valid time units are "ms", "s"| Reduce time the Extension waits for sending telemetry.|
 |`NEW_RELIC_COLLECT_TRACE_ID`| `false` | `true` , `false` | Add attribute `trace.id` to Lambda Logs |
 |`NEW_RELIC_LAMBDA_EXTENSION_ENABLED`| `false` | `true` , `false` | Disable the Extension. It is enabled by default |
+| `NEW_RELIC_LICENSE_KEY_SECRET` | | Secret Name or ARN | Specify the name or ARN of the secret from **AWS Secrets Manager** that contains your New Relic license key.<br><br>**Notes:**<br>- This is only used if `NEW_RELIC_LICENSE_KEY` is not set.<br>- The secret must be in the same AWS region as your Lambda function.<br>- Your Lambda function's execution role needs the `secretsmanager:GetSecretValue` permission for this secret. |
+| `NEW_RELIC_LICENSE_KEY_SSM_PARAMETER_NAME` | | Parameter Name or ARN | Specify the name or ARN of the parameter from the **AWS Systems Manager Parameter Store** that contains your New Relic license key.<br><br>**Notes:**<br> - This is only used if `NEW_RELIC_LICENSE_KEY` is not set.<br> - The SSM parameter must be in the same AWS region as your Lambda function.<br> - Your Lambda function's execution role needs the `ssm:GetParameter` permission for this parameter. |
 
 
 ## Testing

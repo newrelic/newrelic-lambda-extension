@@ -104,7 +104,7 @@ The New Relic Lambda Extension offers various features, which can be utilised by
 |`NEW_RELIC_LAMBDA_EXTENSION_ENABLED`| `true` | `true` , `false` | Disable the Extension. It is enabled by default |
 | `NEW_RELIC_LICENSE_KEY_SECRET` | | Secret Name or ARN | Specify the name or ARN of the secret from **AWS Secrets Manager** that contains your New Relic license key.<br><br>**Notes:**<br>- This is only used if `NEW_RELIC_LICENSE_KEY` is not set.<br>- The secret must be in the same AWS region as your Lambda function.<br>- Your Lambda function's execution role needs the `secretsmanager:GetSecretValue` permission for this secret. |
 | `NEW_RELIC_LICENSE_KEY_SSM_PARAMETER_NAME` | | Parameter Name or ARN | Specify the name or ARN of the parameter from the **AWS Systems Manager Parameter Store** that contains your New Relic license key.<br><br>**Notes:**<br> - This is only used if `NEW_RELIC_LICENSE_KEY` is not set.<br> - The SSM parameter must be in the same AWS region as your Lambda function.<br> - Your Lambda function's execution role needs the `ssm:GetParameter` permission for this parameter. |
-
+| `NEW_RELIC_CLOUD_AWS_ACCOUNT_ID` | | AWS Account ID | Provide the AWS Account ID where your monitored resources (e.g., databases, Lambda functions) are located. This allows New Relic to correctly map and display relationships between these monitored entities. |
 
 ## Testing
 

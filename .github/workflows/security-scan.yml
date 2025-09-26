@@ -1,0 +1,368 @@
+name: Security Scan
+
+on:
+  schedule:
+    - cron: '30 1 * * *'
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+permissions:
+  contents: read
+  pull-requests: write
+  issues: write
+  actions: read
+
+jobs:
+  dependency-scan:
+    name: Dependency Scan
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install cve-bin-tool
+        run: pip install --no-cache-dir --upgrade cve-bin-tool
+      - name: Run dependency scan
+        run: |
+          # Generate CSV for detailed vulnerability data
+          cve-bin-tool . --exclude examples -r go -d "REDHAT,OSV,GAD,CURL" --no-0-cve-report -f csv --output-file dependency-report.csv || true
+          # Generate console output to capture CPE summary with latest stable versions (use wide columns to avoid truncation)
+          COLUMNS=300 cve-bin-tool . --exclude examples -r go -d "REDHAT,OSV,GAD,CURL" --no-0-cve-report -f console > dependency-console.txt 2>&1 || true
+      - name: Upload dependency scan artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: dependency-scan-results
+          path: |
+            dependency-report.csv
+            dependency-console.txt
+
+  cve-scan:
+    name: CVE Scan (${{ matrix.arch }})
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        arch: [ x86_64, arm64 ]
+    env:
+      SCAN_DATASOURCES: REDHAT,OSV,GAD,CURL
+      GO_VERSION: ${{ vars.GO_VERSION || '1.23.12' }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install cve-bin-tool
+        run: pip install --no-cache-dir --upgrade cve-bin-tool
+      - name: Build extension (${{ matrix.arch }})
+        run: |
+          case "${{ matrix.arch }}" in
+            x86_64) make dist-x86_64 ;;
+            arm64)  make dist-arm64 ;;
+          esac
+      - name: Run CVE scan on binary
+        run: |
+          # Generate CSV for detailed vulnerability data
+          cve-bin-tool extensions/ -r go -d "$SCAN_DATASOURCES" --no-0-cve-report -f csv --output-file cve-report-${{ matrix.arch }}.csv || true
+          # Generate console output to capture CPE summary with latest stable versions (use wide columns to avoid truncation)
+          COLUMNS=300 cve-bin-tool extensions/ -r go -d "$SCAN_DATASOURCES" --no-0-cve-report -f console > cve-console-${{ matrix.arch }}.txt 2>&1 || true
+      - name: Upload CVE scan artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: cve-scan-results-${{ matrix.arch }}
+          path: |
+            cve-report-${{ matrix.arch }}.csv
+            cve-console-${{ matrix.arch }}.txt
+
+  summarize-and-report:
+    name: Summarize and Report
+    runs-on: ubuntu-24.04
+    needs: [dependency-scan, cve-scan]
+    if: always()
+    outputs:
+      vuln_count: ${{ steps.parse.outputs.vuln_count }}
+
+    steps:
+      - name: Download all scan artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: reports
+      - name: Consolidate reports and remove duplicates
+        id: parse
+        run: |
+          echo "Vendor,Product,Version,Description,CVE,Severity" > consolidated-report.csv
+          find reports -name "*.csv" -print0 | while IFS= read -r -d $'\0' file; do
+            tail -n +2 "$file" >> temp-combined.csv
+          done
+          if [ -f "temp-combined.csv" ]; then
+            awk -F, '!seen[$5]++' temp-combined.csv >> consolidated-report.csv
+          fi
+          count=$(($(wc -l < consolidated-report.csv) - 1))
+          if [ "$count" -lt 0 ]; then count=0; fi
+          # Create fingerprints for vulnerability comparison
+          if [ -f "consolidated-report.csv" ] && [ "$count" -gt 0 ]; then
+            # Generate fingerprint from sorted unique CVEs
+            fingerprint=$(tail -n +2 consolidated-report.csv | cut -d',' -f5 | sort | uniq | md5sum | cut -d' ' -f1)
+            
+            # Create backup fingerprint using the whole vulnerability set
+            backup_fingerprint=$(tail -n +2 consolidated-report.csv | awk -F, '{print $1","$2","$3","$5","$6}' | sort | uniq | md5sum | cut -d' ' -f1)
+          else
+            fingerprint="no-vulnerabilities"
+            backup_fingerprint="no-vulnerabilities"
+          fi
+          
+          echo "Found $count unique vulnerabilities"
+          echo "vuln_count=$count" >> "$GITHUB_OUTPUT"
+          echo "fingerprint=$fingerprint" >> "$GITHUB_OUTPUT"
+          echo "backup_fingerprint=$backup_fingerprint" >> "$GITHUB_OUTPUT"
+
+      - name: Generate Report Body
+        id: generate-body
+        if: steps.parse.outputs.vuln_count != '0'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const path = require('path');
+            const csv = fs.readFileSync('consolidated-report.csv', 'utf8');
+            const lines = csv.trim().split('\n').slice(1);
+            const allProducts = new Map();
+            function parseLatestVersionsFromConsole() {
+              const latestVersions = new Map();
+              const reportsPath = 'reports';
+              try {
+                const scanDirs = fs.readdirSync(reportsPath, { withFileTypes: true })
+                                   .filter(dirent => dirent.isDirectory())
+                                   .map(dirent => dirent.name);
+                for (const dir of scanDirs) {
+                  const dirPath = path.join(reportsPath, dir);
+                  const files = fs.readdirSync(dirPath);
+                  const consoleFile = files.find(f => f.endsWith('.txt'));
+                  if (!consoleFile) continue;
+                  const filePath = path.join(dirPath, consoleFile);
+                  const consoleOutput = fs.readFileSync(filePath, 'utf8');
+                  const cpeSection = consoleOutput.match(/╭─────────────╮\n│ CPE SUMMARY │\n╰─────────────╯([\s\S]*?)(?=╭─|$)/);
+                  if (cpeSection) {
+                    const tableContent = cpeSection[1];
+                    const tableLines = tableContent.split('\n');
+                    for (const line of tableLines) {
+                      if (line.includes('│') && !line.includes('━') && !line.includes('Vendor')) {
+                        const cells = line.split('│').map(cell => cell.trim()).filter(cell => cell && cell !== '');
+                        if (cells.length >= 4) {
+                          const vendor = cells[0];
+                          const product = cells[1];
+                          const latestVersion = cells[3];
+                          if (vendor && product && latestVersion && !latestVersion.includes('UNKN')) {
+                            const key = `${vendor}-${product}`;
+                            latestVersions.set(key.toLowerCase(), latestVersion);
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              } catch (error) {
+                console.log('Error parsing console output for version information');
+              }
+              return latestVersions;
+            }
+            const latestVersionsMap = parseLatestVersionsFromConsole();
+            for (const line of lines) {
+              const cols = line.split(',');
+              const vendor = cols[0] || 'Unknown';
+              const product = cols[1] || 'Unknown';
+              const version = cols[2] || 'Unknown';
+              const severity = cols[5].toUpperCase().trim();
+              const productKey = `${vendor}-${product}-${version}`;
+              if (!allProducts.has(productKey)) {
+                const lookupKey = `${vendor}-${product}`.toLowerCase();
+                let latestVersion = latestVersionsMap.get(lookupKey) || 'Not available in scan output';
+                allProducts.set(productKey, {
+                  vendor: vendor, product: product, version: version, latest_stable: latestVersion,
+                  vulnerabilities: { CRITICAL: 0, HIGH: 0, MEDIUM: 0, LOW: 0, UNKNOWN: 0, total: 0 }
+                });
+              }
+              const productData = allProducts.get(productKey);
+              if (severity in productData.vulnerabilities) productData.vulnerabilities[severity]++;
+              else productData.vulnerabilities['UNKNOWN']++;
+              productData.vulnerabilities.total++;
+            }
+            const severityCounts = { CRITICAL: 0, HIGH: 0, MEDIUM: 0, LOW: 0, UNKNOWN: 0 };
+            lines.forEach(line => {
+              const severity = line.split(',')[5].toUpperCase().trim();
+              severityCounts[severity in severityCounts ? severity : 'UNKNOWN']++;
+            });
+            let summaryTable = `| Severity | Count |\n|---|---|\n`;
+            for (const [severity, count] of Object.entries(severityCounts)) {
+              if (count > 0) summaryTable += `| ${severity} | ${count} |\n`;
+            }
+            let cpeTable = `| Vendor | Product | Current Version | Latest Stable Version | Total CVEs |\n|---|---|---|---|---|\n`;
+            for (const product of allProducts.values()) {
+              cpeTable += `| ${product.vendor} | ${product.product} | ${product.version} | **${product.latest_stable}** | ${product.vulnerabilities.total} |\n`;
+            }
+            let detailsTable = '| Product | Version | CVE | Severity |\n|---|---|---|---|\n';
+            
+            for (const line of lines) {
+              if (!line.trim()) continue; // Skip empty lines
+              
+              // Handle CSV parsing - split only on commas not within quotes
+              const cols = [];
+              let current = '';
+              let inQuotes = false;
+              
+              for (let i = 0; i < line.length; i++) {
+                const char = line[i];
+                if (char === '"') {
+                  inQuotes = !inQuotes;
+                } else if (char === ',' && !inQuotes) {
+                  cols.push(current.trim());
+                  current = '';
+                } else {
+                  current += char;
+                }
+              }
+              cols.push(current.trim());
+              
+              const product = cols[1] || 'Unknown'; 
+              const version = cols[2] || 'Unknown';
+              const cve = cols[4] || 'Not Available';
+              const severity = cols[5] || 'UNKNOWN';
+              
+              detailsTable += `| ${product} | ${version} | ${cve} | ${severity} |\n`;
+            }
+            const vuln_count = ${{ steps.parse.outputs.vuln_count }};
+            const scanDate = new Date().toISOString().split('T')[0];
+            let body = `## Security Vulnerability Report\n`;
+            body += `**Scan Date:** ${scanDate}  \n`;
+            body += `**Vulnerabilities Found:** ${vuln_count}\n\n`;
+            body += `### Severity Summary\n${summaryTable}\n`;
+            if (allProducts.size > 0) {
+              body += `### Product Summary\nThis table shows the products with vulnerabilities and the latest stable version found during the scan.\n\n${cpeTable}\n`;
+            }
+            body += `<details><summary><h3>Vulnerability Details (Click to expand)</h3></summary>\n\n${detailsTable}\n\n</details>`;
+            return body;
+          result-encoding: string
+
+      - name: Set Report Body as Environment Variable
+        if: steps.generate-body.outputs.result
+        run: echo "REPORT_BODY<<EOF" >> $GITHUB_ENV && echo "${{ steps.generate-body.outputs.result }}" >> $GITHUB_ENV && echo "EOF" >> $GITHUB_ENV
+
+      - name: Create or Update Issue
+        if: (github.event_name == 'schedule' || github.event_name == 'push' || github.event_name == 'pull_request') && steps.parse.outputs.vuln_count != '0'
+        uses: actions/github-script@v7
+        env:
+          REPORT_BODY: ${{ env.REPORT_BODY }}
+        with:
+          script: |
+            const newFingerprint = '${{ steps.parse.outputs.fingerprint }}';
+            const backupFingerprint = '${{ steps.parse.outputs.backup_fingerprint }}';
+            const todayDate = new Date().toISOString().split('T')[0];
+            const vulnCount = '${{ steps.parse.outputs.vuln_count }}';
+            const issueTitle = `Security Scan Report - ${todayDate} (${vulnCount} vulnerabilities)`;
+            const issueLabel = 'vulnerability-report';
+            const newBody = process.env.REPORT_BODY;
+            
+            const { data: issues } = await github.rest.issues.listForRepo({ 
+              owner: context.repo.owner, 
+              repo: context.repo.repo, 
+              state: 'open', 
+              labels: issueLabel 
+            });
+            
+            // Check if we have an existing issue with the same vulnerability fingerprint
+            let sameVulnIssue = null;
+            for (const issue of issues) {
+              // Extract fingerprints from existing issue body
+              const primaryMatch = issue.body.match(/Primary Fingerprint: ([a-f0-9]{32})/);
+              const backupMatch = issue.body.match(/Backup Fingerprint: ([a-f0-9]{32})/);
+              const legacyMatch = issue.body.match(/Fingerprint: ([a-f0-9]{32})/);
+              
+              const existingPrimary = primaryMatch ? primaryMatch[1] : null;
+              const existingBackup = backupMatch ? backupMatch[1] : null;
+              const existingLegacy = legacyMatch ? legacyMatch[1] : null;
+              
+              // Check if any fingerprint matches
+              if ((existingPrimary && existingPrimary === newFingerprint) ||
+                  (existingBackup && existingBackup === backupFingerprint) ||
+                  (existingLegacy && existingLegacy === newFingerprint)) {
+                sameVulnIssue = issue;
+                break;
+              }
+            }
+            
+            if (sameVulnIssue) {
+              // Add a comment to show the scan was run but no changes found
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: sameVulnIssue.number,
+                body: `**Scan Update - ${todayDate}**\n\nRe-scanned and found identical vulnerabilities (${vulnCount} CVEs). No changes detected since last report.`
+              });
+              
+              return; // Exit without creating new issue or closing existing ones
+            }
+            
+            // Close old issues since we have different vulnerabilities
+            if (issues.length > 0) {
+              for (const oldIssue of issues) {
+                await github.rest.issues.createComment({ 
+                  owner: context.repo.owner, 
+                  repo: context.repo.repo, 
+                  issue_number: oldIssue.number, 
+                  body: `This vulnerability report is now outdated. Vulnerabilities have changed since this report. See the new report for current status.\n\n*Closed on: ${todayDate}*` 
+                });
+                await github.rest.issues.update({ 
+                  owner: context.repo.owner, 
+                  repo: context.repo.repo, 
+                  issue_number: oldIssue.number, 
+                  state: 'closed' 
+                });
+              }
+            }
+            
+            // Add both fingerprints to the issue body for future comparison
+            const bodyWithFingerprint = newBody + `\n\n---\n*Primary Fingerprint: ${newFingerprint}*  \n*Backup Fingerprint: ${backupFingerprint}*`;
+            
+            await github.rest.issues.create({ 
+              owner: context.repo.owner, 
+              repo: context.repo.repo, 
+              title: issueTitle, 
+              body: bodyWithFingerprint, 
+              labels: ['security', 'vulnerability', issueLabel] 
+            });
+
+      - name: Comment on PR
+        if: github.event_name == 'pull_request' && steps.parse.outputs.vuln_count != '0'
+        uses: actions/github-script@v7
+        env:
+          REPORT_BODY: ${{ env.REPORT_BODY }}
+        with:
+          script: |
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: process.env.REPORT_BODY
+            });
+
+  final-status-check:
+    name: Final Status Check
+    runs-on: ubuntu-latest
+    needs: [summarize-and-report]
+    if: always()
+    steps:
+      - name: Check for vulnerabilities
+        if: needs.summarize-and-report.outputs.vuln_count != '0'
+        run: |
+          echo "Vulnerabilities were found. Failing the workflow."
+          exit 1

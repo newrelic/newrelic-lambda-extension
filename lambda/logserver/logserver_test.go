@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"sync"
 	"testing"
 	"time"
 
@@ -488,6 +489,7 @@ func TestLogServerShutdownDuringRequests(t *testing.T) {
 	logServer, err := startInternal("localhost")
 	require.NoError(t, err)
 	require.NotNil(t, logServer)
+	var wg sync.WaitGroup
 
 	done := make(chan struct{})
 
@@ -504,6 +506,7 @@ func TestLogServerShutdownDuringRequests(t *testing.T) {
 	time.Sleep(10 * time.Millisecond)
 	err = logServer.Close()
 	assert.NoError(t, err, "Server should close without errors")
+	wg.Wait()
 	close(done)
 	select {
 	case <-done:

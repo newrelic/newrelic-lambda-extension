@@ -43,6 +43,7 @@ type Configuration struct {
 	NewRelicHost               string
 	APMLambdaMode              bool
 	PreconnectEnabled		   bool
+	LambdaWebAdapter           bool
 }
 
 func parseIgnoredExtensionChecks(nrIgnoreExtensionChecksOverride bool, nrIgnoreExtensionChecksStr string) map[string]bool {
@@ -100,7 +101,7 @@ func ConfigurationFromEnvironment() *Configuration {
 	nrHostStr, nrHostOverride := os.LookupEnv("NEW_RELIC_HOST")
 	nrAPMModeStr, nrAPMModeOverride := os.LookupEnv("NEW_RELIC_APM_LAMBDA_MODE")
 	metricEndpoint, meOverride := os.LookupEnv("NEW_RELIC_METRIC_ENDPOINT")
-
+	isLambdaWebAdapterStr, lwaOverride := os.LookupEnv("NEW_RELIC_LAMBDA_WEB_ADAPTER")
 
 	extensionEnabled := true
 	if nrEnabledOverride {
@@ -129,7 +130,9 @@ func ConfigurationFromEnvironment() *Configuration {
 	if nrHostOverride {
 		ret.NewRelicHost = nrHostStr
 	}
-	
+	if lwaOverride && strings.ToLower(isLambdaWebAdapterStr) == "true" {
+		ret.LambdaWebAdapter = true
+	}
 	ret.ClientTimeout = DefaultClientTimeout
 	if ctOverride && clientTimeout != "" {
 		clientTimeout, err := time.ParseDuration(clientTimeout)

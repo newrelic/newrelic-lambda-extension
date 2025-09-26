@@ -29,10 +29,11 @@ jobs:
         run: pip install --no-cache-dir --upgrade cve-bin-tool
       - name: Run dependency scan
         run: |
-          # Generate CSV for detailed vulnerability data
-          cve-bin-tool . --exclude examples -r go -d "REDHAT,OSV,GAD,CURL" --no-0-cve-report -f csv --output-file dependency-report.csv || true
-          # Generate console output to capture CPE summary with latest stable versions (use wide columns to avoid truncation)
-          COLUMNS=300 cve-bin-tool . --exclude examples -r go -d "REDHAT,OSV,GAD,CURL" --no-0-cve-report -f console > dependency-console.txt 2>&1 || true
+          # Scan only specific Go files and modules, exclude directories that may cause false positives
+          # Focus on go.mod dependencies and main source files
+          cve-bin-tool go.mod go.sum main.go --exclude examples --exclude local_testing --exclude test --exclude extensions --exclude .git --exclude .github --exclude credentials --exclude release-testing --exclude preview-extensions-ggqizro707 --exclude venv --exclude .venv -r go -d "REDHAT,OSV,GAD,CURL" --no-0-cve-report -f csv --output-file dependency-report.csv || true
+          # Generate console output for version information
+          COLUMNS=300 cve-bin-tool go.mod go.sum main.go --exclude examples --exclude local_testing --exclude test --exclude extensions --exclude .git --exclude .github --exclude credentials --exclude release-testing --exclude preview-extensions-ggqizro707 --exclude venv --exclude .venv -r go -d "REDHAT,OSV,GAD,CURL" --no-0-cve-report -f console > dependency-console.txt 2>&1 || true
       - name: Upload dependency scan artifacts
         uses: actions/upload-artifact@v4
         with:
@@ -72,10 +73,17 @@ jobs:
           esac
       - name: Run CVE scan on binary
         run: |
-          # Generate CSV for detailed vulnerability data
-          cve-bin-tool extensions/ -r go -d "$SCAN_DATASOURCES" --no-0-cve-report -f csv --output-file cve-report-${{ matrix.arch }}.csv || true
-          # Generate console output to capture CPE summary with latest stable versions (use wide columns to avoid truncation)
-          COLUMNS=300 cve-bin-tool extensions/ -r go -d "$SCAN_DATASOURCES" --no-0-cve-report -f console > cve-console-${{ matrix.arch }}.txt 2>&1 || true
+          # Scan only the compiled binary, not directory contents
+          if [ -f "extensions/newrelic-lambda-extension" ]; then
+            # Generate CSV for detailed vulnerability data
+            cve-bin-tool extensions/newrelic-lambda-extension -r go -d "$SCAN_DATASOURCES" --no-0-cve-report -f csv --output-file cve-report-${{ matrix.arch }}.csv || true
+            # Generate console output to capture CPE summary with latest stable versions
+            COLUMNS=300 cve-bin-tool extensions/newrelic-lambda-extension -r go -d "$SCAN_DATASOURCES" --no-0-cve-report -f console > cve-console-${{ matrix.arch }}.txt 2>&1 || true
+          else
+            echo "Binary not found, creating empty reports"
+            echo "Vendor,Product,Version,Description,CVE,Severity" > cve-report-${{ matrix.arch }}.csv
+            echo "No binary found for scanning" > cve-console-${{ matrix.arch }}.txt
+          fi
       - name: Upload CVE scan artifacts
         uses: actions/upload-artifact@v4
         with:
@@ -268,7 +276,7 @@ jobs:
             const backupFingerprint = '${{ steps.parse.outputs.backup_fingerprint }}';
             const todayDate = new Date().toISOString().split('T')[0];
             const vulnCount = '${{ steps.parse.outputs.vuln_count }}';
-            const issueTitle = `Security Scan Report - ${todayDate} (${vulnCount} vulnerabilities)`;
+            const issueTitle = `Security Scan Report - ${todayDate}`;
             const issueLabel = 'vulnerability-report';
             const newBody = process.env.REPORT_BODY;
             

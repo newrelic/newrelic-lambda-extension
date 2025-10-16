@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/newrelic/newrelic-lambda-extension/config"
@@ -49,8 +50,8 @@ func (r runtimeConfig) check(h handlerConfigs) bool {
 		}
 	}
 	functionHandler := r.getTrueHandler(h)
-	p := removePathMethodName(functionHandler)
 	if r.language == Node {
+		p := removePathMethodNameNode(functionHandler)
 		pJS := pathFormatter(p, "js")
 		cJS := pathFormatter(p, "cjs")
 		pMJS := pathFormatter(p, "mjs")
@@ -59,6 +60,7 @@ func (r runtimeConfig) check(h handlerConfigs) bool {
 			return true
 		}
 	} else {
+		p := removePathMethodName(functionHandler)
 		p = pathFormatter(p, r.fileType)
 	}
 	return util.PathExists(p)
@@ -76,6 +78,16 @@ func (r runtimeConfig) getTrueHandler(h handlerConfigs) string {
 func removePathMethodName(p string) string {
 	s := strings.Split(p, ".")
 	return strings.Join(s[:len(s)-1], "/")
+}
+
+func removePathMethodNameNode(p string) string {
+	mh := filepath.Base(p)
+	mr := p[0:strings.Index(p, mh)]
+
+	s := strings.Split(mh, ".")
+	m := s[0]
+
+	return filepath.Join(mr, m)
 }
 
 func pathFormatter(functionHandler string, fileType string) string {

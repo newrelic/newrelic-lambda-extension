@@ -1,0 +1,129 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Transform: AWS::Serverless-2016-10-31
+Description: An example application stack using S3 and Lambda, instrumented with New Relic Distributed Tracing
+
+Parameters:
+  NRAccountId:
+    Type: String
+    Description: Your New Relic account ID; necessary for distributed tracing.
+    AllowedPattern: "[0-9]+"
+  TrustedAccountId:
+    Type: String
+    Description: Your New Relic account ID; necessary for distributed tracing.
+    AllowedPattern: "[0-9]+"
+  BrowserAppId:
+    Type: String
+    Description: Your New Relic Browser Application ID
+  BrowserAgentId:
+    Type: String
+    Description: Your New Relic Browser Agent ID
+  BrowserLicenseKey:
+    Type: String
+    Description: Your New Relic Browser License Key
+  NewRelicLicenseKey:
+    Type: String
+    Description: Your New Relic license key
+
+Globals:
+  Function:
+    Timeout: 30
+
+Resources:
+  # An S3 bucket, which the Python lambda will write to, and the Node lambda will be triggered by
+  DataBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub "newrelic-dt-example-${AWS::AccountId}-${AWS::Region}"
+
+  PythonS3Writer:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: python/rest_handler/
+      Handler: newrelic_lambda_wrapper.handler
+      Runtime: python3.13
+      PackageType: Zip
+      Environment:
+        Variables:
+          NEW_RELIC_LAMBDA_HANDLER: app.lambda_handler
+          NEW_RELIC_COLLECT_TRACE_ID: true
+          NEW_RELIC_ACCOUNT_ID: !Ref NRAccountId
+          NEW_RELIC_TRUSTED_ACCOUNT_KEY: !Ref TrustedAccountId
+          NEW_RELIC_BROWSER_APPLICATION_ID: !Ref BrowserAppId
+          NEW_RELIC_BROWSER_AGENT_ID: !Ref BrowserAgentId
+          NEW_RELIC_BROWSER_KEY: !Ref BrowserLicenseKey
+          NEW_RELIC_LICENSE_KEY: !Ref NewRelicLicenseKey
+          NEW_RELIC_EXTENSION_SEND_FUNCTION_LOGS: true
+          NEW_RELIC_EXTENSION_SEND_EXTENSION_LOGS: true
+          NEW_RELIC_EXTENSION_LOG_LEVEL: DEBUG
+          BUCKET_NAME: !Ref DataBucket
+      Layers:
+        - !Sub arn:${AWS::Partition}:lambda:${AWS::Region}:451483290750:layer:NewRelicPython313:32
+      Policies:
+        - AWSSecretsManagerGetSecretValuePolicy:
+            SecretArn: !ImportValue NewRelicLicenseKeySecret-NewRelic-LicenseKeySecretARN
+        - S3CrudPolicy:
+            BucketName: !Sub "newrelic-dt-example-${AWS::AccountId}-${AWS::Region}"
+      Events:
+        PythonS3Writer:
+          Type: Api
+          Properties:
+            Path: /hello
+            Method: POST
+        PythonS3Page:
+          Type: Api
+          Properties:
+            Path: /hello
+            Method: GET
+
+  PythonLogs:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub "/aws/lambda/${PythonS3Writer}"
+      RetentionInDays: 7
+
+  NodeS3Reader:
+    Type: AWS::Serverless::Function
+    Properties:
+      Description: A Lambda function that processes S3 events.
+      Runtime: nodejs22.x
+      CodeUri: node/
+      Handler: newrelic-lambda-wrapper.handler
+      PackageType: Zip
+      Environment:
+        Variables:
+          NEW_RELIC_LAMBDA_HANDLER: src/handlers/s3-handler.s3Handler
+          NEW_RELIC_COLLECT_TRACE_ID: true
+          NEW_RELIC_ACCOUNT_ID: !Ref NRAccountId
+          NEW_RELIC_TRUSTED_ACCOUNT_KEY: !Ref TrustedAccountId
+          NEW_RELIC_LICENSE_KEY: !Ref NewRelicLicenseKey
+      Events:
+        S3Event:
+          Type: S3
+          Properties:
+            Bucket: !Ref DataBucket
+            Events: s3:ObjectCreated:*
+            Filter:
+              S3Key:
+                Rules:
+                  - Name: prefix
+                    Value: words/
+      MemorySize: 128
+      Timeout: 25
+      Layers:
+        - !Sub arn:${AWS::Partition}:lambda:${AWS::Region}:451483290750:layer:NewRelicNodeJS22X-slim:22
+      Policies:
+        - AWSSecretsManagerGetSecretValuePolicy:
+            SecretArn: !ImportValue NewRelicLicenseKeySecret-NewRelic-LicenseKeySecretARN
+        - S3ReadPolicy:
+            BucketName: !Sub "newrelic-dt-example-${AWS::AccountId}-${AWS::Region}"
+
+  NodeLogs:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub "/aws/lambda/${NodeS3Reader}"
+      RetentionInDays: 7
+
+Outputs:
+  PythonS3WriterApi:
+    Description: "API Gateway endpoint URL for Prod stage for S3 Distributed Tracing example"
+    Value: !Sub "https://${ServerlessRestApi}.execute-api.${AWS::Region}.amazonaws.com/Prod/hello/"

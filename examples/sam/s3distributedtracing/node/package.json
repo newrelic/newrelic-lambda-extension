@@ -1,0 +1,17 @@
+{
+    "name": "replaced-by-user-input",
+    "description": "replaced-by-user-input",
+    "version": "0.0.1",
+    "private": true,
+    "devDependencies": {
+        "jest": "^29.7.0",
+        "uuid": "^8.3.2"
+    },
+    "scripts": {
+        "test": "jest --roots __tests__/unit",
+        "integ-test": "jest --roots __tests__/integration"
+    },
+    "dependencies": {
+        "aws-sdk": "^2.1692.0"
+    }
+}

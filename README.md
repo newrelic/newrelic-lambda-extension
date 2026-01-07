@@ -7,6 +7,10 @@ An AWS Lambda extension to collect, enhance, and transport telemetry data from y
 This lightweight AWS Lambda Extension runs alongside your AWS Lambda functions and automatically handles the collection and transport of telemetry data from
 supported New Relic serverless agents. The extension requires a telemetry payload from a New Relic agent. Conditions that delay or prevent that payload from being written may result in longer-than-expected invocation durations.
 
+## ⚠️ Notice
+
+This extension has been **converted to a Rust extension**. The Rust extension is now **private** and not publicly available in this repository.
+
 ## Installation
 
 To install the extension, simply include the layer with your instrumented

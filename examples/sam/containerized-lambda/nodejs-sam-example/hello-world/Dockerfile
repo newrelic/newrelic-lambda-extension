@@ -11,4 +11,5 @@ COPY app.mjs package*.json ./
 RUN npm install
 
 # CMD override to New Relic's handler wrapper
-CMD [ "newrelic-lambda-wrapper.handler" ]
+# For CJS use this CMD [ "newrelic-lambda-wrapper.handler" ]
+CMD [ "/opt/nodejs/node_modules/newrelic-esm-lambda-wrapper/index.handler" ]

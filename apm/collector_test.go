@@ -76,6 +76,18 @@ func TestPreconnectHost_RegionLicense(t *testing.T) {
 	}
 }
 
+func TestPreconnectHost_RegionLicenseJP(t *testing.T) {
+	conf := &config.Configuration{
+		NewRelicHost: "",
+		LicenseKey:   "jp01xx000000000000000000000000000000NRAL",
+	}
+	got := preconnectHost(conf)
+	want := "collector.jp01.nr-data.net"
+	if got != want {
+		t.Errorf("preconnectHost() = %q, want %q", got, want)
+	}
+}
+
 func TestPreconnectHost_RegionLicense_NoMatch(t *testing.T) {
 	conf := &config.Configuration{
 		NewRelicHost: "",

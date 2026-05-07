@@ -17,6 +17,7 @@ import (
 const (
 	MetricEndpointEU string = "https://metric-api.eu.newrelic.com/metric/v1"
 	MetricEndpointUS string = "https://metric-api.newrelic.com/metric/v1"
+	MetricEndpointJP string = "https://metric-api.jp.newrelic.com/metric/v1"
 )
 
 // Precompile regex patterns at package level for reusability
@@ -191,6 +192,10 @@ func getMetricEndpointURL(licenseKey string, metricEndpointOverride string) stri
 
 	if strings.HasPrefix(licenseKey, "eu") {
 		return MetricEndpointEU
+	}
+
+	if strings.HasPrefix(licenseKey, "jp") {
+		return MetricEndpointJP
 	}
 
 	return MetricEndpointUS

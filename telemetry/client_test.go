@@ -458,12 +458,14 @@ func TestGetInfraEndpointURL(t *testing.T) {
 	assert.Equal(t, "barbaz", getInfraEndpointURL("foobar", "barbaz"))
 	assert.Equal(t, InfraEndpointUS, getInfraEndpointURL("us license key", ""))
 	assert.Equal(t, InfraEndpointEU, getInfraEndpointURL("eu license key", ""))
+	assert.Equal(t, InfraEndpointJP, getInfraEndpointURL("jp license key", ""))
 }
 
 func TestGetLogEndpointURL(t *testing.T) {
 	assert.Equal(t, "barbaz", getLogEndpointURL("foobar", "barbaz"))
 	assert.Equal(t, LogEndpointUS, getLogEndpointURL("us mock license key", ""))
 	assert.Equal(t, LogEndpointEU, getLogEndpointURL("eu mock license key", ""))
+	assert.Equal(t, LogEndpointJP, getLogEndpointURL("jp mock license key", ""))
 }
 
 func TestGetNewRelicTags(t *testing.T) {

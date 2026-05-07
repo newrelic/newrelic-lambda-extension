@@ -310,6 +310,12 @@ func Test_getMetricEndpointURL(t *testing.T) {
 			want:       MetricEndpointUS,
 		},
 		{
+			name:       "JP license key, no override",
+			licenseKey: "jp01xx1234567890abcdef",
+			metricEndpointOverride: "",
+			want:       MetricEndpointJP,
+		},
+		{
 			name:       "Non-EU, non-US license key, no override",
 			licenseKey: "xx01xx1234567890abcdef",
 			metricEndpointOverride: "",

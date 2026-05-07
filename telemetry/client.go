@@ -24,8 +24,10 @@ import (
 const (
 	InfraEndpointEU string = "https://cloud-collector.eu01.nr-data.net/aws/lambda/v1"
 	InfraEndpointUS string = "https://cloud-collector.newrelic.com/aws/lambda/v1"
+	InfraEndpointJP string = "https://cloud-collector.jp.nr-data.net/aws/lambda/v1"
 	LogEndpointEU   string = "https://log-api.eu.newrelic.com/log/v1"
 	LogEndpointUS   string = "https://log-api.newrelic.com/log/v1"
+	LogEndpointJP   string = "https://log-api.jp.newrelic.com/log/v1"
 
 	// WIP (configuration options?)
 	SendTimeoutRetryBase  time.Duration = 200 * time.Millisecond
@@ -90,6 +92,10 @@ func getInfraEndpointURL(licenseKey string, telemetryEndpointOverride string) st
 		return InfraEndpointEU
 	}
 
+	if strings.HasPrefix(licenseKey, "jp") {
+		return InfraEndpointJP
+	}
+
 	return InfraEndpointUS
 }
 
@@ -101,6 +107,10 @@ func getLogEndpointURL(licenseKey string, logEndpointOverride string) string {
 
 	if strings.HasPrefix(licenseKey, "eu") {
 		return LogEndpointEU
+	}
+
+	if strings.HasPrefix(licenseKey, "jp") {
+		return LogEndpointJP
 	}
 
 	return LogEndpointUS

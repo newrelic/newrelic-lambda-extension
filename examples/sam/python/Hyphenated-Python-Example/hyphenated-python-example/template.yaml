@@ -1,0 +1,59 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: >
+  python-testapp
+
+  Sample SAM Template for python-testapp
+
+# More info about Globals: https://github.com/awslabs/serverless-application-model/blob/master/docs/globals.rst
+Globals:
+  Function:
+    Timeout: 10
+
+    Tracing: Active
+    # You can add LoggingConfig parameters such as the Logformat, Log Group, and SystemLogLevel or ApplicationLogLevel. Learn more here https://docs.aws.amazon.com/serverless-application-model/latest/developerguide/sam-resource-function.html#sam-function-loggingconfig.
+    LoggingConfig:
+      LogFormat: JSON
+  Api:
+    TracingEnabled: true
+Resources:
+  HelloWorldFunction:
+    Type: AWS::Serverless::Function # More info about Function Resource: https://github.com/awslabs/serverless-application-model/blob/master/versions/2016-10-31.md#awsserverlessfunction
+    Properties:
+      CodeUri: hello_world/
+      Handler: newrelic_lambda_wrapper.handler
+      Runtime: python3.14
+      Architectures:
+      - x86_64
+      Environment: # More info about Env Vars: https://github.com/awslabs/serverless-application-model/blob/master/versions/2016-10-31.md#environment-object
+        Variables:
+          NEW_RELIC_ACCOUNT_ID: <NewRelic-AccountID>
+
+          NEW_RELIC_EXTENSION_LOG_LEVEL: all
+
+          NEW_RELIC_LAMBDA_HANDLER: app-prod.lambda_handler
+
+          NEW_RELIC_LICENSE_KEY: <NewRelic-LicenseKey>
+
+      
+      Layers:
+        # This layer includes the New Relic Lambda extension, a sidecar process that sends telemetry,
+        # as well as the New Relic agent for Python, and a handler wrapper that makes integration easy.
+        - !Sub <NewRelic-Python-Layer-ARN>
+      
+      Policies:
+        # This policy allows the lambda to know the value of the New Relic license key. We need this so
+        # that we can send telemetry back to New Relic
+        - AWSSecretsManagerGetSecretValuePolicy:
+            SecretArn: !ImportValue NewRelicLicenseKeySecret-NewRelic-LicenseKeySecretARN
+
+      
+
+Outputs:
+ 
+  HelloWorldFunction:
+    Description: Hello World Lambda Function ARN
+    Value: !GetAtt HelloWorldFunction.Arn
+  HelloWorldFunctionIamRole:
+    Description: Implicit IAM Role created for Hello World function
+    Value: !GetAtt HelloWorldFunctionRole.Arn

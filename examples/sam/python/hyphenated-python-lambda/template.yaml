@@ -1,21 +1,15 @@
 AWSTemplateFormatVersion: '2010-09-09'
 Transform: AWS::Serverless-2016-10-31
 Description: >
-  python-testapp
+  hyphenated-python-lambda
 
-  Sample SAM Template for python-testapp
+  Sample SAM Template for hyphenated-python-lambda
 
 # More info about Globals: https://github.com/awslabs/serverless-application-model/blob/master/docs/globals.rst
 Globals:
   Function:
-    Timeout: 10
+    Timeout: 3
 
-    Tracing: Active
-    # You can add LoggingConfig parameters such as the Logformat, Log Group, and SystemLogLevel or ApplicationLogLevel. Learn more here https://docs.aws.amazon.com/serverless-application-model/latest/developerguide/sam-resource-function.html#sam-function-loggingconfig.
-    LoggingConfig:
-      LogFormat: JSON
-  Api:
-    TracingEnabled: true
 Resources:
   HelloWorldFunction:
     Type: AWS::Serverless::Function # More info about Function Resource: https://github.com/awslabs/serverless-application-model/blob/master/versions/2016-10-31.md#awsserverlessfunction
@@ -24,7 +18,7 @@ Resources:
       Handler: newrelic_lambda_wrapper.handler
       Runtime: python3.14
       Architectures:
-      - x86_64
+        - x86_64
       Environment: # More info about Env Vars: https://github.com/awslabs/serverless-application-model/blob/master/versions/2016-10-31.md#environment-object
         Variables:
           NEW_RELIC_ACCOUNT_ID: <NewRelic-AccountID>
@@ -47,13 +41,13 @@ Resources:
         - AWSSecretsManagerGetSecretValuePolicy:
             SecretArn: !ImportValue NewRelicLicenseKeySecret-NewRelic-LicenseKeySecretARN
 
-      
-
 Outputs:
- 
+  # ServerlessRestApi is an implicit API created out of Events key under Serverless::Function
+  # Find out more about other implicit resources you can reference within SAM
+  # https://github.com/awslabs/serverless-application-model/blob/master/docs/internals/generated_resources.rst#api
   HelloWorldFunction:
-    Description: Hello World Lambda Function ARN
+    Description: "Hello World Lambda Function ARN"
     Value: !GetAtt HelloWorldFunction.Arn
   HelloWorldFunctionIamRole:
-    Description: Implicit IAM Role created for Hello World function
+    Description: "Implicit IAM Role created for Hello World function"
     Value: !GetAtt HelloWorldFunctionRole.Arn

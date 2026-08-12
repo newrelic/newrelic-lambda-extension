@@ -6,6 +6,8 @@ on:
   pull_request:
   push:
 
+permissions:
+  contents: read
 
 env:
   TEST_RESULTS: /tmp/test-results

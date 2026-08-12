@@ -4,7 +4,10 @@ on:
   workflow_dispatch:
   push:
     branches:
-      - main 
+      - main
+
+permissions:
+  contents: read
 
 jobs:
   publish-layers:

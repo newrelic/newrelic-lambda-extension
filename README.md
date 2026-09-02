@@ -1,5 +1,13 @@
 [![Community Plus header](https://github.com/newrelic/opensource-website/raw/main/src/images/categories/Community_Plus.png)](https://opensource.newrelic.com/oss-category/#community-plus)
 
+# 🚨 THIS REPOSITORY IS ARCHIVED 🚨
+
+# ➡️ The current codebase now lives at [github.com/newrelic/newrelic-lambda-extension-rust](https://github.com/newrelic/newrelic-lambda-extension-rust) ⬅️
+
+## **This project has been rewritten in Rust and is no longer maintained here. Please go to [newrelic/newrelic-lambda-extension-rust](https://github.com/newrelic/newrelic-lambda-extension-rust) for the current, actively maintained extension.**
+
+---
+
 # newrelic-lambda-extension [![Build Status](https://github.com/newrelic/newrelic-lambda-extension/actions/workflows/build-release-assets.yml/badge.svg)](https://github.com/newrelic/newrelic-lambda-extension/actions/workflows/build-release-assets.yml) [![Coverage](https://codecov.io/gh/newrelic/newrelic-lambda-extension/branch/main/graph/badge.svg?token=T73UEDVA5K)](https://codecov.io/gh/newrelic/newrelic-lambda-extension)
 
 An AWS Lambda extension to collect, enhance, and transport telemetry data from your AWS Lambda functions to New Relic without requiring an external transport such as CloudWatch Logs or Kinesis.
@@ -9,7 +17,7 @@ supported New Relic serverless agents. The extension requires a telemetry payloa
 
 ## ⚠️ Notice
 
-This extension has been **converted to a Rust extension**. The Rust extension is now **private** and not publicly available in this repository.
+This extension has been **converted to a Rust extension**. Development now happens at **[newrelic/newrelic-lambda-extension-rust](https://github.com/newrelic/newrelic-lambda-extension-rust)**.
 
 ## Installation
 
